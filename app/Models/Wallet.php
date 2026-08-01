@@ -15,6 +15,7 @@ class Wallet extends Model
         'user_id',
         'cash_balance',
         'subsidy_credits',
+        'earned_balance',
         'cash_collected_log',
         'version',
     ];
@@ -27,6 +28,7 @@ class Wallet extends Model
     protected $attributes = [
         'cash_balance' => 0,
         'subsidy_credits' => 0,
+        'earned_balance' => 0,
         'cash_collected_log' => 0,
         'version' => 1,
     ];
@@ -36,6 +38,7 @@ class Wallet extends Model
         return [
             'cash_balance' => 'decimal:2',
             'subsidy_credits' => 'decimal:2',
+            'earned_balance' => 'decimal:2',
             'cash_collected_log' => 'decimal:2',
             'version' => 'integer',
         ];
@@ -49,5 +52,10 @@ class Wallet extends Model
     public function transactions(): HasMany
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    public function payouts(): HasMany
+    {
+        return $this->hasMany(Payout::class);
     }
 }

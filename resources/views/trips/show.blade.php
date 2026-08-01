@@ -172,6 +172,9 @@
                                 <option value="wallet">Wallet (₦{{ number_format((float) $user->wallet?->cash_balance ?? 0, 2) }})</option>
                                 <option value="subsidy_credit">Subsidy credits (₦{{ number_format((float) $user->wallet?->subsidy_credits ?? 0, 2) }})</option>
                                 <option value="cash">Cash to driver</option>
+                                @if (config('workride.time_bank.enabled') && $user->verification_level->value >= \App\Enums\VerificationLevel::NinVerified->value)
+                                    <option value="ride_credit">Ride credit — repay by driving</option>
+                                @endif
                             </select>
                         </div>
                         <button type="submit" class="w-full rounded-xl bg-forest-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-forest-700">

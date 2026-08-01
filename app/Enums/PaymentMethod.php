@@ -9,6 +9,7 @@ enum PaymentMethod: string
     case SubsidyCredit = 'subsidy_credit';
     case Paystack = 'paystack';
     case Free = 'free';
+    case RideCredit = 'ride_credit';
 
     public function label(): string
     {
@@ -18,6 +19,7 @@ enum PaymentMethod: string
             self::SubsidyCredit => 'Subsidy Credit',
             self::Paystack => 'Paystack',
             self::Free => 'Free (Volunteer)',
+            self::RideCredit => 'Ride Credit',
         };
     }
 }

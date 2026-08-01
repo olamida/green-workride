@@ -11,6 +11,11 @@ enum TransactionType: string
     case Hold = 'hold';
     case Capture = 'capture';
     case TopUp = 'top_up';
+    case Earned = 'earned';
+    case P2pDebit = 'p2p_debit';
+    case P2pCredit = 'p2p_credit';
+    case Fee = 'fee';
+    case Payout = 'payout';
 
     public function label(): string
     {
@@ -22,6 +27,11 @@ enum TransactionType: string
             self::Hold => 'Hold',
             self::Capture => 'Capture',
             self::TopUp => 'Wallet Top-up',
+            self::Earned => 'Earnings',
+            self::P2pDebit => 'Transfer Sent',
+            self::P2pCredit => 'Transfer Received',
+            self::Fee => 'Platform Fee',
+            self::Payout => 'Withdrawal',
         };
     }
 }

@@ -23,6 +23,7 @@ class TripService
         private PricingService $pricing,
         private GeofenceService $geofence,
         private BookingService $bookings,
+        private RideCreditService $rideCredits,
     ) {}
 
     public function publish(User $driver, array $data): Trip
@@ -121,6 +122,9 @@ class TripService
             if (in_array($booking->status->value, ['confirmed', 'boarded'], true)) {
                 $this->bookings->settle($booking);
                 $booking->update(['status' => BookingStatus::Completed]);
+                // Time-Bank: every passenger carried repays one seat of the
+                // driver's oldest open ride credit ("Ride Now, Drive Later").
+                $this->rideCredits->repayWithDrive($driver, $booking);
             }
         }
 

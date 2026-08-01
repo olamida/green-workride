@@ -20,6 +20,9 @@ return [
 
     'commission_rate' => env('WORKRIDE_COMMISSION_RATE', 0.10),
 
+    // Union cooperative fee (NURTW/RTEAN) on paid rides — 5% per guide §10.
+    'union_fee_rate' => env('WORKRIDE_UNION_FEE_RATE', 0.05),
+
     'insurance_per_trip' => env('WORKRIDE_INSURANCE_PER_TRIP', 100),
 
     'geofence_radius_m' => env('WORKRIDE_GEOFENCE_RADIUS_M', 500),
@@ -126,5 +129,34 @@ return [
         'iri_alpha' => env('WORKRIDE_IRI_ALPHA', 2.0),
         'iri_beta' => env('WORKRIDE_IRI_BETA', 1.5),
         'max_speed_kmh' => env('WORKRIDE_ROAD_MAX_SPEED_KMH', 200),
+    ],
+
+    // Time-Bank: "Ride Now, Drive Later" community reciprocity engine (Sprint 3.5).
+    // A rider who cannot pay cash owes seats instead; they repay by driving and
+    // carrying passengers. Feature-gated so it can be piloted per-MDA.
+    'time_bank' => [
+        'enabled' => (bool) env('FEATURE_TIME_BANK', false),
+        // Average corridor fare used to convert naira owed into seats owed.
+        'avg_fare_per_seat' => env('WORKRIDE_AVG_FARE_PER_SEAT', 600),
+        // Days after the ride before the owed seats fall overdue.
+        'due_days' => env('WORKRIDE_RIDE_CREDIT_DUE_DAYS', 7),
+        // Max seats a user may owe at once (blocks piling up debt).
+        'max_owed_seats' => env('WORKRIDE_MAX_OWED_SEATS', 3),
+    ],
+
+    // P2P wallet transfer between verified colleagues (like PalmPay).
+    'p2p' => [
+        'daily_limit' => env('WORKRIDE_P2P_DAILY_LIMIT', 10000),
+        // Sender must be NIN-verified (Level 2+) for amounts above this.
+        'sender_level_threshold_amount' => env('WORKRIDE_P2P_SENDER_LEVEL_THRESHOLD_AMOUNT', 5000),
+        // Cash transfers carry a 1% platform fee, minimum ₦10. Earned is free.
+        'fee_cash_rate' => env('WORKRIDE_P2P_FEE_CASH_RATE', 0.01),
+        'fee_cash_min' => env('WORKRIDE_P2P_FEE_CASH_MIN', 10),
+    ],
+
+    // Driver earnings withdrawal (Moniepoint — mocked while unconfigured).
+    'payout' => [
+        'min_amount' => env('WORKRIDE_PAYOUT_MIN_AMOUNT', 100),
+        'max_amount' => env('WORKRIDE_PAYOUT_MAX_AMOUNT', 100000),
     ],
 ];

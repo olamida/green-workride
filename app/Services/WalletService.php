@@ -11,11 +11,12 @@ use App\Models\Wallet;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Dual-balance wallet: cash_balance + subsidy_credits.
+ * Triple-balance wallet: cash_balance + earned_balance + subsidy_credits.
  *
- * Subsidy credits are always spent first. Optimistic locking on the `version`
- * column prevents double-spend races. Every mutation writes an idempotent
- * transaction row keyed by a unique reference.
+ * Spend priority for rides is 1) subsidy credits 2) earned balance 3) cash.
+ * Optimistic locking on the `version` column prevents double-spend races.
+ * Every mutation writes an idempotent transaction row keyed by a unique
+ * reference.
  */
 class WalletService
 {
@@ -26,16 +27,25 @@ class WalletService
 
     public function creditCash(User $user, float $amount, string $reference, ?string $description = null, array $meta = []): void
     {
-        $this->credit($user, $amount, $reference, $description, $meta, TransactionType::Credit);
+        $this->credit($user, $amount, $reference, $description, $meta, TransactionType::Credit, 'cash_balance');
     }
 
     public function creditSubsidy(User $user, float $amount, string $reference, ?string $description = null, array $meta = []): void
     {
-        $this->credit($user, $amount, $reference, $description, $meta, TransactionType::Subsidy);
+        $this->credit($user, $amount, $reference, $description, $meta, TransactionType::Subsidy, 'subsidy_credits');
     }
 
     /**
-     * Hold the seat fare from the passenger's wallet (subsidy first).
+     * Credit driver earnings (fare - commission - union fee - insurance).
+     * Idempotent keyed on the booking reference.
+     */
+    public function creditEarned(User $user, float $amount, string $reference, ?string $description = null, array $meta = []): void
+    {
+        $this->credit($user, $amount, $reference, $description, $meta, TransactionType::Earned, 'earned_balance');
+    }
+
+    /**
+     * Hold the seat fare from the passenger's wallet (subsidy → earned → cash).
      * The amount is debited from the spendable balances and recorded as a hold.
      */
     public function holdForBooking(Booking $booking): void
@@ -48,22 +58,23 @@ class WalletService
         }
 
         $subsidy = round(min((float) $wallet->subsidy_credits, $amount), 2);
-        $cash = round($amount - $subsidy, 2);
+        $earned = round(min((float) $wallet->earned_balance, $amount - $subsidy), 2);
+        $cash = round($amount - $subsidy - $earned, 2);
 
-        if (round($subsidy + (float) $wallet->cash_balance, 2) < $amount) {
+        if (round($subsidy + (float) $wallet->earned_balance + (float) $wallet->cash_balance, 2) < $amount) {
             throw ValidationException::withMessages([
                 'payment_method' => 'Insufficient wallet balance. Please top up or pay with cash.',
             ]);
         }
 
-        $this->debit($wallet, $subsidy, $cash);
+        $this->debit($wallet, $subsidy, $earned, $cash);
 
         $wallet->transactions()->create([
             'type' => TransactionType::Hold,
             'amount' => $amount,
             'reference' => $this->holdReference($booking),
             'description' => "Seat hold — Trip #{$booking->trip_id}",
-            'meta' => ['booking_id' => $booking->id, 'trip_id' => $booking->trip_id, 'subsidy' => $subsidy, 'cash' => $cash],
+            'meta' => ['booking_id' => $booking->id, 'trip_id' => $booking->trip_id, 'subsidy' => $subsidy, 'earned' => $earned, 'cash' => $cash],
         ]);
 
         $wallet->refresh();
@@ -131,9 +142,17 @@ class WalletService
 
     /**
      * Record cash collected by the driver on the driver's wallet ledger.
+     * Idempotent per booking so a double settle (board + trip complete) can
+     * never double-count the collection.
      */
     public function logCashCollection(Booking $booking): void
     {
+        $reference = "BOOK-{$booking->id}-CASH";
+
+        if (Transaction::where('reference', $reference)->exists()) {
+            return;
+        }
+
         $wallet = $this->walletFor($booking->trip->driver);
         $amount = round((float) $booking->fare_paid, 2);
 
@@ -158,9 +177,84 @@ class WalletService
         $wallet->transactions()->create([
             'type' => TransactionType::Capture,
             'amount' => $amount,
-            'reference' => "BOOK-{$booking->id}-CASH",
+            'reference' => $reference,
             'description' => "Cash collected — Trip #{$booking->trip_id}",
             'meta' => ['booking_id' => $booking->id, 'trip_id' => $booking->trip_id, 'payment_method' => PaymentMethod::Cash->value],
+        ]);
+    }
+
+    /**
+     * Version-checked debit of cash + earned balances with a transaction row.
+     * Used by P2P transfers (and withdrawals) where the wallet row is already
+     * locked FOR UPDATE by the caller.
+     */
+    public function debitForTransfer(Wallet $wallet, float $cash, float $earned, string $reference, TransactionType $type, ?string $description = null, array $meta = []): void
+    {
+        $cash = round($cash, 2);
+        $earned = round($earned, 2);
+
+        if ($cash <= 0 && $earned <= 0) {
+            return;
+        }
+
+        $updated = $wallet->newQuery()
+            ->whereKey($wallet->id)
+            ->where('version', $wallet->version)
+            ->update([
+                'cash_balance' => round((float) $wallet->cash_balance - $cash, 2),
+                'earned_balance' => round((float) $wallet->earned_balance - $earned, 2),
+                'version' => $wallet->version + 1,
+            ]);
+
+        if (! $updated) {
+            throw ValidationException::withMessages(['wallet' => 'Wallet changed concurrently. Please retry.']);
+        }
+
+        $wallet->refresh();
+
+        $wallet->transactions()->create([
+            'type' => $type,
+            'amount' => round($cash + $earned, 2),
+            'reference' => $reference,
+            'description' => $description,
+            'meta' => $meta,
+        ]);
+    }
+
+    /**
+     * Version-checked credit to cash + earned balances with a transaction row.
+     * Used by P2P transfers where the receiver wallet is already locked.
+     */
+    public function creditForTransfer(Wallet $wallet, float $cash, float $earned, string $reference, TransactionType $type, ?string $description = null, array $meta = []): void
+    {
+        $cash = round($cash, 2);
+        $earned = round($earned, 2);
+
+        if ($cash <= 0 && $earned <= 0) {
+            return;
+        }
+
+        $updated = $wallet->newQuery()
+            ->whereKey($wallet->id)
+            ->where('version', $wallet->version)
+            ->update([
+                'cash_balance' => round((float) $wallet->cash_balance + $cash, 2),
+                'earned_balance' => round((float) $wallet->earned_balance + $earned, 2),
+                'version' => $wallet->version + 1,
+            ]);
+
+        if (! $updated) {
+            throw ValidationException::withMessages(['wallet' => 'Wallet changed concurrently. Please retry.']);
+        }
+
+        $wallet->refresh();
+
+        $wallet->transactions()->create([
+            'type' => $type,
+            'amount' => round($cash + $earned, 2),
+            'reference' => $reference,
+            'description' => $description,
+            'meta' => $meta,
         ]);
     }
 
@@ -169,7 +263,7 @@ class WalletService
         return Transaction::where('reference', $this->holdReference($booking))->first();
     }
 
-    private function credit(User $user, float $amount, string $reference, ?string $description, array $meta, TransactionType $type): void
+    private function credit(User $user, float $amount, string $reference, ?string $description, array $meta, TransactionType $type, string $column): void
     {
         $amount = round($amount, 2);
 
@@ -179,18 +273,13 @@ class WalletService
 
         $wallet = $this->walletFor($user);
 
-        $fields = ['version' => $wallet->version + 1];
-
-        if ($type === TransactionType::Subsidy) {
-            $fields['subsidy_credits'] = round((float) $wallet->subsidy_credits + $amount, 2);
-        } else {
-            $fields['cash_balance'] = round((float) $wallet->cash_balance + $amount, 2);
-        }
-
         $updated = $wallet->newQuery()
             ->whereKey($wallet->id)
             ->where('version', $wallet->version)
-            ->update($fields);
+            ->update([
+                $column => round((float) $wallet->{$column} + $amount, 2),
+                'version' => $wallet->version + 1,
+            ]);
 
         if (! $updated) {
             throw ValidationException::withMessages(['wallet' => 'Wallet changed concurrently. Please retry.']);
@@ -207,13 +296,14 @@ class WalletService
         ]);
     }
 
-    private function debit(Wallet $wallet, float $subsidy, float $cash): void
+    private function debit(Wallet $wallet, float $subsidy, float $earned, float $cash): void
     {
         $updated = $wallet->newQuery()
             ->whereKey($wallet->id)
             ->where('version', $wallet->version)
             ->update([
                 'cash_balance' => round((float) $wallet->cash_balance - $cash, 2),
+                'earned_balance' => round((float) $wallet->earned_balance - $earned, 2),
                 'subsidy_credits' => round((float) $wallet->subsidy_credits - $subsidy, 2),
                 'version' => $wallet->version + 1,
             ]);
@@ -233,17 +323,20 @@ class WalletService
 
         $meta = $transaction->meta ?? [];
         $subsidyPart = round((float) ($meta['subsidy'] ?? 0), 2);
+        $earnedPart = round((float) ($meta['earned'] ?? 0), 2);
         $cashPart = round((float) ($meta['cash'] ?? 0), 2);
-        $original = round((float) ($meta['subsidy'] ?? 0) + (float) ($meta['cash'] ?? 0), 2) ?: round((float) $transaction->amount, 2);
+        $original = round($subsidyPart + $earnedPart + $cashPart, 2) ?: round((float) $transaction->amount, 2);
 
         $subsidyRefund = $original > 0 ? round(min($subsidyPart, $amount * ($subsidyPart / $original)), 2) : 0;
-        $cashRefund = round($amount - $subsidyRefund, 2);
+        $earnedRefund = $original > 0 ? round(min($earnedPart, $amount * ($earnedPart / $original)), 2) : 0;
+        $cashRefund = round($amount - $subsidyRefund - $earnedRefund, 2);
 
         $updated = $wallet->newQuery()
             ->whereKey($wallet->id)
             ->where('version', $wallet->version)
             ->update([
                 'cash_balance' => round((float) $wallet->cash_balance + $cashRefund, 2),
+                'earned_balance' => round((float) $wallet->earned_balance + $earnedRefund, 2),
                 'subsidy_credits' => round((float) $wallet->subsidy_credits + $subsidyRefund, 2),
                 'version' => $wallet->version + 1,
             ]);

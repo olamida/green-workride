@@ -30,6 +30,7 @@ class User extends Authenticatable
         'nin_hash',
         'nin_last4',
         'is_banned',
+        'has_overdue_ride_credit',
     ];
 
     protected $hidden = [
@@ -46,6 +47,7 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'verification_level' => VerificationLevel::class,
             'is_banned' => 'boolean',
+            'has_overdue_ride_credit' => 'boolean',
         ];
     }
 
@@ -87,6 +89,16 @@ class User extends Authenticatable
     public function roadEvents(): HasMany
     {
         return $this->hasMany(RoadEvent::class);
+    }
+
+    public function rideCredits(): HasMany
+    {
+        return $this->hasMany(RideCredit::class);
+    }
+
+    public function receivedTransfers(): HasMany
+    {
+        return $this->hasMany(P2pTransfer::class, 'receiver_user_id');
     }
 
     public function activityLogs(): HasMany

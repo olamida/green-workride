@@ -24,10 +24,15 @@ class PricingService
         return round($fare * (float) config('workride.commission_rate'), 2);
     }
 
+    public function unionFee(float $fare): float
+    {
+        return round($fare * (float) config('workride.union_fee_rate'), 2);
+    }
+
     public function driverEarning(float $fare): float
     {
         $insurance = (float) config('workride.insurance_per_trip');
 
-        return max(0.0, round($fare - $this->commission($fare) - $insurance, 2));
+        return max(0.0, round($fare - $this->commission($fare) - $this->unionFee($fare) - $insurance, 2));
     }
 }

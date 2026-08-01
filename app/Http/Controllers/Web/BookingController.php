@@ -31,7 +31,7 @@ class BookingController extends Controller
         abort_unless($request->user()->canBook(), 403, 'Workplace verification (Level 1) is required to book rides.');
 
         $data = $request->validate([
-            'payment_method' => ['required', Rule::in(['wallet', 'cash', 'subsidy_credit'])],
+            'payment_method' => ['required', Rule::in(['wallet', 'cash', 'subsidy_credit', 'ride_credit'])],
             'pickup_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'pickup_lng' => ['nullable', 'numeric', 'between:-180,180'],
         ]);

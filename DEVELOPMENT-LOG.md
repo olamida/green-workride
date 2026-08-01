@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 6 Complete)
+## 2. Current Status (Phase: Foundation / Sprint 6 Complete + Sprint 3.5 Time-Bank)
 
 | Area | Status |
 |------|--------|
@@ -34,7 +34,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 4 complete — GTFS Publisher (static feed + GTFS-RT) |
 | Feature modules | ✅ Sprint 5 complete — Road Sensor + Road Intelligence (IRI, pothole clustering, FERMA export) + Routing API cost caps |
 | Feature modules | ✅ Sprint 6 complete — PWA award UI + Impact certificates (CO₂/Fuel, QR-verifiable) + Impact analytics + demo users |
-| Tests | ✅ 159 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA) |
+| Feature modules | ✅ Sprint 3.5 complete — Time-Bank (ride credits) + Earned wallet + P2P transfers + Payouts (feature-gated `FEATURE_TIME_BANK`) |
+| Tests | ✅ 184 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer) |
 
 ---
 
@@ -278,6 +279,39 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (25 new — 159 total, 476 assertions):** `Co2ServiceTest` (solo = 0, 2-occupant formula, trees factor, fuel litres, forRide snapshot, haversine distance), `CalculateImpactJobTest` (driver + riders credited, each boarded passenger, solo no-op, cancelled excluded, missing trip no-op), `ImpactPageTest` (auth redirect, personal stats render, workplace leaderboard, cert auth + CO₂/Fuel render with QR, invalid type 404, public verify confirms/empty), `PwaControllerTest` (manifest JSON + icons, service worker JS, icons on disk), `DemoUserSeederTest` (3 users with expected levels/plate/subsidy/impact).
 
+### 4.13 Sprint 3.5 — Time-Bank (Ride Credits) + Earned Wallet + P2P Transfers + Payouts (COMPLETE)
+
+**Schema (5 migrations):**
+- `add_earned_balance_to_wallets_table` — `earned_balance` decimal(15,2) default 0 after `subsidy_credits`.
+- `add_overdue_flag_to_users_table` — `has_overdue_ride_credit` boolean default false.
+- `create_ride_credits_table` — `user_id`, `trip_id`/`booking_id` (nullable FKs), `seats_owed`, `seats_repaid`, `fare_value`, `due_date`, `status` (owed/repaid/overdue/waived), indexed `[user_id, status]`.
+- `create_p2p_transfers_table` — `sender_wallet_id`, `receiver_user_id`, `amount`, `fee`, `type`, `reference` (unique), `status`, `meta`.
+- `create_payouts_table` — `wallet_id`, `amount`, `bank_code`, `account_number`, `status`, `reference` (unique), `meta`.
+
+**Enums (4 new + 2 extended):** `RideCreditStatus`, `P2pTransferType`, `P2pTransferStatus`, `PayoutStatus`; `PaymentMethod::RideCredit`, `TransactionType` cases `Earned`, `P2pDebit`, `P2pCredit`, `Fee`, `Payout`.
+
+**Models:** `RideCredit` (enum casts + `outstandingSeats()`/`isSettled()`), `P2pTransfer` (`senderWallet`/`receiver` relations), `Payout`; `Wallet` gains `earned_balance` (fillable/attributes/casts) + `payouts()`; `User` gains `has_overdue_ride_credit` cast + `rideCredits()`/`receivedTransfers()`.
+
+**Services:**
+- `WalletService` (rewritten) — triple-balance: `creditEarned()`, `holdForBooking()` (subsidy → earned → cash priority), proportional `restore()` on refunds (uses hold `meta` breakdown), idempotent `logCashCollection()` (`BOOK-{id}-CASH`), version-checked `debitForTransfer()`/`creditForTransfer()` (P2P + payouts, caller holds `FOR UPDATE`).
+- `RideCreditService` — `seatsFor()` = `ceil(fare / avg_fare_per_seat)` (600), `assertEligible()` (L2+ NIN, registered vehicle, no overdue credit, ≤ `max_owed_seats` 3 at once), `createOwedRide()`, `repayWithDrive()` (oldest open credit, 1 seat per passenger carried on trip completion), `cancelRideCredit()` (waive on cancel/no-show), `hasOverdueCredit()` + `flagOverdue()`.
+- `P2pTransferService` — `transfer()` inside a DB transaction with `SELECT ... FOR UPDATE` on both wallets; 1% cash fee (min ₦10) vs free earned; daily limit ₦10k; L2+ sender above ₦5k; receiver must be L1+; subsidy NEVER transferable; idempotent `P2P-{sender}-{ts}-{rand}` refs with `-DEBIT`/`-CREDIT`/`-FEE` transactions + `P2pTransferCompleted` event.
+- `PayoutService` — `withdraw()` debits earned-first then cash (never subsidy), min ₦100 / max ₦100k, mock Moniepoint payout ledger (`PO-{user}-{rand}`, settles to completed).
+- `PricingService::driverEarning()` now subtracts commission (10%) + `unionFee` (5%) + insurance (₦100).
+
+**Booking/Trip wiring:** `BookingService::book()` accepts `payment_method=ride_credit` (fare_paid 0, no hold, `createOwedRide`), cancel/no-show waives the credit, `settle()` credits `EARN-{bookingId}` when Time-Bank is on; `TripService::completeTrip()` calls `settle()` + `repayWithDrive()` per carried passenger.
+
+**API (`/api/v1`):** `POST /wallet/transfer`, `GET /wallet/transfers`, `POST /wallet/withdraw`, `GET /ride-credits`; wallet index now returns `earned_balance`.
+
+**Web:** Wallet page now shows 3 balance cards, quick top-up, "Send money" (cash/earned), "Withdraw to bank", a Ride Credits (Time-Bank) panel, and transfers/payouts history; `trips/show` booking select gains `ride_credit` when the feature is enabled for L2+ users.
+
+**Config:** `workride.time_bank.*` (enabled/avg_fare_per_seat/due_days/max_owed_seats), `workride.p2p.*` (daily_limit/sender_level_threshold_amount/fee_cash_rate/fee_cash_min), `workride.payout.*` (min/max amount), `workride.union_fee_rate`; all mirrored in `.env.example` (`FEATURE_TIME_BANK` gates the whole feature).
+
+**Bugs fixed (found during Sprint 3.5 hardening):**
+- `assertEligible()` relied on the persisted `has_overdue_ride_credit` flag, which `flagOverdue()` set *inside* the booking DB transaction — when the booking then threw, the whole transaction (flag + status) rolled back, so the flag never survived a rejected request. Now the overdue gate reads the committed `ride_credits` rows directly (`hasOverdueCredit()`), with the user flag updated as a best-effort cache.
+
+**Tests (25 new — 184 total, 561 assertions):** `RideCreditTest` (disabled gate, NIN required, vehicle required, owed-seats booking with no hold, max-owed-seats cap, cancel waives, overdue blocks, trip completion repays a seat, API index), `EarnedWalletTest` (earning = fare − commission − union − insurance on capture, idempotent double-settle, disabled no-op, payout earned-first then cash, subsidy never withdrawable, min amount, API earned balance + withdraw validation), `P2pTransferTest` (disabled gate, cash fee, earned free, receiver L1+, sender L2+ over threshold, daily limit, subsidy never transferable, history).
+
 ---
 
 ## 5. Issues Resolved
@@ -437,6 +471,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 4 (Wk 5) | GTFS Publisher → submit to Google | ✅ Complete |
 | Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ✅ Complete |
 | Sprint 6 (Wk 7) | PWA award UI + impact certificates | ✅ Complete |
+| Sprint 3.5 | Time-Bank (ride credits) + earned wallet + P2P transfers + payouts | ✅ Complete (feature-gated `FEATURE_TIME_BANK`) |
 | Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ⏳ Next |
 
 ### Immediate next steps
@@ -460,6 +495,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.4.0` | Sprint 4 — GTFS Publisher | Static feed zip (7 files) + GTFS-RT (protobuf) + nightly job + on-publish regen + admin dashboard | 108 (339) | 2026-08-01 |
 | `v0.5.0` | Sprint 5 — Road Sensor + Intelligence + Routing | useRoadSensor.js + POST /api/v1/road-events + IRI clustering + FERMA export + RoutingService cost caps + docker-compose | 134 (409) | 2026-08-01 |
 | `v0.6.0` | Sprint 6 — PWA + Impact | Web App Manifest + service worker + icons + /impact analytics + QR-verifiable CO₂/Fuel certificates + CalculateImpactJob + demo users | 159 (476) | 2026-08-01 |
+| `v0.6.5` | Sprint 3.5 — Time-Bank + Earned + P2P + Payouts | Ride credits (seats owed/repaid) + triple-balance wallet (subsidy→earned→cash hold priority) + driver earnings (fare − commission − union − insurance) + P2P transfers (1% cash fee, earned free) + Moniepoint-mocked payouts — gated on `FEATURE_TIME_BANK` | 184 (561) | 2026-08-01 |
 
 ---
 

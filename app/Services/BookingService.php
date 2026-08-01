@@ -23,7 +23,11 @@ use Illuminate\Validation\ValidationException;
  */
 class BookingService
 {
-    public function __construct(private WalletService $wallet) {}
+    public function __construct(
+        private WalletService $wallet,
+        private PricingService $pricing,
+        private RideCreditService $rideCredits,
+    ) {}
 
     public function book(Trip $trip, User $passenger, array $data): Booking
     {
@@ -58,12 +62,16 @@ class BookingService
                     'pickup_lat' => $data['pickup_lat'] ?? null,
                     'pickup_lng' => $data['pickup_lng'] ?? null,
                     'status' => BookingStatus::Confirmed,
-                    'fare_paid' => $trip->fare_per_seat,
+                    'fare_paid' => $paymentMethod === PaymentMethod::RideCredit ? 0 : $trip->fare_per_seat,
                     'payment_method' => $paymentMethod,
                 ]);
 
                 if ($this->needsHold($trip, $paymentMethod)) {
                     $this->wallet->holdForBooking($booking);
+                }
+
+                if ($paymentMethod === PaymentMethod::RideCredit) {
+                    $this->rideCredits->createOwedRide($passenger, $trip, $booking);
                 }
 
                 $trip->decrement('available_seats');
@@ -101,6 +109,10 @@ class BookingService
 
             if ($this->needsHold($booking->trip, $booking->payment_method)) {
                 $this->wallet->releaseHold($booking);
+            }
+
+            if ($booking->payment_method === PaymentMethod::RideCredit) {
+                $this->rideCredits->cancelRideCredit($booking);
             }
 
             $booking->trip->increment('available_seats');
@@ -146,6 +158,10 @@ class BookingService
                 $this->wallet->captureForBooking($booking, round((float) $booking->fare_paid * $capturePercent / 100, 2));
             }
 
+            if ($booking->payment_method === PaymentMethod::RideCredit) {
+                $this->rideCredits->cancelRideCredit($booking);
+            }
+
             $booking->trip->increment('available_seats');
 
             return $booking->fresh();
@@ -155,6 +171,8 @@ class BookingService
     /**
      * Capture the held fare (or log cash collection) once the service is
      * delivered. Used by board() and by TripService::completeTrip().
+     * When the Time-Bank feature is on, the driver's earning (fare minus
+     * commission, union fee and insurance) is credited to their earned wallet.
      */
     public function settle(Booking $booking): void
     {
@@ -168,7 +186,33 @@ class BookingService
 
         if (in_array($method, [PaymentMethod::Wallet, PaymentMethod::SubsidyCredit], true)) {
             $this->wallet->captureForBooking($booking);
+
+            if (config('workride.time_bank.enabled')) {
+                $this->creditDriverEarning($booking);
+            }
         }
+    }
+
+    /**
+     * Credit the driver's earned balance for a paid digital ride. Idempotent
+     * keyed on `EARN-{bookingId}` so a double settle never double-pays.
+     */
+    private function creditDriverEarning(Booking $booking): void
+    {
+        $fare = (float) $booking->fare_paid;
+        $earning = $this->pricing->driverEarning($fare);
+
+        if ($earning <= 0) {
+            return;
+        }
+
+        $this->wallet->creditEarned(
+            $booking->trip->driver,
+            $earning,
+            "EARN-{$booking->id}",
+            "Trip earnings — Trip #{$booking->trip_id}",
+            ['booking_id' => $booking->id, 'trip_id' => $booking->trip_id, 'fare' => $fare],
+        );
     }
 
     private function resolvePaymentMethod(Trip $trip, array $data): PaymentMethod
@@ -180,6 +224,7 @@ class BookingService
         return match ($data['payment_method'] ?? 'wallet') {
             'cash' => PaymentMethod::Cash,
             'subsidy_credit' => PaymentMethod::SubsidyCredit,
+            'ride_credit' => PaymentMethod::RideCredit,
             default => PaymentMethod::Wallet,
         };
     }
@@ -187,6 +232,10 @@ class BookingService
     private function needsHold(Trip $trip, PaymentMethod $method): bool
     {
         if ($trip->is_free_volunteer) {
+            return false;
+        }
+
+        if ($method === PaymentMethod::RideCredit) {
             return false;
         }
 

@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
+use App\Http\Controllers\Api\V1\P2pTransferController;
+use App\Http\Controllers\Api\V1\RideCreditController;
 use App\Http\Controllers\Api\V1\RoadSensorController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\VerificationController;
@@ -22,6 +24,12 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/wallet', [WalletController::class, 'index']);
         Route::post('/wallet/topup', [WalletController::class, 'topUp']);
+        Route::post('/wallet/withdraw', [WalletController::class, 'withdraw']);
+
+        Route::post('/wallet/transfer', [P2pTransferController::class, 'store']);
+        Route::get('/wallet/transfers', [P2pTransferController::class, 'index']);
+
+        Route::get('/ride-credits', [RideCreditController::class, 'index']);
 
         Route::get('/verifications', [VerificationController::class, 'index']);
         Route::post('/verifications/workplace', [VerificationController::class, 'submitWorkplace']);

@@ -65,6 +65,8 @@ Route::middleware('auth')->group(function () {
     Route::prefix('wallet')->name('wallet.')->group(function () {
         Route::get('/', [WalletController::class, 'index'])->name('index');
         Route::post('/topup', [WalletController::class, 'topUp'])->name('topup');
+        Route::post('/transfer', [WalletController::class, 'transfer'])->name('transfer');
+        Route::post('/withdraw', [WalletController::class, 'withdraw'])->name('withdraw');
     });
 
     Route::prefix('verify')->name('verification.')->group(function () {
