@@ -1,0 +1,170 @@
+<?php
+
+namespace App\Http\Controllers\Web;
+
+use App\Enums\Corridor;
+use App\Events\NewChatMessage;
+use App\Http\Controllers\Controller;
+use App\Models\Trip;
+use App\Services\TripMatchingService;
+use App\Services\TripService;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class TripBoardController extends Controller
+{
+    public function __construct(private TripService $trips) {}
+
+    public function index(Request $request, TripMatchingService $matcher)
+    {
+        $corridor = $request->has('corridor') && $request->input('corridor')
+            ? Corridor::from($request->input('corridor'))
+            : null;
+
+        $trips = $matcher->upcoming($corridor);
+
+        return view('trips.board', compact('trips', 'corridor'));
+    }
+
+    public function create()
+    {
+        $user = auth()->user();
+
+        abort_unless($user->canDriveVolunteer(), 403, 'Workplace verification (Level 1) is required to publish rides.');
+
+        $vehicles = $user->vehicles()->get();
+        $corridors = Corridor::cases();
+
+        return view('trips.create', compact('vehicles', 'corridors'));
+    }
+
+    public function store(Request $request)
+    {
+        $user = $request->user();
+        $isFreeVolunteer = $request->boolean('is_free_volunteer');
+
+        if ($isFreeVolunteer) {
+            abort_unless($user->canDriveVolunteer(), 403, 'Workplace verification (Level 1) is required to publish free volunteer rides.');
+        } else {
+            abort_unless($user->canDrivePaid(), 403, 'Driver verification (Level 3) is required to publish paid rides.');
+        }
+
+        $data = $request->validate($this->publishRules());
+
+        try {
+            $trip = $this->trips->publish($user, $data);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
+        }
+
+        return redirect()->route('trips.show', $trip)
+            ->with('status', 'Trip published. Passengers near '.$trip->route_name.' have been notified.');
+    }
+
+    public function show(Trip $trip)
+    {
+        $user = auth()->user();
+
+        $trip->load(['driver', 'vehicle', 'waypoints', 'bookings.passenger', 'chatMessages.sender']);
+
+        $canStart = $trip->driver_id === $user->id && $trip->status->value === 'scheduled';
+        $canComplete = $trip->driver_id === $user->id && $trip->status->value === 'active';
+        $canCancelTrip = ($trip->driver_id === $user->id || $user->isAdmin())
+            && ! in_array($trip->status->value, ['completed', 'cancelled'], true);
+
+        $myBooking = $user->bookings()->where('trip_id', $trip->id)->whereIn('status', ['requested', 'confirmed', 'boarded'])->first();
+        $isParticipant = $trip->isParticipant($user);
+
+        return view('trips.show', compact(
+            'trip',
+            'user',
+            'canStart',
+            'canComplete',
+            'canCancelTrip',
+            'myBooking',
+            'isParticipant',
+        ));
+    }
+
+    public function start(Request $request, Trip $trip)
+    {
+        try {
+            $this->trips->start($trip, $request->user());
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return redirect()->route('trips.show', $trip)->with('status', 'Trip started. Live location now streaming.');
+    }
+
+    public function complete(Request $request, Trip $trip)
+    {
+        try {
+            $this->trips->completeTrip($trip, $request->user());
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return redirect()->route('trips.show', $trip)->with('status', 'Trip completed. Fares settled.');
+    }
+
+    public function cancel(Request $request, Trip $trip)
+    {
+        try {
+            $this->trips->cancelTrip($trip, $request->user(), $request->input('reason'));
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return redirect()->route('trips.show', $trip)->with('status', 'Trip cancelled. Passengers refunded.');
+    }
+
+    public function storeMessage(Request $request, Trip $trip)
+    {
+        if (! $trip->isParticipant($request->user())) {
+            return response()->json(['message' => 'Only trip participants can chat.'], 403);
+        }
+
+        $data = $request->validate([
+            'message' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $message = $trip->chatMessages()->create([
+            'sender_id' => $request->user()->id,
+            'message' => $data['message'],
+        ]);
+
+        broadcast(new NewChatMessage($message->load('sender')));
+
+        return response()->json([
+            'chat' => [
+                'id' => $message->id,
+                'trip_id' => $message->trip_id,
+                'sender_id' => $message->sender_id,
+                'sender_name' => $message->sender?->name,
+                'message' => $message->message,
+                'created_at' => $message->created_at?->toIso8601String(),
+            ],
+        ], 201);
+    }
+
+    private function publishRules(): array
+    {
+        return [
+            'corridor' => ['required', Rule::enum(Corridor::class)],
+            'origin_text' => ['required', 'string', 'max:255'],
+            'destination_text' => ['required', 'string', 'max:255'],
+            'total_seats' => ['required', 'integer', 'min:1', 'max:60'],
+            'departure_time' => ['required', 'date', 'after:now'],
+            'is_free_volunteer' => ['sometimes', 'boolean'],
+            'current_lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'current_lng' => ['nullable', 'numeric', 'between:-180,180'],
+            'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
+            'waypoints' => ['nullable', 'array'],
+            'waypoints.*.label' => ['required_with:waypoints', 'string', 'max:255'],
+            'waypoints.*.lat' => ['required_with:waypoints', 'numeric', 'between:-90,90'],
+            'waypoints.*.lng' => ['required_with:waypoints', 'numeric', 'between:-180,180'],
+        ];
+    }
+}

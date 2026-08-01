@@ -1,0 +1,14 @@
+{
+    "agents": [
+        "opencode"
+    ],
+    "instructions": [
+        "APP-GUIDE.md",
+        "DEVELOPMENT-LOG.md"
+    ],
+    "lsp": true,
+    "cloud": false,
+    "mcp": true,
+    "nightwatch": false,
+    "sail": false
+}
