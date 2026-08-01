@@ -61,6 +61,20 @@ return [
     // Google OAuth toggle. Disabled until GOOGLE_CLIENT_ID is set.
     'google_enabled' => (bool) env('GOOGLE_CLIENT_ID'),
 
+    // GTFS static feed publisher settings.
+    'gtfs' => [
+        'agency_id' => env('WORKRIDE_GTFS_AGENCY_ID', 'WR'),
+        'agency_name' => env('WORKRIDE_GTFS_AGENCY_NAME', 'WorkRide Staff Mobility'),
+        'agency_lang' => env('WORKRIDE_GTFS_AGENCY_LANG', 'en'),
+        'agency_timezone' => env('WORKRIDE_GTFS_AGENCY_TIMEZONE', 'Africa/Lagos'),
+        // Feed covers 365 days forward from generation.
+        'service_days' => env('WORKRIDE_GTFS_SERVICE_DAYS', 365),
+        // Average corridor speed used to interpolate stop_times (km/h).
+        'avg_speed_kmh' => env('WORKRIDE_GTFS_AVG_SPEED_KMH', 30),
+        // Waypoints closer than this (m) to a catalog stop reuse its stop_id.
+        'stop_match_radius_m' => env('WORKRIDE_GTFS_STOP_MATCH_RADIUS_M', 1500),
+    ],
+
     // FCT boundary (approximate bounding box).
     'fct_bounds' => [
         'min_lat' => 8.60,

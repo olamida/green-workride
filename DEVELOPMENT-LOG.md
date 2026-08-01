@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 3 Complete)
+## 2. Current Status (Phase: Foundation / Sprint 4 Complete)
 
 | Area | Status |
 |------|--------|
@@ -31,7 +31,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 1 complete — Auth + Verification + Ops Control Tower |
 | Feature modules | ✅ Sprint 2 complete — Trip publishing + atomic booking + Reverb chat |
 | Feature modules | ✅ Sprint 3 complete — Wallet dual balance + Paystack top-up + Subsidy bulk credit |
-| Tests | ✅ 90 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy) |
+| Feature modules | ✅ Sprint 4 complete — GTFS Publisher (static feed + GTFS-RT) |
+| Tests | ✅ 108 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS) |
 
 ---
 
@@ -177,6 +178,37 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (19 new — 90 total, 269 assertions):** `WalletFundingTest` (charge.success credits cash, idempotent duplicate webhook, invalid signature rejected, non-charge events ignored, malformed reference rejected, unknown user rejected), `SubsidyTest` (non-admin 403, dashboard view, CSV bulk credit happy path, unknown-email/bad-row skip, file required, non-CSV rejected), `WalletTopUpTest` (guest redirect, wallet page balances, unconfigured top-up error, amount validation, API 401, API balances, API top-up 503).
 
+### 4.10 Sprint 4 — GTFS Publisher: Static Feed + GTFS-RT (COMPLETE)
+
+**Schema (3 new migrations):** `gtfs_stops` (unique `stop_id`, `stop_lat`/`stop_lon` decimal:7, indexed `corridor`), `gtfs_routes` (unique `route_id`, unique `corridor`), `gtfs_feed_meta` (single-row generation metadata). Models `GtfsStop`, `GtfsRoute`, `GtfsFeedMeta` added.
+
+**Seeder:** `GtfsStopSeeder` — 53 representative Abuja stops across the three corridors (Kubwa→CBD 20, Nyanya→Idu 18, Lugbe→CBD 15), wired into `DatabaseSeeder`.
+
+**`GtfsService`** — builds the 7 GTFS files (`agency/stops/routes/trips/stop_times/calendar/shapes`) from live scheduled/active trips + the stop catalog and zips them to `storage/app/public/gtfs/gtfs.zip`:
+- Routes `updateOrCreate`d per corridor (`KUB-CBD`, `NYY-IDU`, `LUG-CBD`).
+- Trip points come from relational `trip_waypoints` rows first, then the JSON snapshot, then corridor endpoints.
+- Each point resolves to a catalog stop within `stop_match_radius_m`, else a `SYN-{tripId}-{n}` synthetic stop.
+- `stop_times` interpolated from `departure_time` at `avg_speed_kmh`; calendar covers `service_days` (365) from today.
+- Records `GtfsFeedMeta` and returns stats.
+
+**`GtfsRtService`** — dependency-free hand-rolled protobuf wire encoder emitting a `FeedMessage` VehiclePositions feed (plus an empty-snapshot TripUpdates feed) for Google Transit partner polling. Field numbers follow the `transit_realtime` schema.
+
+**Wiring:**
+- `php artisan gtfs:generate` command (`app/Console/Commands/GenerateGtfsFeed`).
+- Nightly `Schedule::command('gtfs:generate')->dailyAt('02:00')` in `routes/console.php`.
+- `GenerateGtfsFeedJob` dispatched on every trip publish (`TripService::queueGtfsRegeneration()`).
+- Public routes: `GET /gtfs/gtfs.zip`, `GET /gtfs/gtfs-rt/vehicle_positions.pb`, `GET /gtfs/gtfs-rt/trip_updates.pb`.
+- Admin dashboard `/admin/gtfs` (feed status, download, regenerate) + "GTFS Publisher" nav link.
+- Config block `workride.gtfs.*` (agency, timezone, service_days, avg_speed_kmh, stop_match_radius_m).
+
+**Bugs fixed (found during Sprint 4 hardening):**
+- The `waypoints` JSON column on `trips` shadows the `waypoints()` hasMany relation (the cast wins on property access), so `GtfsService::tripPoints()` now reads the relation via its query builder / `getRelation()`, falling back to JSON, then corridor endpoints.
+- `corridorEndpoints()` returned an associative array (`start`/`end` keys) while callers index numerically — now returns a plain list.
+- `isset($resolved['synthetic'])` matched both `true` and `false`, duplicating every resolved stop into the synthetic list — now gated on the boolean being `true`.
+- GTFS-RT field numbers: `FeedEntity.vehicle` used field 8 (shape) instead of 4; `TripDescriptor.start_time` used field 5 (start_date) instead of 4.
+
+**Tests (18 new — 108 total, 339 assertions):** `GtfsServiceTest` (7-file zip, feed metadata, per-corridor routes, relational-vs-JSON waypoint precedence, JSON fallback, synthetic stops, feed-path lifecycle), `GtfsRtTest` (a wire-format decoder proves only active trips with coords are included, vehicle on field 4, start_time on field 4, header version 2.0 + timestamp, empty trip-updates snapshot), `GtfsControllerTest` (public endpoints, 404 before generation, download after, admin dashboard gating, regenerate).
+
 ---
 
 ## 5. Issues Resolved
@@ -257,6 +289,7 @@ php artisan pail               # live log tailing
 npm run dev                    # vite HMR
 php artisan test               # run tests
 php artisan pint               # format code
+php artisan gtfs:generate      # regenerate the GTFS static feed zip
 php artisan ide-helper:generate  # refresh IDE autocomplete
 ```
 
@@ -267,6 +300,9 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `/dashboard` | Rider dashboard (wallet, verification, impact) |
 | `/verify` | Level 1 workplace ID + Level 2 NIN submission |
 | `/admin` | Ops Control Tower — dashboard, verifications, users, workplaces |
+| `/admin/gtfs` | GTFS Publisher — feed status, download, regenerate |
+| `/gtfs/gtfs.zip` | Public static GTFS feed (7-file zip) |
+| `/gtfs/gtfs-rt/vehicle_positions.pb` | GTFS-realtime VehiclePositions feed (protobuf) |
 | `/telescope` | Debug dashboard (requests, queries, jobs, mail) |
 | `/api/v1/auth/*` | Sanctum API — register, login, me, logout |
 | `/api/v1/verifications/*` | Sanctum API — submit workplace/NIN verification |
@@ -283,13 +319,13 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 1 (Wk 1-2) | Auth + Verification (NDPR compliant, Google sign-in) | ✅ Complete |
 | Sprint 2 (Wk 3) | Trip + Booking atomic + Reverb chat | ✅ Complete |
 | Sprint 3 (Wk 4) | Wallet dual balance + Paystack + subsidy bulk credit | ✅ Complete |
-| Sprint 4 (Wk 5) | GTFS Publisher → submit to Google | ⏳ Next |
-| Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ⏳ |
+| Sprint 4 (Wk 5) | GTFS Publisher → submit to Google | ✅ Complete |
+| Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ⏳ Next |
 | Sprint 6 (Wk 7) | PWA award UI + impact certificates | ⏳ |
 | Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ⏳ |
 
 ### Immediate next steps
-1. Sprint 4: GTFS Publisher — `GtfsService` generating agency/stops/routes/trips/stop_times/calendar/shapes → `gtfs.zip`, nightly job, validation page
+1. Sprint 5: Road Sensor — `useRoadSensor.js` (accelerometer Z > 15 pothole detection), `POST /api/v1/road-events`, `RoadIntelligenceService` pothole clustering + IRI, Leaflet heatmap
 2. Enable Redis (GEO + queue) per the guide's tech stack
 3. Add `maatwebsite/excel` for FERMA/CSV exports when needed
 4. Add the v3.0/v4.0 operations tables (demand surveys, forecasts, assets, maintenance) as a follow-up schema pass
@@ -306,6 +342,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 |-----|--------|-------|--------------------|------|
 | `v0.2.0` | Baseline — Foundation (Sprint 1 + 2) | Scaffold + auth/verification/control tower + trips/bookings/chat | 71 (222) | 2026-08-01 |
 | `v0.3.0` | Sprint 3 — Wallet + Top-up + Subsidy | Paystack top-up + webhook + wallet page + subsidy bulk credit (CSV) + MDA dashboard | 90 (269) | 2026-08-01 |
+| `v0.4.0` | Sprint 4 — GTFS Publisher | Static feed zip (7 files) + GTFS-RT (protobuf) + nightly job + on-publish regen + admin dashboard | 108 (339) | 2026-08-01 |
 
 ---
 
@@ -318,4 +355,4 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 - Dual-app: Blade+Tailwind+Alpine Rider PWA (public) + Filament-style Ops Control Tower
 - Design system: Forest Green `#2E7D32`, Gold `#FBC02D`, Slate `#0F172A`, Paper `#F6F9F6`; Sora/Inter/JetBrains Mono; 8px grid
 - Git: Conventional Commits (`feat|fix|test|refactor|chore|docs|perf(scope): subject`); never stage `.env`/secrets; tag each sprint (`v0.X.0`); update this log before every commit
-- Git cadence: commit after **every feature/process implementation** that passes the DoD ritual (pint → test → build → docs → stage → commit), and one milestone commit + tag (`v0.X.0`) at each sprint boundary — per guide §19
+- Git cadence: commit after **every feature/process implementation** that passes the DoD ritual (pint → test → build → docs → stage → commit), one milestone commit + tag (`v0.X.0`) at each sprint boundary, and **`git push origin master && git push --tags` after every sprint** — per guide §19

@@ -25,6 +25,7 @@
                     <x-admin-nav-link :active="request()->routeIs('admin.users.*')" href="{{ route('admin.users.index') }}">Users</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.workplaces.*')" href="{{ route('admin.workplaces.index') }}">Workplaces</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.subsidies.*')" href="{{ route('admin.subsidies.index') }}">Subsidies</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.gtfs.*')" href="{{ route('admin.gtfs.index') }}">GTFS Publisher</x-admin-nav-link>
                 </nav>
 
                 <div class="border-t border-ink-800 p-4 text-sm">

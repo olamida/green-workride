@@ -10,6 +10,7 @@ use App\Events\TripCompleted;
 use App\Events\TripLocationUpdated;
 use App\Events\TripPublished;
 use App\Events\TripStarted;
+use App\Jobs\GenerateGtfsFeedJob;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -65,6 +66,8 @@ class TripService
         }
 
         event(new TripPublished($trip));
+
+        $this->queueGtfsRegeneration();
 
         return $trip->load('driver', 'vehicle', 'waypoints');
     }
@@ -184,5 +187,14 @@ class TripService
         if ($trip->driver_id !== $user->id) {
             throw ValidationException::withMessages(['trip' => 'Only the trip driver can perform this action.']);
         }
+    }
+
+    /**
+     * Kick off a queued GTFS feed regeneration so Google's feed reflects the
+     * new trip as soon as possible instead of waiting for the nightly job.
+     */
+    private function queueGtfsRegeneration(): void
+    {
+        GenerateGtfsFeedJob::dispatch();
     }
 }

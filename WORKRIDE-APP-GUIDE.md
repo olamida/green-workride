@@ -502,7 +502,7 @@ Sprint7 Week8: PWA Award UI + Impact Certificates + Corporate Pass → Launch Gr
 
 ## 19. Git & Version Control - Commit Every Phase
 
-> **Policy:** **Every sprint (phase) AND every feature/process implementation ends in a git commit.** A sprint additionally ends in exactly **one milestone commit + one tag** (`git push` to GitHub after the tag). Within a sprint, commit small, logical units so each commit is self-contained, builds, and passes tests. This gives funders, auditors, and future developers a verifiable history: "Sprint 2 → `v0.2.0`, 68 tests green."
+> **Policy:** **Every sprint (phase) AND every feature/process implementation ends in a git commit.** A sprint additionally ends in exactly **one milestone commit + one tag**, then a push: **`git push origin master && git push --tags`** (upload to GitHub). Within a sprint, commit small, logical units so each commit is self-contained, builds, and passes tests. This gives funders, auditors, and future developers a verifiable history: "Sprint 2 → `v0.2.0`, 68 tests green."
 
 ### 19.1 Repository Layout & Branching (Trunk-Based + Short-Lived Branches)
 - `master` (or `main`) is the single source of truth and is always deployable.
@@ -529,6 +529,7 @@ Run this checklist **before every commit** (feature/process OR phase milestone):
 Commit cadence:
 - **Feature/process implementation** → commit when it passes the ritual (e.g. `feat(wallet): Paystack top-up`).
 - **Sprint boundary** → one milestone commit (squash) + annotated tag `v0.X.0` + push to GitHub.
+- **Every sprint, without exception** → run `git push origin master && git push --tags` right after the milestone tag so the sprint is on GitHub.
 - **Small working units** during a sprint → small commits, easy to `bisect`.
 
 Rules:

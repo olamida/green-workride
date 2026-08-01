@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\GtfsController as AdminGtfsController;
 use App\Http\Controllers\Admin\SubsidyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
@@ -8,6 +9,7 @@ use App\Http\Controllers\Admin\WorkplaceController as AdminWorkplaceController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\PaystackWebhookController;
 use App\Http\Controllers\Web\TripBoardController;
@@ -18,6 +20,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', HomeController::class)->name('home');
 
 Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->name('paystack.webhook');
+
+// Public GTFS endpoints — static feed zip + GTFS-realtime for Google Transit.
+Route::prefix('gtfs')->name('gtfs.')->group(function () {
+    Route::get('/gtfs.zip', [GtfsController::class, 'feed'])->name('feed');
+    Route::get('/gtfs-rt/vehicle_positions.pb', [GtfsController::class, 'vehiclePositions'])->name('vehicle_positions');
+    Route::get('/gtfs-rt/trip_updates.pb', [GtfsController::class, 'tripUpdates'])->name('trip_updates');
+});
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -73,5 +82,8 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/subsidies', [SubsidyController::class, 'index'])->name('subsidies.index');
         Route::post('/subsidies/credit', [SubsidyController::class, 'bulkCredit'])->name('subsidies.credit');
+
+        Route::get('/gtfs', [AdminGtfsController::class, 'index'])->name('gtfs.index');
+        Route::post('/gtfs/regenerate', [AdminGtfsController::class, 'regenerate'])->name('gtfs.regenerate');
     });
 });
