@@ -19,6 +19,18 @@ class Wallet extends Model
         'version',
     ];
 
+    /**
+     * Model-level defaults mirror the DB column defaults so a freshly created
+     * wallet carries the same values in memory (optimistic locking relies on
+     * `version` being present before the first mutation).
+     */
+    protected $attributes = [
+        'cash_balance' => 0,
+        'subsidy_credits' => 0,
+        'cash_collected_log' => 0,
+        'version' => 1,
+    ];
+
     protected function casts(): array
     {
         return [

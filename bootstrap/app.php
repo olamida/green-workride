@@ -24,6 +24,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'driver.verified' => EnsureDriverVerified::class,
             'not.banned' => EnsureNotBanned::class,
         ]);
+
+        $middleware->validateCsrfTokens(except: ['paystack/webhook']);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -492,17 +492,17 @@ Disposal: After 4 years or 250k km, system flags: `status=disposal_due`, calcula
 
 ## 18. Build Sprints - Operations First (Updated)
 
-Sprint1 Week1-2: Auth+Verification+Ops Control Tower skeleton (Filament) + WorkplaceSeeder 45 MDAs → Demo to MDA
-Sprint2 Week3: Trip+Booking Atomic + Demand Calendar table + Duty Roster → Get 50 volunteer drivers
-Sprint3 Week4: Asset+Maintenance+Inspection tables + Driver App checklist + OBD2 telemetry → Lease 3 buses, start pilot
-Sprint4 Week5: Wallet Dual + Stakeholder Remittance + Daily Settlement Job → Finance ready
-Sprint5 Week6: GTFS Publisher → Submit to Google, pitch World Bank
-Sprint6 Week7: Road Sensor useRoadSensor.js + IRI + Heatmap → Pitch FERMA, sell Road API
-Sprint7 Week8: PWA Award UI + Impact Certificates + Corporate Pass → Launch Green Challenge, PR, Angel round
+Sprint1 Week1-2: Auth+Verification+Ops Control Tower skeleton (Filament) + WorkplaceSeeder 45 MDAs → Demo to MDA → commit + tag v0.1.0
+Sprint2 Week3: Trip+Booking Atomic + Demand Calendar table + Duty Roster → Get 50 volunteer drivers → commit + tag v0.2.0
+Sprint3 Week4: Wallet Dual + Paystack + Subsidy bulk credit → Demo to Ministry Finance for palliative tracking → commit + tag v0.3.0
+Sprint4 Week5: Asset+Maintenance+Inspection tables + Driver App checklist + OBD2 telemetry → Lease 3 buses, start pilot → commit + tag v0.4.0
+Sprint5 Week6: GTFS Publisher → Submit to Google, pitch World Bank → commit + tag v0.5.0
+Sprint6 Week7: Road Sensor useRoadSensor.js + IRI + Heatmap → Pitch FERMA, sell Road API → commit + tag v0.6.0
+Sprint7 Week8: PWA Award UI + Impact Certificates + Corporate Pass → Launch Green Challenge, PR, Angel round → commit + tag v0.7.0
 
 ## 19. Git & Version Control - Commit Every Phase
 
-> **Policy:** Every phase (sprint) ends in exactly **one milestone commit + one tag**. Within a phase, commit small, logical units so each commit is self-contained, builds, and passes tests. This gives funders, auditors, and future developers a verifiable history: "Sprint 2 → `v0.2.0`, 68 tests green."
+> **Policy:** **Every sprint (phase) AND every feature/process implementation ends in a git commit.** A sprint additionally ends in exactly **one milestone commit + one tag** (`git push` to GitHub after the tag). Within a sprint, commit small, logical units so each commit is self-contained, builds, and passes tests. This gives funders, auditors, and future developers a verifiable history: "Sprint 2 → `v0.2.0`, 68 tests green."
 
 ### 19.1 Repository Layout & Branching (Trunk-Based + Short-Lived Branches)
 - `master` (or `main`) is the single source of truth and is always deployable.
@@ -512,7 +512,7 @@ Sprint7 Week8: PWA Award UI + Impact Certificates + Corporate Pass → Launch Gr
 - Work on one phase at a time; never mix two phases in one branch/commit.
 
 ### 19.2 When to Commit — the "Definition of Done" Ritual
-Run this checklist **before every commit**, and again at the phase-end milestone:
+Run this checklist **before every commit** (feature/process OR phase milestone):
 
 | Gate | Command (Windows) | Pass Criteria |
 |------|-------------------|---------------|
@@ -523,13 +523,19 @@ Run this checklist **before every commit**, and again at the phase-end milestone
 | Stage | `git add <relevant files>` | only intended files |
 | Inspect | `git status` / `git diff --cached` | no `.env`, no secrets |
 | Commit | `git commit -m "<conventional message>"` | message explains WHY |
-| Tag | `git tag -a v0.2.0 -m "..."` | only at phase end |
+| Tag | `git tag -a v0.2.0 -m "..."` | only at sprint end |
+| Push | `git push origin master` + `git push --tags` | after a tagged sprint (upload to GitHub) |
+
+Commit cadence:
+- **Feature/process implementation** → commit when it passes the ritual (e.g. `feat(wallet): Paystack top-up`).
+- **Sprint boundary** → one milestone commit (squash) + annotated tag `v0.X.0` + push to GitHub.
+- **Small working units** during a sprint → small commits, easy to `bisect`.
 
 Rules:
-- **Commit at two levels:** (a) after each small working unit that passes tests (small commits, easy to `bisect`), and (b) one milestone commit + tag at each sprint boundary.
 - **Never stage `.env`, `*.key`, or any credential.** `.gitignore` already blocks `.env`; verify with `git status` before committing.
 - Commit only files relevant to the change — no stray IDE/config noise.
 - A good commit message describes the **why**, not just the what, so the history reads as a narrative for the 40% investor / 15% Trust audits.
+- Push to GitHub (or any remote) **only after a tag** — the pushed tag IS the milestone record.
 
 ### 19.3 Commit Message Standard — Conventional Commits
 ```

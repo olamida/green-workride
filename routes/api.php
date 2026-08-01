@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\VerificationController;
+use App\Http\Controllers\Api\V1\WalletController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -14,6 +15,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+        Route::get('/wallet', [WalletController::class, 'index']);
+        Route::post('/wallet/topup', [WalletController::class, 'topUp']);
 
         Route::get('/verifications', [VerificationController::class, 'index']);
         Route::post('/verifications/workplace', [VerificationController::class, 'submitWorkplace']);

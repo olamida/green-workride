@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 2 Complete)
+## 2. Current Status (Phase: Foundation / Sprint 3 Complete)
 
 | Area | Status |
 |------|--------|
@@ -30,7 +30,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Core stack packages | ✅ Done — Sanctum, Reverb, Telescope installed |
 | Feature modules | ✅ Sprint 1 complete — Auth + Verification + Ops Control Tower |
 | Feature modules | ✅ Sprint 2 complete — Trip publishing + atomic booking + Reverb chat |
-| Tests | ✅ 68 feature tests passing (auth, verification, admin, trips, bookings, chat) |
+| Feature modules | ✅ Sprint 3 complete — Wallet dual balance + Paystack top-up + Subsidy bulk credit |
+| Tests | ✅ 90 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy) |
 
 ---
 
@@ -151,6 +152,31 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (35 new — 68 total, 217 assertions):** `TripTest` (board access, publish gating L1 volunteer/L3 paid, fixed fare, FCT rejection, foreign vehicle rejection, API search, start/complete/cancel, driver-only rules), `BookingTest` (holds, subsidy-first, refunds, board capture, no-show half-capture, trip completion settlement, cash collection logging, API booking, guest redirect), `ChatTest` (participant-only auth, web+API send/view, validation).
 
+### 4.9 Sprint 3 — Wallet Dual Balance + Paystack Top-up + Subsidy Bulk Credit (COMPLETE)
+
+**Schema (1 new migration):** `add_gateway_columns_to_transactions_table` — nullable `tx_ref` (indexed) + `gateway_ref` on `transactions` for idempotent gateway reconciliation. `Transaction` model gains both fillables; `PaymentMethod` gains `Paystack`; `TransactionType` gains `TopUp`.
+
+**Services:**
+- `PaystackService` — thin HTTP client: `isConfigured()` (secret + webhook secret present), `initialize(email, naira, reference)` → `authorization_url` (kobo conversion at the edges), `verify(reference)`, `verifyWebhookSignature(payload, signature)` via HMAC-SHA512. Falls back to a synthetic 503 response when Paystack is unreachable.
+- `WalletFundingService` — `referenceFor(user)` builds `WR-{userId}-{random}` (embeds the user so the webhook can resolve them without a pending-row lookup); `creditTopUp()` credits cash idempotently keyed by the Paystack `tx_ref` and stamps `type=top_up` + gateway refs; `handlePaystackWebhook()` verifies signature → ignores non-`charge.success` events → converts kobo → credits the matched user. Duplicates return `ack=true, reason=duplicate`; bad signature/unknown user return `ack=false` (Paystack gets a 4xx and will retry).
+- `WalletService` unchanged except a fix below enabling fresh wallets.
+
+**Web:**
+- `WalletController` — `GET /wallet` (dual balances + last 25 transactions + quick top-up chips), `POST /wallet/topup` (validates ₦100–₦1M, redirects to Paystack `authorization_url`; friendly error when Paystack unconfigured).
+- `PaystackWebhookController` — `POST /paystack/webhook`, **CSRF-exempt** (signature is the gate), returns 200 on ack / 400 on reject. Route is public (no `auth`).
+- Views: `wallet/index.blade.php`, wallet link added to rider nav.
+
+**Admin (Control Tower):**
+- `SubsidyController` — `GET /admin/subsidies` (MDA dashboard: total issued, staff funded, per-workplace subsidy totals, recent subsidy transactions filterable by workplace) and `POST /admin/subsidies/credit` (CSV `email,amount` bulk credit; skips header/unknown emails/bad rows; per-row idempotent references `MDA-{workplace}-{batch}-{index}`; non-CSV rejected). Subsidies link added to admin nav.
+
+**API (`/api/v1`):** `WalletController` — `GET /wallet` (balances + transactions), `POST /wallet/topup` (returns `reference` + `authorization_url`, 503 when unconfigured). Both under `auth:sanctum`.
+
+**Config:** `config/services.php` → `paystack` block (`public_key`, `secret_key`, `webhook_secret`, `mode=test`); `.env.example` documents the three `PAYSTACK_*` keys.
+
+**Fix (latent Sprint 2 bug):** newly created wallets had a `null` `version` in memory (DB default is `1`), so the optimistic-lock `WHERE version = ?` matched nothing and the first mutation threw "Wallet changed concurrently. Please retry." Added model-level `$attributes` defaults on `Wallet` mirroring the DB defaults — this also hardens the existing booking hold flow for passengers with no prior wallet.
+
+**Tests (19 new — 90 total, 269 assertions):** `WalletFundingTest` (charge.success credits cash, idempotent duplicate webhook, invalid signature rejected, non-charge events ignored, malformed reference rejected, unknown user rejected), `SubsidyTest` (non-admin 403, dashboard view, CSV bulk credit happy path, unknown-email/bad-row skip, file required, non-CSV rejected), `WalletTopUpTest` (guest redirect, wallet page balances, unconfigured top-up error, amount validation, API 401, API balances, API top-up 503).
+
 ---
 
 ## 5. Issues Resolved
@@ -207,6 +233,12 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 - **Fix:** `shouldRenderJsonWhen` now returns `$request->is('api/*') || $request->expectsJson()`.
 - **Status:** ✅ Resolved — 422 JSON returned for JSON-expecting web requests.
 
+### Fresh wallets failed the optimistic-lock update (`version` null in memory)
+- **Symptom:** First `creditSubsidy`/`creditCash` on a user with no prior wallet threw `Wallet changed concurrently. Please retry.` — hit by CSV bulk credit and Paystack webhook crediting.
+- **Root cause:** `Wallet::create()` leaves `version` unset in memory; the DB default `1` is only applied on insert. The optimistic-lock `WHERE version = ?` then compared against `null`, matched nothing, and reported a false "concurrent change".
+- **Fix:** Added model-level `$attributes` defaults on `Wallet` (`cash_balance = 0`, `subsidy_credits = 0`, `cash_collected_log = 0`, `version = 1`) mirroring the DB defaults. Also hardens the pre-existing booking-hold flow for passengers with no wallet.
+- **Status:** ✅ Resolved — covered by `SubsidyTest` bulk-credit + `WalletFundingTest` webhook paths.
+
 ---
 
 ## 6. How to Work On This Project
@@ -250,14 +282,14 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 |--------|-------|--------|
 | Sprint 1 (Wk 1-2) | Auth + Verification (NDPR compliant, Google sign-in) | ✅ Complete |
 | Sprint 2 (Wk 3) | Trip + Booking atomic + Reverb chat | ✅ Complete |
-| Sprint 3 (Wk 4) | Wallet dual balance + Paystack + subsidy bulk credit | ⏳ Next |
-| Sprint 4 (Wk 5) | GTFS Publisher → submit to Google | ⏳ |
+| Sprint 3 (Wk 4) | Wallet dual balance + Paystack + subsidy bulk credit | ✅ Complete |
+| Sprint 4 (Wk 5) | GTFS Publisher → submit to Google | ⏳ Next |
 | Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ⏳ |
 | Sprint 6 (Wk 7) | PWA award UI + impact certificates | ⏳ |
 | Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ⏳ |
 
 ### Immediate next steps
-1. Sprint 3: Wallet dual balance + Paystack + subsidy bulk credit (MDA CSV upload, `WalletController::bulkCredit`, MDA subsidy dashboard)
+1. Sprint 4: GTFS Publisher — `GtfsService` generating agency/stops/routes/trips/stop_times/calendar/shapes → `gtfs.zip`, nightly job, validation page
 2. Enable Redis (GEO + queue) per the guide's tech stack
 3. Add `maatwebsite/excel` for FERMA/CSV exports when needed
 4. Add the v3.0/v4.0 operations tables (demand surveys, forecasts, assets, maintenance) as a follow-up schema pass
@@ -266,12 +298,14 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 
 ## 7.1 Version History (Git Tags)
 
-> Policy per guide §19: each sprint ends in **one milestone commit + one annotated tag**.
+> Policy per guide §19: each sprint ends in **one milestone commit + one annotated tag**, and
+> every feature/process implementation passes the DoD ritual before its own commit.
 > Update this table on every phase-end commit. Full workflow: `WORKRIDE-APP-GUIDE.md` §19.
 
 | Tag | Sprint | State | Tests (assertions) | Date |
 |-----|--------|-------|--------------------|------|
 | `v0.2.0` | Baseline — Foundation (Sprint 1 + 2) | Scaffold + auth/verification/control tower + trips/bookings/chat | 71 (222) | 2026-08-01 |
+| `v0.3.0` | Sprint 3 — Wallet + Top-up + Subsidy | Paystack top-up + webhook + wallet page + subsidy bulk credit (CSV) + MDA dashboard | 90 (269) | 2026-08-01 |
 
 ---
 
@@ -283,4 +317,5 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 - Registration only allows `UserRole::assignableCases()` (passenger/driver/both/volunteer) — admin roles come from the Control Tower
 - Dual-app: Blade+Tailwind+Alpine Rider PWA (public) + Filament-style Ops Control Tower
 - Design system: Forest Green `#2E7D32`, Gold `#FBC02D`, Slate `#0F172A`, Paper `#F6F9F6`; Sora/Inter/JetBrains Mono; 8px grid
-- Git: Conventional Commits (`feat|fix|test|refactor|chore|docs|perf(scope): subject`); never stage `.env`/secrets; tag each sprint (`v0.X.0`); update this log before every phase-end commit
+- Git: Conventional Commits (`feat|fix|test|refactor|chore|docs|perf(scope): subject`); never stage `.env`/secrets; tag each sprint (`v0.X.0`); update this log before every commit
+- Git cadence: commit after **every feature/process implementation** that passes the DoD ritual (pint → test → build → docs → stage → commit), and one milestone commit + tag (`v0.X.0`) at each sprint boundary — per guide §19

@@ -10,6 +10,7 @@ enum TransactionType: string
     case Refund = 'refund';
     case Hold = 'hold';
     case Capture = 'capture';
+    case TopUp = 'top_up';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum TransactionType: string
             self::Refund => 'Refund',
             self::Hold => 'Hold',
             self::Capture => 'Capture',
+            self::TopUp => 'Wallet Top-up',
         };
     }
 }

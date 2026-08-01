@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\SubsidyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
 use App\Http\Controllers\Admin\WorkplaceController as AdminWorkplaceController;
@@ -8,11 +9,15 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\HomeController;
+use App\Http\Controllers\Web\PaystackWebhookController;
 use App\Http\Controllers\Web\TripBoardController;
 use App\Http\Controllers\Web\VerificationController;
+use App\Http\Controllers\Web\WalletController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+
+Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->name('paystack.webhook');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -27,6 +32,11 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::prefix('wallet')->name('wallet.')->group(function () {
+        Route::get('/', [WalletController::class, 'index'])->name('index');
+        Route::post('/topup', [WalletController::class, 'topUp'])->name('topup');
+    });
 
     Route::prefix('verify')->name('verification.')->group(function () {
         Route::get('/', [VerificationController::class, 'index'])->name('index');
@@ -60,5 +70,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/users/{user}/unban', [AdminUserController::class, 'unban'])->name('users.unban');
 
         Route::get('/workplaces', [AdminWorkplaceController::class, 'index'])->name('workplaces.index');
+
+        Route::get('/subsidies', [SubsidyController::class, 'index'])->name('subsidies.index');
+        Route::post('/subsidies/credit', [SubsidyController::class, 'bulkCredit'])->name('subsidies.credit');
     });
 });

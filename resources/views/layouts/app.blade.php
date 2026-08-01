@@ -21,6 +21,7 @@
                     <x-nav-link :active="request()->routeIs('dashboard')" href="{{ route('dashboard') }}">Dashboard</x-nav-link>
                     <x-nav-link :active="request()->routeIs('trips.*')" href="{{ route('trips.index') }}">Trips</x-nav-link>
                     <x-nav-link :active="request()->routeIs('bookings.*')" href="{{ route('bookings.index') }}">My Rides</x-nav-link>
+                    <x-nav-link :active="request()->routeIs('wallet.*')" href="{{ route('wallet.index') }}">Wallet</x-nav-link>
                     <x-nav-link :active="request()->routeIs('verification.*')" href="{{ route('verification.index') }}">Verify</x-nav-link>
                     @if (auth()->user()->isAdmin())
                         <x-nav-link :active="request()->routeIs('admin.*')" href="{{ route('admin.dashboard') }}">Control Tower</x-nav-link>
