@@ -10,6 +10,7 @@ use App\Events\TripCompleted;
 use App\Events\TripLocationUpdated;
 use App\Events\TripPublished;
 use App\Events\TripStarted;
+use App\Jobs\CalculateImpactJob;
 use App\Jobs\GenerateGtfsFeedJob;
 use App\Models\Trip;
 use App\Models\User;
@@ -124,6 +125,8 @@ class TripService
         }
 
         event(new TripCompleted($trip->fresh()));
+
+        dispatch(new CalculateImpactJob($trip->id));
 
         return $trip->fresh();
     }

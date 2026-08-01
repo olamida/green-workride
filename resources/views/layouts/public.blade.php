@@ -4,6 +4,9 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="theme-color" content="#2E7D32">
+        <link rel="manifest" href="{{ route('pwa.manifest') }}">
+        <link rel="apple-touch-icon" href="{{ url('/pwa/icon-192.png') }}">
         @if (auth()->check())
             <meta name="user-id" content="{{ auth()->id() }}">
         @endif

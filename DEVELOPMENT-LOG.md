@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 5 Complete)
+## 2. Current Status (Phase: Foundation / Sprint 6 Complete)
 
 | Area | Status |
 |------|--------|
@@ -33,7 +33,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 3 complete — Wallet dual balance + Paystack top-up + Subsidy bulk credit |
 | Feature modules | ✅ Sprint 4 complete — GTFS Publisher (static feed + GTFS-RT) |
 | Feature modules | ✅ Sprint 5 complete — Road Sensor + Road Intelligence (IRI, pothole clustering, FERMA export) + Routing API cost caps |
-| Tests | ✅ 134 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing) |
+| Feature modules | ✅ Sprint 6 complete — PWA award UI + Impact certificates (CO₂/Fuel, QR-verifiable) + Impact analytics + demo users |
+| Tests | ✅ 159 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA) |
 
 ---
 
@@ -245,6 +246,38 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (26 new — 134 total, 409 assertions):** `RoadSensorTest` (unauth 401, verified driver 201 + DB row, outside-FCT 422, invalid type 422, public endpoint returns only confirmed + no user_id, public map renders), `RoadIntelligenceServiceTest` (5-within-radius confirms all, <5 not confirmed, far-apart no cluster, >72h excluded, IRI→condition bands, null-z IRI, confirmed potholes refresh segment IRI, recordEvent confirms + writes segment, FERMA export filter), `RoutingServiceTest` (OSRM path via Http::fake, Google fallback when OSRM empty, mapbox, cost-logging, monthly cap block), `RoadAdminTest` (dashboard gating, admin view, FERMA CSV content, non-admin export 403).
 
+### 4.12 Sprint 6 — PWA Award UI + Impact Certificates + Impact Analytics + Demo Users (COMPLETE)
+
+**`Co2Service` (`app/Services/Co2Service.php`)** — guide-formula impact math:
+- `co2Kg(occupants, distanceKm)` = `(occupants - 1) * distance * co2_per_passenger_km` (0.12), 0 for a solo driver.
+- `treesEquivalent(co2Kg)` = `co2 / trees_per_kg_co2` (21); `fuelLitres(occupants, distanceKm)` = `distance * fuel_litres_per_km * occupants` (0.10).
+- `forRide(occupants, distanceKm)` → snapshot; `distanceKm()` via `GeofenceService::haversine()`.
+
+**`CalculateImpactJob` (`app/Jobs/CalculateImpactJob.php`)** — dispatched from `TripService::completeTrip()` (after `TripCompleted`): loads the trip, gathers `boarded`/`completed` bookings, computes per-participant CO₂/trees/fuel from the waypoint path distance (corridor fallback from new `workride.corridor_distance_km`), upserts each participant's `ImpactStat` (`credit()` helper). Solo trips credit nothing.
+
+**Impact pages (rider PWA):**
+- `ImpactController` — `GET /impact` (auth): personal CO₂/fuel/trips/tree cards + Abuja-wide top-25 leaderboard + workplace leaderboard (filtered to the signed-in user's workplace).
+- `ImpactCertificateController` — `GET /impact/certificate/{co2|fuel}` (auth): printable certificate sheet (CO₂ SAVED / FUEL SAVED) with shared rides, savings, Abuja rank, green percentile, Green Level, and a **QR code** (`simplesoftwareio/simple-qrcode`, SVG data-URI) that decodes to the public verify URL. `GET /impact/verify/{user}/{type}` (public, guest-safe `layouts/public`) confirms the record — the anti-fraud audit trail for CSR/ESG + subsidy claims.
+
+**PWA shell:**
+- `PwaController` — `GET /manifest.json` (Web App Manifest: standalone, theme `#2E7D32`, background `#F6F9F6`, 192/512 icons) + `GET /sw.js` (service worker: `workride-v1` shell cache, stale-while-revalidate, activate cleanup, skipWaiting).
+- `resources/js/app.js` — SW registration + `beforeinstallprompt` → `window.deferredInstallPrompt` / `wr-install-ready` custom event (for a future install button).
+- Icons `public/pwa/icon-192.png` + `icon-512.png` (generated). Manifest `<link>` + `theme-color` + apple-touch-icon added to `layouts/app` + `layouts/public`.
+
+**Demo users (`DemoUserSeeder`)** — funding-pitch accounts, all password `demo1234` (config `workride.demo.password`), attached to FMF:
+- `driver@workride.ng` — Aisha Bello, L3 paid driver, Toyota Hiace Coaster ABJ-849-KJ, ₦12,450 wallet, 42-trip impact (756 kg CO₂).
+- `volunteer@workride.ng` — Chinedu Okafor, workplace-verified volunteer, 15-trip impact.
+- `passenger@workride.ng` — Fatima Yusuf, L1 with ₦3,200 cash + ₦15,000 subsidy credits, 28-trip impact.
+
+**Config:** `workride.demo.password`, `workride.corridor_distance_km` (kubwa_cbd 22, nyanya_idu 14, lugbe_cbd 12). Composer: `simplesoftwareio/simple-qrcode` added (SVG QR needs no GD).
+
+**Bugs fixed (found during Sprint 6 hardening):**
+- `DemoUserSeeder` originally passed nested `wallet`/`vehicle`/`impact` arrays into `User::updateOrCreate` → `SQLSTATE[42S22] Unknown column 'wallet'`. Now strips the nested keys first and applies wallet/vehicle/impact via their own `updateOrCreate` calls.
+- PWA manifest asserted as `application/json` and relative paths in tests — controller returns `application/manifest+json` with absolute `start_url`/`scope`/icon URLs; tests updated to match.
+- PWA icons can't be routed through the feature-test HTTP client (static files, no route) — replaced the HTTP assertion with an on-disk `assertFileExists` + size check.
+
+**Tests (25 new — 159 total, 476 assertions):** `Co2ServiceTest` (solo = 0, 2-occupant formula, trees factor, fuel litres, forRide snapshot, haversine distance), `CalculateImpactJobTest` (driver + riders credited, each boarded passenger, solo no-op, cancelled excluded, missing trip no-op), `ImpactPageTest` (auth redirect, personal stats render, workplace leaderboard, cert auth + CO₂/Fuel render with QR, invalid type 404, public verify confirms/empty), `PwaControllerTest` (manifest JSON + icons, service worker JS, icons on disk), `DemoUserSeederTest` (3 users with expected levels/plate/subsidy/impact).
+
 ---
 
 ## 5. Issues Resolved
@@ -330,6 +363,17 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 - **Fix:** Assert `Content-Type` exactly (`text/csv; charset=utf-8`) and `Content-Disposition` via `assertHeaderContains`; read body with `getContent()` (controller returns a plain response, not streamed).
 - **Status:** ✅ Resolved.
 
+### `DemoUserSeeder` passed nested arrays straight into `User::updateOrCreate`
+- **Symptom:** `php artisan db:seed` failed on the demo users — `SQLSTATE[42S22] Unknown column 'wallet' in 'field list'`.
+- **Root cause:** Each demo-user array carried `wallet`/`vehicle`/`impact` sub-arrays, which were merged directly into the users insert as non-existent columns.
+- **Fix:** Seeder now extracts the three nested keys (`unset`) before `User::updateOrCreate`, then applies wallet/vehicle/impact via their own `updateOrCreate` calls keyed on `user_id`/`plate_number`.
+- **Status:** ✅ Resolved — `php artisan db:seed` creates all 3 demo accounts; covered by `DemoUserSeederTest`.
+
+### PWA manifest/test contract mismatches
+- **Symptom:** `PwaControllerTest` failed — manifest is served as `application/manifest+json` (not `application/json`) with absolute `start_url`/`scope`/icon URLs; the service worker returns `application/javascript` (not `text/javascript`); PWA icons are static files with no route, so the feature-test client 404s them.
+- **Fix:** Updated assertions to the real contract; replaced the icon HTTP request with an on-disk `assertFileExists` + `filesize` check.
+- **Status:** ✅ Resolved.
+
 ---
 
 ## 6. How to Work On This Project
@@ -362,12 +406,24 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `/admin/gtfs` | GTFS Publisher — feed status, download, regenerate |
 | `/gtfs/gtfs.zip` | Public static GTFS feed (7-file zip) |
 | `/gtfs/gtfs-rt/vehicle_positions.pb` | GTFS-realtime VehiclePositions feed (protobuf) |
+| `/impact` | Personal impact (CO₂/fuel/trips) + leaderboards |
+| `/impact/certificate/{co2|fuel}` | Printable QR-verifiable CO₂/Fuel certificate |
+| `/impact/verify/{user}/{type}` | Public certificate verification (QR target) |
+| `/manifest.json` | PWA Web App Manifest |
+| `/sw.js` | PWA service worker |
 | `/telescope` | Debug dashboard (requests, queries, jobs, mail) |
 | `/api/v1/auth/*` | Sanctum API — register, login, me, logout |
 | `/api/v1/verifications/*` | Sanctum API — submit workplace/NIN verification |
 
 ### Seeded admin
 `admin@workride.ng` / `admin1234` (via `config/workride.php` → `WORKRIDE_ADMIN_EMAIL` / `WORKRIDE_ADMIN_PASSWORD`).
+
+### Demo accounts (funding-pitch / demo — password `demo1234`)
+| Email | Role | Notes |
+|-------|------|-------|
+| `driver@workride.ng` | Aisha Bello — L3 paid driver | Coaster ABJ-849-KJ, ₦12,450 wallet, 42-trip impact |
+| `volunteer@workride.ng` | Chinedu Okafor — volunteer | Free-ride supply, 15-trip impact |
+| `passenger@workride.ng` | Fatima Yusuf — L1 passenger | ₦3,200 cash + ₦15,000 subsidy credits |
 
 ---
 
@@ -380,14 +436,14 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 3 (Wk 4) | Wallet dual balance + Paystack + subsidy bulk credit | ✅ Complete |
 | Sprint 4 (Wk 5) | GTFS Publisher → submit to Google | ✅ Complete |
 | Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ✅ Complete |
-| Sprint 6 (Wk 7) | PWA award UI + impact certificates | ⏳ Next |
-| Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ⏳ |
+| Sprint 6 (Wk 7) | PWA award UI + impact certificates | ✅ Complete |
+| Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ⏳ Next |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
 2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
 3. Add the v3.0/v4.0 operations tables (demand surveys, forecasts, assets, maintenance) as a follow-up schema pass
-4. PWA award UI + impact certificates (Sprint 6)
+4. Sprint 7 — Business dashboard + receipts + exports (receipts 8 types per guide §14)
 
 ---
 
@@ -403,6 +459,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.3.0` | Sprint 3 — Wallet + Top-up + Subsidy | Paystack top-up + webhook + wallet page + subsidy bulk credit (CSV) + MDA dashboard | 90 (269) | 2026-08-01 |
 | `v0.4.0` | Sprint 4 — GTFS Publisher | Static feed zip (7 files) + GTFS-RT (protobuf) + nightly job + on-publish regen + admin dashboard | 108 (339) | 2026-08-01 |
 | `v0.5.0` | Sprint 5 — Road Sensor + Intelligence + Routing | useRoadSensor.js + POST /api/v1/road-events + IRI clustering + FERMA export + RoutingService cost caps + docker-compose | 134 (409) | 2026-08-01 |
+| `v0.6.0` | Sprint 6 — PWA + Impact | Web App Manifest + service worker + icons + /impact analytics + QR-verifiable CO₂/Fuel certificates + CalculateImpactJob + demo users | 159 (476) | 2026-08-01 |
 
 ---
 

@@ -11,7 +11,8 @@
         "laravel/reverb": "^1.11",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.29",
-        "laravel/tinker": "^3.0"
+        "laravel/tinker": "^3.0",
+        "simplesoftwareio/simple-qrcode": "*"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",

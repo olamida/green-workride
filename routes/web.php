@@ -12,7 +12,10 @@ use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
+use App\Http\Controllers\Web\ImpactCertificateController;
+use App\Http\Controllers\Web\ImpactController;
 use App\Http\Controllers\Web\PaystackWebhookController;
+use App\Http\Controllers\Web\PwaController;
 use App\Http\Controllers\Web\RoadMapController;
 use App\Http\Controllers\Web\TripBoardController;
 use App\Http\Controllers\Web\VerificationController;
@@ -21,8 +24,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
 
+// PWA shell — installable manifest + offline service worker.
+Route::get('/manifest.json', [PwaController::class, 'manifest'])->name('pwa.manifest');
+Route::get('/sw.js', [PwaController::class, 'serviceWorker'])->name('pwa.sw');
+
 // Public Road Intelligence heatmap — confirmed potholes + segment condition.
 Route::get('/road/map', RoadMapController::class)->name('road.map');
+
+// Public certificate verification — the QR on every impact certificate decodes here.
+Route::get('/impact/verify/{user}/{type}', [ImpactCertificateController::class, 'verify'])->name('impact.verify');
 
 Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->name('paystack.webhook');
 
@@ -46,6 +56,11 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::prefix('impact')->name('impact.')->group(function () {
+        Route::get('/', [ImpactController::class, 'index'])->name('index');
+        Route::get('/certificate/{type}', [ImpactCertificateController::class, 'show'])->name('certificate');
+    });
 
     Route::prefix('wallet')->name('wallet.')->group(function () {
         Route::get('/', [WalletController::class, 'index'])->name('index');

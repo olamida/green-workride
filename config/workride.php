@@ -13,6 +13,11 @@ return [
         'password' => env('WORKRIDE_ADMIN_PASSWORD', 'admin1234'),
     ],
 
+    // Demo accounts (DemoUserSeeder). Weak on purpose — demo-only credentials.
+    'demo' => [
+        'password' => env('WORKRIDE_DEMO_PASSWORD', 'demo1234'),
+    ],
+
     'commission_rate' => env('WORKRIDE_COMMISSION_RATE', 0.10),
 
     'insurance_per_trip' => env('WORKRIDE_INSURANCE_PER_TRIP', 100),
@@ -33,6 +38,14 @@ return [
         'kubwa_cbd' => 800,
         'nyanya_idu' => 700,
         'lugbe_cbd' => 600,
+    ],
+
+    // Approximate corridor distance (km) used for impact when a trip records
+    // no measured route distance.
+    'corridor_distance_km' => [
+        'kubwa_cbd' => 22,
+        'nyanya_idu' => 14,
+        'lugbe_cbd' => 12,
     ],
 
     // CO2 saved per passenger-km (kg).
