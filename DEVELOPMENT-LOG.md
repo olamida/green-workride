@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 7 Complete — Business Dashboard + Receipts + Exports)
+## 2. Current Status (Phase: Foundation / Sprint 8 Complete — Employer Mobility + Rewards & Green Points + Commodity Commerce)
 
 | Area | Status |
 |------|--------|
@@ -36,7 +36,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 6 complete — PWA award UI + Impact certificates (CO₂/Fuel, QR-verifiable) + Impact analytics + demo users |
 | Feature modules | ✅ Sprint 3.5 complete — Time-Bank (ride credits) + Earned wallet + P2P transfers + Payouts (feature-gated `FEATURE_TIME_BANK`) |
 | Feature modules | ✅ Sprint 7 complete — Business dashboard (KPIs + revenue/corridor/subsidy charts) + 5 QR-verifiable financial receipts + CSV exports (transactions, settlements, subsidy) |
-| Tests | ✅ 209 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts) |
+| Feature modules | ✅ Sprint 8 complete — Employer Mobility Programs (org-funded commutes) + Reward Campaigns & Green Points economy + Commodity Commerce (wallet → gold/rice/maize/fuel positions + QR shop orders), all feature-gated |
+| Tests | ✅ 255 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce) |
 
 ---
 
@@ -344,6 +345,52 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (25 new — 209 total, 638 assertions):** `BusinessDashboardTest` (admin-only guard, dashboard render, gross-revenue aggregation excluding free rides, earnings + subsidy KPIs, payouts KPI, 3 CSV export content/headers, non-admin export 403), `ReceiptTest` (guest redirect, passenger/driver own-booking receipt + stranger 403, driver earnings receipt + non-driver 403, top-up receipt owner + stranger 403, subsidy receipt admin + non-admin 403, own monthly statement, invalid month 422, public verify for booking/top-up/statement refs, unknown/bogus reference 404).
 
+### 4.15 Sprint 8 — Employer Mobility + Rewards & Green Points + Commodity Commerce (COMPLETE)
+
+**Schema (8 migrations, all feature-gated by config):**
+- `employers` — name, slug, email, phone, address, program_type (`full`/`one_way`/`percent`/`capped`), coverage_pct (for percent), cap_per_ride_ngn (for capped), active, approved.
+- `employer_members` — employer_id, user_id, employee_id, status (`active`/`suspended`), joined_at; unique `[employer_id, user_id]`.
+- `add_employer_columns_to_bookings` — `employer_id` (nullable FK), `employer_coverage_ngn`, `employer_coverage` enum (`full`/`one_way`/`percent`/`capped`, cast `EmployerCoverageType`).
+- `reward_campaigns` — name, description, audience (`drivers`/`passengers`/`volunteers`/`both`), trigger (`trip_completed`/`volunteer_ride`/`weekly_five_rides`/`monthly_ten_rides`/`pothole_confirmed`), reward_type (`cash`/`earned`/`subsidy`/`green_points`), reward_value, period (`once`/`daily`/`weekly`/`monthly`/`unlimited`), budget_total/budget_spent, sponsor_type/sponsor_name, starts_at/ends_at, active, created_by.
+- `reward_claims` — user_id, campaign_id, trigger, reward_type, reward_value, reference (unique), period_key, meta, awarded_at.
+- `add_green_points_to_users` — `green_points` int default 0.
+- `commodities` — symbol (unique), name, category (`precious_metal`/`agricultural`/`fuel`), unit (gram/kg/bag/litre), current_price_ngn, is_tradable, is_shop_item, active.
+- `commodity_positions` — user_id, commodity_id, quantity, avg_cost_ngn; unique `[user_id, commodity_id]`.
+- `shop_orders` — user_id, reference (unique), items json, total_ngn, paid_from (`cash`/`earned`), status (`placed`/`fulfilled`/`cancelled`), meta, fulfilled_at.
+
+**Enums (12 new + 2 extended):** `EmployerProgramType`, `EmployerCoverageType`, `EmployerMemberStatus`, `EmployerTransactionType` (funding/cover/refund), `RewardAudience`, `RewardTrigger`, `RewardPeriod`, `RewardType` (cash/earned/subsidy/green_points), `SponsorType`, `CommodityCategory`, `OrderPaymentSource` (cash/earned), `OrderStatus`; `TransactionType` gains `CommodityBuy`, `CommoditySell`, `Purchase`, `OrderRefund`; `UserRole` gains `EmployerAdmin` + `isPassenger()` and `assignableCases()` excludes employer_admin.
+
+**Models (9 new + updates):** `Employer` (route-bound via `employer_id`, with `wallet()`, `members()`, `transactions()`, `isProgramRunning()`), `EmployerWallet` (balance + version, optimistic lock), `EmployerTransaction`, `EmployerMember`, `RewardCampaign` (`claims()` FK fixed to `campaign_id`, `isRunningNow()`, `hasBudget()`), `RewardClaim` (`campaign()` FK fixed to `campaign_id`), `Commodity` (`unitLabel()`, `currentValue()`), `CommodityPosition` (`currentValue()`), `ShopOrder` (enum casts). `Booking` gains `employer()` relation + `passengerHoldAmount()`; `User` gains `green_points` + `employers()`/`memberships()` relations; `ActivityLog` gains a static `log()` helper.
+
+**Services:**
+- `EmployerLedgerService` — triple-ledger wallet (`balance`, versioned) with `fund()` (idempotent `FUND-{employer}-{ref}`), `cover()` (COVER at boarding, `EMP-{booking}-COVER` reference), `refund()` (only when a COVER transaction exists — a confirmed-then-cancelled booking has nothing to refund), and `transactions()`.
+- `EmployerService` — `assertEnabled()`, `programFor()`, `coverageFor(booking)` → `[coverage_ngn, type]` from the employer program (full covers the passenger's hold, one-way covers a configurable 50%, percent applies `coverage_pct`, capped applies `cap_per_ride_ngn`), `enroll()`, `members()`, `fund()` passthrough.
+- `RewardService` — sponsor/engine auto-award: `award(user, trigger)` runs every campaign matching trigger + audience + `isRunningNow()` + `hasBudget()`, applies `period` dedupe via `period_key` + unique `reference`, mints cash/earned/subsidy/green-points credits, marks budget_spent, writes `ActivityLog`; `redeemGreenPoints(user, points)` → naira via `green_points_naira_per_point` (min `green_points_min_redeem`), mints an Earned transaction.
+- `CommodityService` — wallet-to-goods commerce, **subsidy NEVER spendable**: `buy()` (cash→earned split via `debitForTransfer`, upserts `CommodityPosition` with weighted average cost), `sell()` (proceeds to cash, `creditForTransfer`, partial sell reduces / full sell deletes position), `portfolio()`, `placeOrder()` (shop items only, `OrderPaymentSource::Cash`|`Earned`, `Purchase` transaction, items JSON), `cancelOrder()` (owner-only, placed-only, full refund via `OrderRefund`), `fulfillOrder()`.
+
+**Integration (Sprint 8 wired into existing flows):**
+- `BookingService::book()` stores `employer_id`/`employer_coverage_ngn`/`employer_coverage` (via `EmployerService::coverageFor`) when the passenger belongs to an active program; `cancelBooking()` refunds any employer coverage back to the employer wallet; `board()` runs `coverPartial` when employer coverage is present; `settle()` covers the full employer amount at boarding.
+- `WalletService::passengerHoldAmount()` gives the hold split; booking holds are reduced by employer coverage so passengers never double-pay.
+- `TripService::completeTrip()` fires ride/volunteer/streak rewards (weekly-five / monthly-ten via `RewardTrigger`), `RoadIntelligenceService` fires the `pothole_confirmed` reward.
+
+**Controllers + routes:**
+- `Admin\EmployerController` — index/create/store/show/fund/enroll (+ CSV bulk enroll parse). `Admin\RewardController` — index/create/store/toggle.
+- `Web\RewardsController` — `/rewards` index + `/rewards/redeem` (Green Points → earned balance). `Web\CommodityController` — `/commodities` market + buy/sell. `Web\ShopController` — `/shop` orders + store + cancel.
+- Admin sidebar gains "Employers" + "Rewards"; rider nav gains "Rewards", "Commodities", "Shop".
+
+**Views:** `admin/employers/index|create|show`, `admin/rewards/index|create`, `rewards/index` (campaigns + green points + redeem), `commodities/index` (market + portfolio), `shop/index` (items + orders + QR note).
+
+**Config (`config/workride.php`):** `employer_programs.enabled` (`FEATURE_EMPLOYER_PROGRAMS`), `rewards.*` (`FEATURE_REWARDS`, volunteer_green_points 10, green_points_naira_per_point 5, green_points_min_redeem 50), `commodities.enabled` (`FEATURE_COMMODITIES`).
+
+**Seeder:** `Sprint8DemoSeeder` (FMF employer + funded ₦2,000,000 wallet + 3 enrolled staff, 2 reward campaigns, 4 commodities — Gold/Rice/Maize/Fuel), wired into `DatabaseSeeder`.
+
+**Bugs fixed (found during Sprint 8 hardening):**
+- `RewardClaim::campaign()` inferred the FK `reward_campaign_id` while the column is `campaign_id` → `admin/rewards` 500'd (`no such column: reward_claims.reward_campaign_id`). Fixed both directions: `campaign()` on `RewardClaim` and `claims()` on `RewardCampaign` now pass `'campaign_id'` explicitly.
+- `Admin\RewardController::store()` validated `type`/`value` but only mapped `value` → `reward_value`, dropping `reward_type` (NOT NULL) → `Integrity constraint violation: reward_campaigns.reward_type`. Now maps `reward_type` too.
+- `EmployerLedgerService::refund()` refunded unconditionally; a booking cancelled while still confirmed has no COVER transaction, so the refund threw. Now refunds only when an `EMP-{booking}-COVER` transaction exists.
+
+**Tests (46 new — 255 total, 765 assertions):** `EmployerTest` (11 — feature-gated, program coverage full/percent/capped, enroll, cover-on-board, cancel-refund, funding, CSV enroll, admin flows), `RewardTest` (14 — disabled no-award, cash/earned/green-points campaigns, budget exhaustion, period dedupe once/weekly, ended campaign skip, redeem + min threshold + over-balance, admin create/toggle), `CommodityCommerceTest` (21 — disabled gate, buy cash/earned, cash→earned split, subsidy never spendable, insufficient funds, inactive/non-tradable, sell partial/full/over-sell, orders cash/earned, subsidy order blocked, inactive item, cancel + foreign/closed cancel, fulfill, portfolio, web market/shop render, web buy/sell/order/cancel flows, validation).
+
 ---
 
 ## 5. Issues Resolved
@@ -440,6 +487,24 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 - **Fix:** Updated assertions to the real contract; replaced the icon HTTP request with an on-disk `assertFileExists` + `filesize` check.
 - **Status:** ✅ Resolved.
 
+### `admin/rewards` 500 — `no such column: reward_claims.reward_campaign_id`
+- **Symptom:** `RewardTest::test_admin_can_create_and_toggle_campaign` got a 500 on the `admin/rewards` index view (`RewardClaim::with('campaign')` failed).
+- **Root cause:** `RewardClaim::campaign()` and `RewardCampaign::claims()` used Eloquent's default FK inference — `reward_campaign_id` — while the actual column is `campaign_id`.
+- **Fix:** Both relations now pass the FK explicitly (`belongsTo(RewardCampaign::class, 'campaign_id')` / `hasMany(RewardClaim::class, 'campaign_id')`).
+- **Status:** ✅ Resolved — regression-tested.
+
+### Creating a reward campaign dropped `reward_type` (NOT NULL)
+- **Symptom:** POST `/admin/rewards` → `Integrity constraint violation: reward_campaigns.reward_type`.
+- **Root cause:** `Admin\RewardController::store()` validated `type`/`value` but only mapped `value` → `reward_value`; `reward_type` (a NOT NULL column) was never set.
+- **Fix:** `store()` now maps `reward_type` from `$data['type']` too.
+- **Status:** ✅ Resolved — covered by the admin create/toggle test.
+
+### `EmployerLedgerService::refund()` threw on confirmed-then-cancelled bookings
+- **Symptom:** Cancelling a booking that was still `confirmed` (never boarded, so no COVER was written) raised an exception inside `refund()`.
+- **Root cause:** `refund()` refunded unconditionally, but an employer can only refund money the wallet actually moved — and money only moves at boarding (`cover()`).
+- **Fix:** `refund()` now returns early unless an `EMP-{booking}-COVER` transaction exists.
+- **Status:** ✅ Resolved — covered by `EmployerTest` cancel-refund cases.
+
 ---
 
 ## 6. How to Work On This Project
@@ -505,6 +570,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 6 (Wk 7) | PWA award UI + impact certificates | ✅ Complete |
 | Sprint 3.5 | Time-Bank (ride credits) + earned wallet + P2P transfers + payouts | ✅ Complete (feature-gated `FEATURE_TIME_BANK`) |
 | Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ✅ Complete |
+| Sprint 8 | Employer mobility programs + rewards/green points + commodity commerce | ✅ Complete (feature-gated `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES`) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -528,6 +594,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.6.0` | Sprint 6 — PWA + Impact | Web App Manifest + service worker + icons + /impact analytics + QR-verifiable CO₂/Fuel certificates + CalculateImpactJob + demo users | 159 (476) | 2026-08-01 |
 | `v0.6.5` | Sprint 3.5 — Time-Bank + Earned + P2P + Payouts | Ride credits (seats owed/repaid) + triple-balance wallet (subsidy→earned→cash hold priority) + driver earnings (fare − commission − union − insurance) + P2P transfers (1% cash fee, earned free) + Moniepoint-mocked payouts — gated on `FEATURE_TIME_BANK` | 184 (561) | 2026-08-01 |
 | `v0.7.0` | Sprint 7 — Business Dashboard + Receipts + Exports | Control Tower "Business" page (gross revenue, MRR, driver earnings, commission/union/insurance, subsidy issued/spent, corridor + revenue-per-day charts) + 5 QR-verifiable financial receipts (booking, driver earnings, wallet top-up, subsidy MDA, monthly statement) with public verify + 3 CSV exports (transactions, settlements, subsidy) | 209 (638) | 2026-08-01 |
+| `v0.8.0` | Sprint 8 — Employer Mobility + Rewards + Commodity Commerce | Employer programs (full/one-way/percent/capped coverage, org-funded commutes, employer wallet + COVER ledger) + reward campaigns (cash/earned/subsidy/green-points, period dedupe, budget caps) + Green Points economy + commodity market & shop (positions, buy/sell, QR orders; subsidy never spendable) — gated on `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES` | 255 (765) | 2026-08-01 |
 
 ---
 

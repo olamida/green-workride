@@ -27,6 +27,8 @@ class BookingService
         private WalletService $wallet,
         private PricingService $pricing,
         private RideCreditService $rideCredits,
+        private EmployerService $employers,
+        private EmployerLedgerService $employerLedger,
     ) {}
 
     public function book(Trip $trip, User $passenger, array $data): Booking
@@ -57,12 +59,18 @@ class BookingService
 
                 $paymentMethod = $this->resolvePaymentMethod($trip, $data);
 
+                $fare = $trip->fare_per_seat;
+                [$employerContribution, $employerCoverage, $employer] = $this->employers->bestCoverage($trip, $passenger, (float) $fare);
+
                 $booking = $trip->bookings()->create([
                     'passenger_id' => $passenger->id,
                     'pickup_lat' => $data['pickup_lat'] ?? null,
                     'pickup_lng' => $data['pickup_lng'] ?? null,
                     'status' => BookingStatus::Confirmed,
-                    'fare_paid' => $paymentMethod === PaymentMethod::RideCredit ? 0 : $trip->fare_per_seat,
+                    'fare_paid' => $paymentMethod === PaymentMethod::RideCredit ? 0 : $fare,
+                    'employer_id' => $employer?->id,
+                    'employer_contribution' => $employerContribution,
+                    'employer_coverage' => $employerCoverage?->value,
                     'payment_method' => $paymentMethod,
                 ]);
 
@@ -115,6 +123,8 @@ class BookingService
                 $this->rideCredits->cancelRideCredit($booking);
             }
 
+            $this->employerLedger->refund($booking);
+
             $booking->trip->increment('available_seats');
 
             event(new BookingCancelled($booking->fresh()));
@@ -155,7 +165,8 @@ class BookingService
 
             if ($this->needsHold($booking->trip, $booking->payment_method)) {
                 $capturePercent = (float) config('workride.no_show_capture_percent', 50);
-                $this->wallet->captureForBooking($booking, round((float) $booking->fare_paid * $capturePercent / 100, 2));
+                $this->wallet->captureForBooking($booking, round($booking->passengerHoldAmount() * $capturePercent / 100, 2));
+                $this->employerLedger->coverPartial($booking, $capturePercent);
             }
 
             if ($booking->payment_method === PaymentMethod::RideCredit) {
@@ -180,12 +191,14 @@ class BookingService
 
         if ($method === PaymentMethod::Cash) {
             $this->wallet->logCashCollection($booking);
+            $this->employerLedger->cover($booking);
 
             return;
         }
 
         if (in_array($method, [PaymentMethod::Wallet, PaymentMethod::SubsidyCredit], true)) {
             $this->wallet->captureForBooking($booking);
+            $this->employerLedger->cover($booking);
 
             if (config('workride.time_bank.enabled')) {
                 $this->creditDriverEarning($booking);

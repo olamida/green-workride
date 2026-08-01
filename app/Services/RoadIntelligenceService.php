@@ -2,10 +2,12 @@
 
 namespace App\Services;
 
+use App\Enums\RewardTrigger;
 use App\Enums\RoadCondition;
 use App\Enums\RoadEventType;
 use App\Models\RoadEvent;
 use App\Models\RoadSegment;
+use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -21,7 +23,10 @@ use Throwable;
  */
 class RoadIntelligenceService
 {
-    public function __construct(private GeofenceService $geofence) {}
+    public function __construct(
+        private GeofenceService $geofence,
+        private RewardService $rewards,
+    ) {}
 
     /**
      * Record one sensor reading. Returns the persisted event, and triggers
@@ -46,6 +51,18 @@ class RoadIntelligenceService
 
         if ($event->type === RoadEventType::Pothole && $event->is_confirmed && $event->road_name) {
             $this->refreshSegment($event->road_name);
+        }
+
+        if ($event->is_confirmed && $event->user_id) {
+            $reporter = User::find($event->user_id);
+
+            if ($reporter) {
+                $this->rewards->award(
+                    $reporter,
+                    RewardTrigger::PotholeConfirmed,
+                    ['event_key' => "road-event-{$event->id}", 'road_event_id' => $event->id],
+                );
+            }
         }
 
         return $event;

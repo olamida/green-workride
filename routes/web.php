@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\BusinessController;
+use App\Http\Controllers\Admin\EmployerController;
 use App\Http\Controllers\Admin\GtfsController as AdminGtfsController;
+use App\Http\Controllers\Admin\RewardController as AdminRewardController;
 use App\Http\Controllers\Admin\RoadController as AdminRoadController;
 use App\Http\Controllers\Admin\SubsidyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -10,6 +12,7 @@ use App\Http\Controllers\Admin\VerificationController as AdminVerificationContro
 use App\Http\Controllers\Admin\WorkplaceController as AdminWorkplaceController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingController;
+use App\Http\Controllers\Web\CommodityController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
@@ -18,7 +21,9 @@ use App\Http\Controllers\Web\ImpactController;
 use App\Http\Controllers\Web\PaystackWebhookController;
 use App\Http\Controllers\Web\PwaController;
 use App\Http\Controllers\Web\ReceiptController;
+use App\Http\Controllers\Web\RewardsController;
 use App\Http\Controllers\Web\RoadMapController;
+use App\Http\Controllers\Web\ShopController;
 use App\Http\Controllers\Web\TripBoardController;
 use App\Http\Controllers\Web\VerificationController;
 use App\Http\Controllers\Web\WalletController;
@@ -72,6 +77,23 @@ Route::middleware('auth')->group(function () {
         Route::post('/topup', [WalletController::class, 'topUp'])->name('topup');
         Route::post('/transfer', [WalletController::class, 'transfer'])->name('transfer');
         Route::post('/withdraw', [WalletController::class, 'withdraw'])->name('withdraw');
+    });
+
+    Route::prefix('rewards')->name('rewards.')->group(function () {
+        Route::get('/', [RewardsController::class, 'index'])->name('index');
+        Route::post('/redeem', [RewardsController::class, 'redeem'])->name('redeem');
+    });
+
+    Route::prefix('commodities')->name('commodities.')->group(function () {
+        Route::get('/', [CommodityController::class, 'index'])->name('index');
+        Route::post('/buy', [CommodityController::class, 'buy'])->name('buy');
+        Route::post('/sell', [CommodityController::class, 'sell'])->name('sell');
+    });
+
+    Route::prefix('shop')->name('shop.')->group(function () {
+        Route::get('/', [ShopController::class, 'index'])->name('index');
+        Route::post('/orders', [ShopController::class, 'store'])->name('store');
+        Route::post('/orders/{order}/cancel', [ShopController::class, 'cancel'])->name('cancel');
     });
 
     Route::prefix('verify')->name('verification.')->group(function () {
@@ -128,5 +150,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/business/export/transactions', [BusinessController::class, 'exportTransactions'])->name('business.export.transactions');
         Route::get('/business/export/settlements', [BusinessController::class, 'exportSettlements'])->name('business.export.settlements');
         Route::get('/business/export/subsidy', [BusinessController::class, 'exportSubsidy'])->name('business.export.subsidy');
+
+        Route::get('/employers', [EmployerController::class, 'index'])->name('employers.index');
+        Route::get('/employers/create', [EmployerController::class, 'create'])->name('employers.create');
+        Route::post('/employers', [EmployerController::class, 'store'])->name('employers.store');
+        Route::get('/employers/{employer}', [EmployerController::class, 'show'])->name('employers.show');
+        Route::post('/employers/{employer}/fund', [EmployerController::class, 'fund'])->name('employers.fund');
+        Route::post('/employers/{employer}/enroll', [EmployerController::class, 'enroll'])->name('employers.enroll');
+
+        Route::get('/rewards', [AdminRewardController::class, 'index'])->name('rewards.index');
+        Route::get('/rewards/create', [AdminRewardController::class, 'create'])->name('rewards.create');
+        Route::post('/rewards', [AdminRewardController::class, 'store'])->name('rewards.store');
+        Route::post('/rewards/{campaign}/toggle', [AdminRewardController::class, 'toggle'])->name('rewards.toggle');
     });
 });

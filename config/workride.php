@@ -159,4 +159,23 @@ return [
         'min_amount' => env('WORKRIDE_PAYOUT_MIN_AMOUNT', 100),
         'max_amount' => env('WORKRIDE_PAYOUT_MAX_AMOUNT', 100000),
     ],
+
+    // Corporate Mobility Programs (Sprint 8) — employers pay staff commutes.
+    'employer_programs' => [
+        'enabled' => (bool) env('FEATURE_EMPLOYER_PROGRAMS', false),
+    ],
+
+    // Reward Campaigns + Green Points economy (Sprint 8).
+    'rewards' => [
+        'enabled' => (bool) env('FEATURE_REWARDS', false),
+        // Core guide §6 Workflow 2: volunteer drivers earn green points per ride.
+        'volunteer_green_points' => env('WORKRIDE_VOLUNTEER_GREEN_POINTS', 10),
+        'green_points_naira_per_point' => env('WORKRIDE_GREEN_POINTS_NAIRA_PER_POINT', 5),
+        'green_points_min_redeem' => env('WORKRIDE_GREEN_POINTS_MIN_REDEEM', 50),
+    ],
+
+    // Wallet-to-commodity commerce (Sprint 8) — gold, rice, maize, fuel.
+    'commodities' => [
+        'enabled' => (bool) env('FEATURE_COMMODITIES', false),
+    ],
 ];

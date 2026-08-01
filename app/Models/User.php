@@ -31,6 +31,7 @@ class User extends Authenticatable
         'nin_last4',
         'is_banned',
         'has_overdue_ride_credit',
+        'green_points',
     ];
 
     protected $hidden = [
@@ -48,6 +49,7 @@ class User extends Authenticatable
             'verification_level' => VerificationLevel::class,
             'is_banned' => 'boolean',
             'has_overdue_ride_credit' => 'boolean',
+            'green_points' => 'integer',
         ];
     }
 
@@ -99,6 +101,26 @@ class User extends Authenticatable
     public function receivedTransfers(): HasMany
     {
         return $this->hasMany(P2pTransfer::class, 'receiver_user_id');
+    }
+
+    public function employerMemberships(): HasMany
+    {
+        return $this->hasMany(EmployerMember::class);
+    }
+
+    public function rewardClaims(): HasMany
+    {
+        return $this->hasMany(RewardClaim::class);
+    }
+
+    public function commodityPositions(): HasMany
+    {
+        return $this->hasMany(CommodityPosition::class);
+    }
+
+    public function shopOrders(): HasMany
+    {
+        return $this->hasMany(ShopOrder::class);
     }
 
     public function activityLogs(): HasMany

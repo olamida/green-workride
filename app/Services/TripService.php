@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\BookingStatus;
 use App\Enums\Corridor;
+use App\Enums\RewardTrigger;
 use App\Enums\TripStatus;
 use App\Events\TripCancelled;
 use App\Events\TripCompleted;
@@ -24,6 +25,7 @@ class TripService
         private GeofenceService $geofence,
         private BookingService $bookings,
         private RideCreditService $rideCredits,
+        private RewardService $rewards,
     ) {}
 
     public function publish(User $driver, array $data): Trip
@@ -132,6 +134,8 @@ class TripService
 
         dispatch(new CalculateImpactJob($trip->id));
 
+        $this->awardCompletionRewards($trip);
+
         return $trip->fresh();
     }
 
@@ -193,6 +197,33 @@ class TripService
     {
         if ($trip->driver_id !== $user->id) {
             throw ValidationException::withMessages(['trip' => 'Only the trip driver can perform this action.']);
+        }
+    }
+
+    /**
+     * Reward engine wiring (guide §2.2 stream #7): completed-trip triggers for
+     * the driver and every carried passenger, the weekly/monthly streak
+     * triggers, and the core green-points economy for volunteer rides.
+     */
+    private function awardCompletionRewards(Trip $trip): void
+    {
+        $context = ['event_key' => "trip-{$trip->id}", 'trip_id' => $trip->id];
+
+        if ($trip->is_free_volunteer) {
+            $this->rewards->creditGreenPoints($trip->driver, (int) config('workride.rewards.volunteer_green_points', 10));
+            $this->rewards->award($trip->driver, RewardTrigger::VolunteerRide, $context);
+        }
+
+        $this->rewards->award($trip->driver, RewardTrigger::TripCompleted, $context);
+        $this->rewards->award($trip->driver, RewardTrigger::WeeklyFiveRides, $context);
+        $this->rewards->award($trip->driver, RewardTrigger::MonthlyTenRides, $context);
+
+        foreach ($trip->bookings as $booking) {
+            if (in_array($booking->status->value, ['boarded', 'completed'], true)) {
+                $this->rewards->award($booking->passenger, RewardTrigger::TripCompleted, $context);
+                $this->rewards->award($booking->passenger, RewardTrigger::WeeklyFiveRides, $context);
+                $this->rewards->award($booking->passenger, RewardTrigger::MonthlyTenRides, $context);
+            }
         }
     }
 

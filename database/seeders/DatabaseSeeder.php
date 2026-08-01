@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             GtfsStopSeeder::class,
             AdminUserSeeder::class,
             DemoUserSeeder::class,
+            Sprint8DemoSeeder::class,
         ]);
     }
 }

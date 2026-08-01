@@ -16,6 +16,10 @@ enum TransactionType: string
     case P2pCredit = 'p2p_credit';
     case Fee = 'fee';
     case Payout = 'payout';
+    case CommodityBuy = 'commodity_buy';
+    case CommoditySell = 'commodity_sell';
+    case Purchase = 'purchase';
+    case OrderRefund = 'order_refund';
 
     public function label(): string
     {
@@ -32,6 +36,10 @@ enum TransactionType: string
             self::P2pCredit => 'Transfer Received',
             self::Fee => 'Platform Fee',
             self::Payout => 'Withdrawal',
+            self::CommodityBuy => 'Commodity Purchase',
+            self::CommoditySell => 'Commodity Sale',
+            self::Purchase => 'Shop Order',
+            self::OrderRefund => 'Order Refund',
         };
     }
 }

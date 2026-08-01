@@ -25,6 +25,9 @@
                     <x-nav-link :active="request()->routeIs('trips.*')" href="{{ route('trips.index') }}">Trips</x-nav-link>
                     <x-nav-link :active="request()->routeIs('bookings.*')" href="{{ route('bookings.index') }}">My Rides</x-nav-link>
                     <x-nav-link :active="request()->routeIs('wallet.*')" href="{{ route('wallet.index') }}">Wallet</x-nav-link>
+                    <x-nav-link :active="request()->routeIs('rewards.*')" href="{{ route('rewards.index') }}">Rewards</x-nav-link>
+                    <x-nav-link :active="request()->routeIs('commodities.*')" href="{{ route('commodities.index') }}">Commodities</x-nav-link>
+                    <x-nav-link :active="request()->routeIs('shop.*')" href="{{ route('shop.index') }}">Shop</x-nav-link>
                     <x-nav-link :active="request()->routeIs('impact.*')" href="{{ route('impact.index') }}">Impact</x-nav-link>
                     <x-nav-link :active="request()->routeIs('verification.*')" href="{{ route('verification.index') }}">Verify</x-nav-link>
                     <x-nav-link :active="request()->routeIs('road.map')" href="{{ route('road.map') }}">Road Map</x-nav-link>

@@ -51,7 +51,7 @@ class WalletService
     public function holdForBooking(Booking $booking): void
     {
         $wallet = $this->walletFor($booking->passenger);
-        $amount = round((float) $booking->fare_paid, 2);
+        $amount = $booking->passengerHoldAmount();
 
         if ($amount <= 0) {
             return;
@@ -92,7 +92,7 @@ class WalletService
             return;
         }
 
-        $amount = round((float) $booking->fare_paid, 2);
+        $amount = $booking->passengerHoldAmount();
         $capture = round(min(max($captureAmount ?? $amount, 0), $amount), 2);
 
         if ($capture >= $amount) {
@@ -132,7 +132,7 @@ class WalletService
             return;
         }
 
-        $this->restore($transaction->wallet, $transaction, (float) $booking->fare_paid);
+        $this->restore($transaction->wallet, $transaction, $booking->passengerHoldAmount());
 
         $transaction->update([
             'type' => TransactionType::Refund,
@@ -154,7 +154,7 @@ class WalletService
         }
 
         $wallet = $this->walletFor($booking->trip->driver);
-        $amount = round((float) $booking->fare_paid, 2);
+        $amount = $booking->passengerHoldAmount();
 
         if ($amount <= 0) {
             return;
