@@ -175,7 +175,9 @@
             <div class="rounded-2xl border border-ink-200 bg-white p-6">
                 <div class="flex items-center justify-between">
                     <h2 class="font-heading font-semibold text-ink-900">Recent transactions</h2>
-                    <span class="text-xs text-ink-400">Last {{ $transactions->count() }}</span>
+                    <a href="{{ route('receipts.statement', now()->format('Y-m')) }}" class="text-xs font-semibold text-forest-600 hover:underline">
+                        Monthly statement →
+                    </a>
                 </div>
 
                 <div class="mt-4 space-y-2">
@@ -192,6 +194,9 @@
                                 <p class="text-sm font-medium text-ink-800">{{ $transaction->description ?? $transaction->type->label() }}</p>
                                 <p class="font-mono text-[11px] text-ink-400">
                                     {{ $transaction->created_at->format('d M Y, H:i') }} · {{ $transaction->type->label() }}
+                                    @if ($transaction->type->value === 'top_up' && $transaction->id)
+                                        · <a href="{{ route('receipts.topup', $transaction) }}" class="font-semibold text-forest-600 hover:underline">receipt</a>
+                                    @endif
                                 </p>
                             </div>
                             <span @class([

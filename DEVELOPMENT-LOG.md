@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 6 Complete + Sprint 3.5 Time-Bank)
+## 2. Current Status (Phase: Foundation / Sprint 7 Complete — Business Dashboard + Receipts + Exports)
 
 | Area | Status |
 |------|--------|
@@ -35,7 +35,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 5 complete — Road Sensor + Road Intelligence (IRI, pothole clustering, FERMA export) + Routing API cost caps |
 | Feature modules | ✅ Sprint 6 complete — PWA award UI + Impact certificates (CO₂/Fuel, QR-verifiable) + Impact analytics + demo users |
 | Feature modules | ✅ Sprint 3.5 complete — Time-Bank (ride credits) + Earned wallet + P2P transfers + Payouts (feature-gated `FEATURE_TIME_BANK`) |
-| Tests | ✅ 184 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer) |
+| Feature modules | ✅ Sprint 7 complete — Business dashboard (KPIs + revenue/corridor/subsidy charts) + 5 QR-verifiable financial receipts + CSV exports (transactions, settlements, subsidy) |
+| Tests | ✅ 209 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts) |
 
 ---
 
@@ -312,6 +313,37 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (25 new — 184 total, 561 assertions):** `RideCreditTest` (disabled gate, NIN required, vehicle required, owed-seats booking with no hold, max-owed-seats cap, cancel waives, overdue blocks, trip completion repays a seat, API index), `EarnedWalletTest` (earning = fare − commission − union − insurance on capture, idempotent double-settle, disabled no-op, payout earned-first then cash, subsidy never withdrawable, min amount, API earned balance + withdraw validation), `P2pTransferTest` (disabled gate, cash fee, earned free, receiver L1+, sender L2+ over threshold, daily limit, subsidy never transferable, history).
 
+### 4.14 Sprint 7 — Business Dashboard + Receipts + Exports (COMPLETE)
+
+**Business Controller (`app/Http/Controllers/Admin/BusinessController.php`)** — the Control Tower "Business" page (per guide §8 dashboard + §11 receipts):
+- `index()` aggregates: gross revenue (sum of captured/fare-bearing bookings + cash fares), MRR (last 30 days), driver earnings, platform commission, union fees, insurance collected, P2P fees, payouts (net cash moved out), subsidy issued/spent/remaining, cash/earned held, `cash_collected_log`, paid rides; plus `revenueByDay()` (last 14 days), `tripsByCorridor()`, `subsidyByWorkplace()` (issued vs spent + utilization).
+- CSV exports via a private `csv()` helper (`text/csv` + attachment disposition): `exportTransactions()` (reference, date, user, email, type, amount, description), `exportSettlements()` (per-driver totals from `Transaction` `meta->>"$.fare"`), `exportSubsidy()` (workplace, staff funded, issued, spent, utilisation).
+
+**Routes (`routes/web.php`):** `admin.business.index`, `admin.business.export.transactions|settlements|subsidy` in the admin group; "Business" sidebar link added to `layouts/admin.blade.php`.
+
+**View (`resources/views/admin/business.blade.php`):** KPI cards, inline-SVG revenue-per-day bar chart (no CSS-class/JS chart dependency), corridor revenue list, subsidy per-workplace table with utilization pill.
+
+**`ReceiptController` (`app/Http/Controllers/Web/ReceiptController.php`)** — 5 printable financial receipts (guide §14 types 1,2,3,4,8; the CO₂/Fuel certificates and FERMA road report already ship), all QR-verifiable:
+- `booking(Booking)` — Trip Booking Receipt (`BK-{id}`), passenger/driver/admin.
+- `earnings(Booking)` — Driver Earnings Receipt (`EARN-{bookingId}`) with commission/union/insurance breakdown via `PricingService`.
+- `topup(Transaction)` — Wallet Top-up Receipt (Paystack-funded, `TOPUP-{txRef}`), wallet owner/admin.
+- `subsidy(Transaction)` — Subsidy Credit Receipt (MDA audit trail), admin-only.
+- `statement(Request, string $month)` — Monthly Commute Statement (`ST-{userId}-{Y-m}`) with per-payment-method totals + ride log; admins can pass `?user=`.
+- `verify(type, reference)` — public QR target resolving `BK-`/`EARN-`/`TOPUP-`/subsidy-reference/`ST-` refs → `receipts.verify` view (guest-safe `layouts.public`), with a `verified` flag (confirmed/boarded/completed for bookings, EARN transaction exists for earnings).
+- Private `render()` builds `verifyUrl` + SVG QR data-URI (`SimpleSoftwareIO\QrCode`) + issued-at timestamp; layout requires `holder` (passenger/driver/user name) for the sheet header.
+
+**Views (`resources/views/receipts/`):** shared printable `layout.blade.php` (branded sheet, QR footer, print/`@media print` button hiding, `WORKRIDE VERIFIED` stamp) + `booking/earnings/topup/subsidy/statement/verify`.
+
+**UI wiring:** receipt link per paid booking in `bookings/index.blade.php`; "Earnings receipt" for boarded/completed paid bookings in `trips/show.blade.php`; "Monthly statement →" in the wallet recent-transactions header; per-topup receipt link in wallet rows; the `MDA-…` subsidy reference in `admin/subsidies.blade.php` now links to the subsidy receipt.
+
+**Routes:** public `GET /receipts/verify/{type}/{reference}` + auth group `receipts.booking/{booking}`, `receipts.earnings/{booking}`, `receipts.topup/{transaction}`, `receipts.subsidy/{transaction}`, `receipts.statement/{month}`.
+
+**Bugs fixed (found during Sprint 7 hardening):**
+- The shared receipt layout referenced `$holder` (line 103) but no printable-render path supplied it → `Undefined variable $holder` view exception. Now every `render()` call passes `holder` (passenger/driver/user name).
+- `verifyBooking()` used `in_array($booking->status, [...->value], true)` — the cast `status` is a `BookingStatus` enum, so the strict comparison against string values always failed and the verify page showed "no payment yet". Now compares against `BookingStatus` enum instances.
+
+**Tests (25 new — 209 total, 638 assertions):** `BusinessDashboardTest` (admin-only guard, dashboard render, gross-revenue aggregation excluding free rides, earnings + subsidy KPIs, payouts KPI, 3 CSV export content/headers, non-admin export 403), `ReceiptTest` (guest redirect, passenger/driver own-booking receipt + stranger 403, driver earnings receipt + non-driver 403, top-up receipt owner + stranger 403, subsidy receipt admin + non-admin 403, own monthly statement, invalid month 422, public verify for booking/top-up/statement refs, unknown/bogus reference 404).
+
 ---
 
 ## 5. Issues Resolved
@@ -472,13 +504,12 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ✅ Complete |
 | Sprint 6 (Wk 7) | PWA award UI + impact certificates | ✅ Complete |
 | Sprint 3.5 | Time-Bank (ride credits) + earned wallet + P2P transfers + payouts | ✅ Complete (feature-gated `FEATURE_TIME_BANK`) |
-| Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ⏳ Next |
+| Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ✅ Complete |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
 2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
 3. Add the v3.0/v4.0 operations tables (demand surveys, forecasts, assets, maintenance) as a follow-up schema pass
-4. Sprint 7 — Business dashboard + receipts + exports (receipts 8 types per guide §14)
 
 ---
 
@@ -496,6 +527,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.5.0` | Sprint 5 — Road Sensor + Intelligence + Routing | useRoadSensor.js + POST /api/v1/road-events + IRI clustering + FERMA export + RoutingService cost caps + docker-compose | 134 (409) | 2026-08-01 |
 | `v0.6.0` | Sprint 6 — PWA + Impact | Web App Manifest + service worker + icons + /impact analytics + QR-verifiable CO₂/Fuel certificates + CalculateImpactJob + demo users | 159 (476) | 2026-08-01 |
 | `v0.6.5` | Sprint 3.5 — Time-Bank + Earned + P2P + Payouts | Ride credits (seats owed/repaid) + triple-balance wallet (subsidy→earned→cash hold priority) + driver earnings (fare − commission − union − insurance) + P2P transfers (1% cash fee, earned free) + Moniepoint-mocked payouts — gated on `FEATURE_TIME_BANK` | 184 (561) | 2026-08-01 |
+| `v0.7.0` | Sprint 7 — Business Dashboard + Receipts + Exports | Control Tower "Business" page (gross revenue, MRR, driver earnings, commission/union/insurance, subsidy issued/spent, corridor + revenue-per-day charts) + 5 QR-verifiable financial receipts (booking, driver earnings, wallet top-up, subsidy MDA, monthly statement) with public verify + 3 CSV exports (transactions, settlements, subsidy) | 209 (638) | 2026-08-01 |
 
 ---
 

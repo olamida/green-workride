@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminController;
+use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\GtfsController as AdminGtfsController;
 use App\Http\Controllers\Admin\RoadController as AdminRoadController;
 use App\Http\Controllers\Admin\SubsidyController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Web\ImpactCertificateController;
 use App\Http\Controllers\Web\ImpactController;
 use App\Http\Controllers\Web\PaystackWebhookController;
 use App\Http\Controllers\Web\PwaController;
+use App\Http\Controllers\Web\ReceiptController;
 use App\Http\Controllers\Web\RoadMapController;
 use App\Http\Controllers\Web\TripBoardController;
 use App\Http\Controllers\Web\VerificationController;
@@ -33,6 +35,9 @@ Route::get('/road/map', RoadMapController::class)->name('road.map');
 
 // Public certificate verification — the QR on every impact certificate decodes here.
 Route::get('/impact/verify/{user}/{type}', [ImpactCertificateController::class, 'verify'])->name('impact.verify');
+
+// Public receipt verification — the QR on every receipt decodes here.
+Route::get('/receipts/verify/{type}/{reference}', [ReceiptController::class, 'verify'])->name('receipts.verify');
 
 Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->name('paystack.webhook');
 
@@ -75,6 +80,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/nin', [VerificationController::class, 'storeNin'])->name('nin');
     });
 
+    Route::prefix('receipts')->name('receipts.')->group(function () {
+        Route::get('/booking/{booking}', [ReceiptController::class, 'booking'])->name('booking');
+        Route::get('/earnings/{booking}', [ReceiptController::class, 'earnings'])->name('earnings');
+        Route::get('/topup/{transaction}', [ReceiptController::class, 'topup'])->name('topup');
+        Route::get('/subsidy/{transaction}', [ReceiptController::class, 'subsidy'])->name('subsidy');
+        Route::get('/statement/{month}', [ReceiptController::class, 'statement'])->name('statement');
+    });
+
     Route::resource('trips', TripBoardController::class)->only(['index', 'create', 'store', 'show']);
     Route::post('/trips/{trip}/start', [TripBoardController::class, 'start'])->name('trips.start');
     Route::post('/trips/{trip}/complete', [TripBoardController::class, 'complete'])->name('trips.complete');
@@ -110,5 +123,10 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/road', [AdminRoadController::class, 'index'])->name('road.index');
         Route::get('/road/export', [AdminRoadController::class, 'export'])->name('road.export');
+
+        Route::get('/business', [BusinessController::class, 'index'])->name('business.index');
+        Route::get('/business/export/transactions', [BusinessController::class, 'exportTransactions'])->name('business.export.transactions');
+        Route::get('/business/export/settlements', [BusinessController::class, 'exportSettlements'])->name('business.export.settlements');
+        Route::get('/business/export/subsidy', [BusinessController::class, 'exportSubsidy'])->name('business.export.subsidy');
     });
 });

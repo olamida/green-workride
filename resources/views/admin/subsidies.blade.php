@@ -99,7 +99,9 @@
                             <td class="px-5 py-4 text-sm text-ink-500">
                                 {{ $transaction->wallet?->user?->workplace?->name ?? '—' }}
                             </td>
-                            <td class="px-5 py-4 font-mono text-xs text-ink-500">{{ $transaction->reference }}</td>
+                            <td class="px-5 py-4 font-mono text-xs text-ink-500">
+                                <a href="{{ route('receipts.subsidy', $transaction) }}" class="font-semibold text-forest-600 hover:underline">{{ $transaction->reference }}</a>
+                            </td>
                             <td class="px-5 py-4 text-right font-mono text-sm font-semibold text-forest-700">
                                 +₦{{ number_format((float) $transaction->amount, 2) }}
                             </td>

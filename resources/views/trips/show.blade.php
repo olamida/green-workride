@@ -105,6 +105,11 @@
                                             <button class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 transition hover:bg-ink-100">No-show</button>
                                         </form>
                                     @endif
+                                    @if ((float) $booking->fare_paid > 0 && in_array($booking->status->value, ['boarded', 'completed'], true))
+                                        <a href="{{ route('receipts.earnings', $booking) }}" class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 transition hover:bg-white">
+                                            Earnings receipt
+                                        </a>
+                                    @endif
                                 </div>
                             </div>
                         @empty
