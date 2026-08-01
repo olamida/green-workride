@@ -23,6 +23,13 @@ class RoadEvent extends Model
         'road_name',
     ];
 
+    // Mirror DB column defaults so freshly-created models hold the real values
+    // in memory (the DB default is otherwise only applied on insert).
+    protected $attributes = [
+        'severity' => 1,
+        'is_confirmed' => false,
+    ];
+
     protected function casts(): array
     {
         return [

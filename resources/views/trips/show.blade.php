@@ -139,6 +139,25 @@
                     </div>
                 </div>
             @endif
+
+            @if ($trip->status->value === 'active' && $trip->driver_id === $user->id)
+                <div class="rounded-2xl border border-ink-200 bg-white p-6"
+                     x-data="roadSensor({ threshold: {{ config('workride.road_sensor.pothole_z_threshold') }}, endpoint: '/api/v1/road-events' })">
+                    <h2 class="font-heading font-semibold text-ink-900">Road sensor</h2>
+                    <p class="mt-1 text-sm text-ink-500">
+                        Your phone detects potholes (accelerometer Z &gt; {{ config('workride.road_sensor.pothole_z_threshold') }})
+                        while you drive — anonymised into the Road Intelligence map.
+                    </p>
+                    <div class="mt-4 flex items-center gap-3 rounded-xl bg-paper px-4 py-3">
+                        <span class="relative flex h-3 w-3">
+                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-forest-400 opacity-75"></span>
+                            <span class="relative inline-flex h-3 w-3 rounded-full bg-forest-500"></span>
+                        </span>
+                        <span class="text-sm font-medium text-ink-700" x-text="status === 'listening' ? 'Listening for potholes…' : status === 'unsupported' ? 'Device motion not supported' : status === 'denied' ? 'Sensor permission denied' : 'Sensor idle'"></span>
+                        <span class="ml-auto font-mono text-sm text-ink-500" x-show="hits > 0"><span x-text="hits"></span> hit(s)</span>
+                    </div>
+                </div>
+            @endif
         </div>
 
         <div class="space-y-6">

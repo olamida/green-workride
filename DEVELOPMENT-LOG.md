@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 4 Complete)
+## 2. Current Status (Phase: Foundation / Sprint 5 Complete)
 
 | Area | Status |
 |------|--------|
@@ -32,7 +32,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 2 complete — Trip publishing + atomic booking + Reverb chat |
 | Feature modules | ✅ Sprint 3 complete — Wallet dual balance + Paystack top-up + Subsidy bulk credit |
 | Feature modules | ✅ Sprint 4 complete — GTFS Publisher (static feed + GTFS-RT) |
-| Tests | ✅ 108 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS) |
+| Feature modules | ✅ Sprint 5 complete — Road Sensor + Road Intelligence (IRI, pothole clustering, FERMA export) + Routing API cost caps |
+| Tests | ✅ 134 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing) |
 
 ---
 
@@ -209,6 +210,41 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (18 new — 108 total, 339 assertions):** `GtfsServiceTest` (7-file zip, feed metadata, per-corridor routes, relational-vs-JSON waypoint precedence, JSON fallback, synthetic stops, feed-path lifecycle), `GtfsRtTest` (a wire-format decoder proves only active trips with coords are included, vehicle on field 4, start_time on field 4, header version 2.0 + timestamp, empty trip-updates snapshot), `GtfsControllerTest` (public endpoints, 404 before generation, download after, admin dashboard gating, regenerate).
 
+### 4.11 Sprint 5 — Road Sensor + Road Intelligence + Routing Cost Caps (COMPLETE)
+
+**Schema (1 new migration):** `api_cost_logs` — `provider` (osrm/google/mapbox), `service`, `cost_naira` decimal(12,2), `meta` json, indexed `[provider, created_at]` and `[service, created_at]`. Model `ApiCostLog` (decimal:2 + array casts).
+
+**Infrastructure (open-source-first per the Tools Selection Guide):**
+- `RoutingService` — strategy chain driven by `config/workride.php` `routing.primary` (default `osrm`, OSRM self-hosted = free): asserts free OSRM host first, falls back to Google Directions, then Mapbox; Google/Mapbox only run when their key is present **and** `withinMonthlyCap()` passes. Every paid call is logged via `CostLogger` → `api_cost_logs` (₦20/Google, ₦25/Mapbox per request). Returns `[distance_m, duration_s, points]`; Google polyline decoded client-side. Throws `RoutingUnavailableException` when no provider can serve.
+- `CostLogger` — `log()`, `monthlySpend(?provider)`, `withinMonthlyCap($additional)`, `monthlyCalls(?provider)`; monthly cap from `workride.api_caps.monthly_naira` (default ₦20,000) prevents API-bill surprise in the field.
+- `docker-compose.yml` — `redis:7-alpine` on by default; `osrm`, `postgis/postgres:15-3.4`, `ghcr.io/mobilitydata/gtfs-validator`, `metabase` all behind `profiles: ['selfhost']` (future self-host targets, not wired to `.env` yet). `.env.example` documents the `OSRM_*`, `GOOGLE_MAPS_*`, `MAPBOX_*`, `WORKRIDE_API_MONTHLY_CAP`, and road-sensor toggles.
+
+**`RoadIntelligenceService`** — World Bank RoadLab method:
+- `recordEvent()` persists one sensor reading, runs confirmation clustering, refreshes the event, then updates its road segment when confirmed.
+- `confirmClusters()` — groups unconfirmed events of the same type within `pothole_confirm.radius_m` (20 m) and `within_hours` (72 h); any cluster of `min_reports` (5) is confirmed (`is_confirmed = true`), then each confirmed pothole refreshes its `road_segments` row.
+- `iri($z, $speed)` = `alpha * sqrt(z²) / speed + beta` (alpha 2.0, beta 1.5 from `road_sensor.*`), mapped via `conditionFor()` to the existing `iri_thresholds` bands (Excellent <4, Good <6, Fair <10, Poor ≥10).
+- `refreshSegment()`, `confirmedPotholes(?hours)`, `segmentsByCondition()`, `fermaExport()` (CSV rows: road_name, lat, lng, type, severity, reported_at).
+
+**API + Web:**
+- `POST /api/v1/road-events` (Sanctum) — `RoadSensorController::store` validates type via `Rule::enum(RoadEventType::class)`, severity 1–5, speed, accelerometer_z; rejects points outside the FCT bounding box (422, "Road events can only be collected inside the FCT."). Returns 201 with the persisted event.
+- `GET /api/v1/road-events` (public) — confirmed potholes only, optional `hours` filter, anonymized (no `user_id`).
+- `GET /road/map` (public, `RoadMapController`) — Leaflet heatmap with severity-colored dots (≥4 red, 3 gold, else green) + worst-segments IRI table. Uses new guest-safe `layouts/public` (the app layout assumes `auth()->user()`).
+- `GET /admin/road` + `GET /admin/road/export` — Ops dashboard (total/unconfirmed/confirmed potholes, segments, condition breakdown) + FERMA-ready CSV download.
+
+**Frontend:**
+- `use-road-sensor.js` — Alpine `roadSensor` component: listens to `DeviceMotionEvent`, flags hits where Z-acceleration > `road_sensor.pothole_z_threshold` (15), throttles to one report / 30 s, reads `navigator.geolocation`, POSTs to the API. Wired into `trips/show` for the active driver.
+- `road-map.js` — Leaflet + OSM tiles (`window.initRoadMap`); added as a second Vite input.
+- Nav links "Road Map" (rider) and "Road Intelligence" (Control Tower).
+
+**Config:** `config/workride.php` — `routing.*` (primary, osrm_host, osrm_timeout, use_google_fallback, google_api_key, google_cost_per_request 20, use_mapbox_premium, mapbox_access_token, mapbox_cost_per_request 25), `api_caps.monthly_naira` (20000), `road_sensor.*` (pothole_z_threshold 15, iri_alpha 2.0, iri_beta 1.5, max_speed_kmh 200).
+
+**Bugs fixed (found during Sprint 5 hardening):**
+- Freshly-created `RoadEvent` models had `is_confirmed` = `null` in memory (DB default `false` is only applied on insert), so `recordEvent()` returned a stale event and the `refreshSegment()` branch never fired. Added model-level `$attributes` defaults (`severity` 1, `is_confirmed` false) plus `$event->refresh()` after clustering.
+- `RoadEvent` is confirmed in the DB by `confirmClusters()` but the returned model wasn't refreshed — the same stale-value bug.
+- The public `/road/map` page 500'd for guests because `layouts/app` reads `auth()->user()` directly. New guest-safe `layouts/public` used instead.
+
+**Tests (26 new — 134 total, 409 assertions):** `RoadSensorTest` (unauth 401, verified driver 201 + DB row, outside-FCT 422, invalid type 422, public endpoint returns only confirmed + no user_id, public map renders), `RoadIntelligenceServiceTest` (5-within-radius confirms all, <5 not confirmed, far-apart no cluster, >72h excluded, IRI→condition bands, null-z IRI, confirmed potholes refresh segment IRI, recordEvent confirms + writes segment, FERMA export filter), `RoutingServiceTest` (OSRM path via Http::fake, Google fallback when OSRM empty, mapbox, cost-logging, monthly cap block), `RoadAdminTest` (dashboard gating, admin view, FERMA CSV content, non-admin export 403).
+
 ---
 
 ## 5. Issues Resolved
@@ -271,6 +307,29 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 - **Fix:** Added model-level `$attributes` defaults on `Wallet` (`cash_balance = 0`, `subsidy_credits = 0`, `cash_collected_log = 0`, `version = 1`) mirroring the DB defaults. Also hardens the pre-existing booking-hold flow for passengers with no wallet.
 - **Status:** ✅ Resolved — covered by `SubsidyTest` bulk-credit + `WalletFundingTest` webhook paths.
 
+### `RoadEvent.is_confirmed` was null for freshly-created models
+- **Symptom:** `recordEvent()` returned `is_confirmed` = `null` (not `false`) and the confirmed-pothole refresh branch never fired; `RoadSensorTest` failed asserting `event.is_confirmed` is `false`.
+- **Root cause:** Same latent bug as the Wallet one — `RoadEvent::create()` leaves `is_confirmed` unset in memory; the DB default `false` is only applied on insert, so the in-memory attribute stayed `null` until a DB round-trip.
+- **Fix:** Added model-level `$attributes` defaults on `RoadEvent` (`severity = 1`, `is_confirmed = false`) mirroring the DB defaults.
+- **Status:** ✅ Resolved — covered by `RoadSensorTest` + `RoadIntelligenceServiceTest`.
+
+### Clustering ran but the confirmed event still read `false` after `recordEvent()`
+- **Symptom:** `test_record_event_confirms_and_refreshes_segment` failed — the DB row was confirmed but the returned model's `is_confirmed` was still `false`, so `refreshSegment()` never ran.
+- **Root cause:** `confirmClusters()` updates the DB via `update(['is_confirmed' => true])`; the in-memory `$event` returned by `recordEvent()` was never refreshed.
+- **Fix:** Added `$event->refresh()` in `recordEvent()` after `confirmClusters()`.
+- **Status:** ✅ Resolved — covered by `test_record_event_confirms_and_refreshes_segment`.
+
+### Public `/road/map` 500'd for guests (`Attempt to read property "id" on null`)
+- **Symptom:** `test_public_road_map_page_renders` got a 500 — `auth()->user()->id` on line 7 of the compiled `layouts/app`.
+- **Root cause:** `layouts/app.blade.php` reads `auth()->user()` unconditionally (nav + header), but `/road/map` is a public route.
+- **Fix:** New guest-safe `layouts/public.blade.php` (optional user block, "Sign in"/"Dashboard" buttons); `road/map.blade.php` now extends it.
+- **Status:** ✅ Resolved.
+
+### FERMA CSV export header assertions
+- **Symptom:** `RoadAdminTest` failed on the CSV export — Laravel appends `; charset=utf-8` to `Content-Type` and a filename to `Content-Disposition`; `assertHeaderContaining` doesn't exist (it's `assertHeaderContains`).
+- **Fix:** Assert `Content-Type` exactly (`text/csv; charset=utf-8`) and `Content-Disposition` via `assertHeaderContains`; read body with `getContent()` (controller returns a plain response, not streamed).
+- **Status:** ✅ Resolved.
+
 ---
 
 ## 6. How to Work On This Project
@@ -320,15 +379,15 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 2 (Wk 3) | Trip + Booking atomic + Reverb chat | ✅ Complete |
 | Sprint 3 (Wk 4) | Wallet dual balance + Paystack + subsidy bulk credit | ✅ Complete |
 | Sprint 4 (Wk 5) | GTFS Publisher → submit to Google | ✅ Complete |
-| Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ⏳ Next |
-| Sprint 6 (Wk 7) | PWA award UI + impact certificates | ⏳ |
+| Sprint 5 (Wk 6) | Road Sensor (`useRoadSensor.js`) + heatmap | ✅ Complete |
+| Sprint 6 (Wk 7) | PWA award UI + impact certificates | ⏳ Next |
 | Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ⏳ |
 
 ### Immediate next steps
-1. Sprint 5: Road Sensor — `useRoadSensor.js` (accelerometer Z > 15 pothole detection), `POST /api/v1/road-events`, `RoadIntelligenceService` pothole clustering + IRI, Leaflet heatmap
-2. Enable Redis (GEO + queue) per the guide's tech stack
-3. Add `maatwebsite/excel` for FERMA/CSV exports when needed
-4. Add the v3.0/v4.0 operations tables (demand surveys, forecasts, assets, maintenance) as a follow-up schema pass
+1. Enable Redis (GEO + queue) per the guide's tech stack
+2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
+3. Add the v3.0/v4.0 operations tables (demand surveys, forecasts, assets, maintenance) as a follow-up schema pass
+4. PWA award UI + impact certificates (Sprint 6)
 
 ---
 
@@ -343,6 +402,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.2.0` | Baseline — Foundation (Sprint 1 + 2) | Scaffold + auth/verification/control tower + trips/bookings/chat | 71 (222) | 2026-08-01 |
 | `v0.3.0` | Sprint 3 — Wallet + Top-up + Subsidy | Paystack top-up + webhook + wallet page + subsidy bulk credit (CSV) + MDA dashboard | 90 (269) | 2026-08-01 |
 | `v0.4.0` | Sprint 4 — GTFS Publisher | Static feed zip (7 files) + GTFS-RT (protobuf) + nightly job + on-publish regen + admin dashboard | 108 (339) | 2026-08-01 |
+| `v0.5.0` | Sprint 5 — Road Sensor + Intelligence + Routing | useRoadSensor.js + POST /api/v1/road-events + IRI clustering + FERMA export + RoutingService cost caps + docker-compose | 134 (409) | 2026-08-01 |
 
 ---
 

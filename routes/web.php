@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\GtfsController as AdminGtfsController;
+use App\Http\Controllers\Admin\RoadController as AdminRoadController;
 use App\Http\Controllers\Admin\SubsidyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
@@ -12,12 +13,16 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\PaystackWebhookController;
+use App\Http\Controllers\Web\RoadMapController;
 use App\Http\Controllers\Web\TripBoardController;
 use App\Http\Controllers\Web\VerificationController;
 use App\Http\Controllers\Web\WalletController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+
+// Public Road Intelligence heatmap — confirmed potholes + segment condition.
+Route::get('/road/map', RoadMapController::class)->name('road.map');
 
 Route::post('/paystack/webhook', [PaystackWebhookController::class, 'handle'])->name('paystack.webhook');
 
@@ -85,5 +90,8 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/gtfs', [AdminGtfsController::class, 'index'])->name('gtfs.index');
         Route::post('/gtfs/regenerate', [AdminGtfsController::class, 'regenerate'])->name('gtfs.regenerate');
+
+        Route::get('/road', [AdminRoadController::class, 'index'])->name('road.index');
+        Route::get('/road/export', [AdminRoadController::class, 'export'])->name('road.export');
     });
 });

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
+use App\Http\Controllers\Api\V1\RoadSensorController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\VerificationController;
 use App\Http\Controllers\Api\V1\WalletController;
@@ -11,6 +12,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/login', [AuthController::class, 'login']);
+
+    // Public, anonymised road data for the heatmap (lat/lng/severity only).
+    Route::get('/road-events', [RoadSensorController::class, 'index']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
@@ -22,6 +26,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/verifications', [VerificationController::class, 'index']);
         Route::post('/verifications/workplace', [VerificationController::class, 'submitWorkplace']);
         Route::post('/verifications/nin', [VerificationController::class, 'submitNin']);
+
+        Route::post('/road-events', [RoadSensorController::class, 'store']);
 
         Route::get('/trips', [TripController::class, 'index']);
         Route::post('/trips', [TripController::class, 'store']);

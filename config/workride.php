@@ -82,4 +82,36 @@ return [
         'min_lng' => 6.90,
         'max_lng' => 7.70,
     ],
+
+    // Routing: OSRM (self-hosted, free) primary, paid fallback capped+logged.
+    // Open-source first: paid APIs are only used when the free path fails AND
+    // the monthly budget has headroom (api_caps.monthly_naira).
+    'routing' => [
+        // 'osrm' | 'google' | 'mapbox'
+        'primary' => env('WORKRIDE_ROUTING_PRIMARY', 'osrm'),
+        'osrm_host' => env('OSRM_HOST', 'http://localhost:5000'),
+        'osrm_timeout' => env('OSRM_TIMEOUT', 5),
+        'use_google_fallback' => (bool) env('USE_GOOGLE_FALLBACK', false),
+        'google_api_key' => env('GOOGLE_MAPS_API_KEY'),
+        'google_cost_per_request' => env('GOOGLE_COST_PER_REQUEST', 20),
+        'use_mapbox_premium' => (bool) env('USE_MAPBOX_PREMIUM', false),
+        'mapbox_access_token' => env('MAPBOX_ACCESS_TOKEN'),
+        'mapbox_cost_per_request' => env('MAPBOX_COST_PER_REQUEST', 25),
+    ],
+
+    // Paid external API budget. Every paid call is logged to api_cost_logs and
+    // refused once this monthly cap is spent.
+    'api_caps' => [
+        'monthly_naira' => env('WORKRIDE_MONTHLY_API_CAP_NAIRA', 20000),
+    ],
+
+    // Road sensor thresholds (Sprint 5).
+    'road_sensor' => [
+        // Accelerometer Z (gravity-corrected) above this = candidate pothole.
+        'pothole_z_threshold' => env('WORKRIDE_POTHOLE_Z_THRESHOLD', 15),
+        // World Bank RoadLab: IRI = alpha * RMS(acc_z) / speed + beta.
+        'iri_alpha' => env('WORKRIDE_IRI_ALPHA', 2.0),
+        'iri_beta' => env('WORKRIDE_IRI_BETA', 1.5),
+        'max_speed_kmh' => env('WORKRIDE_ROAD_MAX_SPEED_KMH', 200),
+    ],
 ];

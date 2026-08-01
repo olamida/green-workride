@@ -1,0 +1,76 @@
+# WorkRide self-hosted infrastructure blueprint (open-source first).
+#
+# This is the FUTURE self-host target per WORKRIDE-APP-GUIDE §12-13:
+#   - OSRM: free routing (no per-call cost, replaces paid fallbacks by default)
+#   - Redis: cache/queue/GEO (enables Redis Streams live location in prod)
+#   - PostgreSQL + PostGIS: optional future geospatial DB (app currently runs on MySQL)
+#   - GTFS validator: feedvalidator.mobilitydata.org locally
+#   - Metabase: free BI dashboards for the Ops Control Tower
+#
+# Current dev runs on Laragon (MySQL, no Docker). Only `redis` is useful today:
+#   docker compose up -d redis
+# Everything else is optional and intentionally NOT wired to .env yet.
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: workride-redis
+    ports:
+      - '6379:6379'
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  osrm:
+    image: ghcr.io/project-osrm/osrm-backend:latest
+    container_name: workride-osrm
+    command: ['osrm-routed', '--algorithm', 'mld', '--max-table-size', '8000', '--data', '/data/abuja.osrm']
+    ports:
+      - '5000:5000'
+    volumes:
+      - ./osrm-data:/data
+    profiles: ['selfhost']
+
+  postgres:
+    image: postgis/postgis:15-3.4
+    container_name: workride-postgis
+    environment:
+      POSTGRES_DB: workride
+      POSTGRES_USER: workride
+      POSTGRES_PASSWORD: workride
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    profiles: ['selfhost']
+
+  gtfs-validator:
+    image: ghcr.io/mobilitydata/gtfs-validator:latest
+    container_name: workride-gtfs-validator
+    command: ['--url', 'http://host.docker.internal:8000/gtfs/gtfs.zip']
+    profiles: ['selfhost']
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: workride-metabase
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase
+      MB_DB_PORT: 5432
+      MB_DB_USER: workride
+      MB_DB_PASS: workride
+      MB_DB_HOST: postgres
+    ports:
+      - '3000:3000'
+    depends_on:
+      - postgres
+    profiles: ['selfhost']
+
+volumes:
+  redis-data:
+  postgres-data:
