@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\MissionActivityType;
 use App\Enums\RewardTrigger;
 use App\Enums\RoadCondition;
 use App\Enums\RoadEventType;
@@ -26,6 +27,7 @@ class RoadIntelligenceService
     public function __construct(
         private GeofenceService $geofence,
         private RewardService $rewards,
+        private MissionService $missions,
     ) {}
 
     /**
@@ -61,6 +63,26 @@ class RoadIntelligenceService
                     $reporter,
                     RewardTrigger::PotholeConfirmed,
                     ['event_key' => "road-event-{$event->id}", 'road_event_id' => $event->id],
+                );
+
+                if ($event->type === RoadEventType::Pothole) {
+                    $this->missions->record(
+                        $reporter,
+                        MissionActivityType::PotholesConfirmed,
+                        ['road_event_id' => $event->id],
+                    );
+                }
+            }
+        }
+
+        if ($event->user_id) {
+            $reporter = User::find($event->user_id);
+
+            if ($reporter) {
+                $this->missions->record(
+                    $reporter,
+                    MissionActivityType::PotholeReports,
+                    ['road_event_id' => $event->id],
                 );
             }
         }

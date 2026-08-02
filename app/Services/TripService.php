@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\BookingStatus;
 use App\Enums\Corridor;
+use App\Enums\MissionActivityType;
 use App\Enums\RewardTrigger;
 use App\Enums\TripStatus;
 use App\Events\TripCancelled;
@@ -26,6 +27,7 @@ class TripService
         private BookingService $bookings,
         private RideCreditService $rideCredits,
         private RewardService $rewards,
+        private MissionService $missions,
     ) {}
 
     public function publish(User $driver, array $data): Trip
@@ -135,6 +137,7 @@ class TripService
         dispatch(new CalculateImpactJob($trip->id));
 
         $this->awardCompletionRewards($trip);
+        $this->recordMissionProgress($trip);
 
         return $trip->fresh();
     }
@@ -225,6 +228,44 @@ class TripService
                 $this->rewards->award($booking->passenger, RewardTrigger::MonthlyTenRides, $context);
             }
         }
+    }
+
+    /**
+     * Missions observation (guide §9B demand + §8 stakeholder): every completed
+     * ride counts toward the promoted activities it matches — volunteer/paid
+     * for the driver, passenger/peak for everyone carried. MissionService
+     * no-ops when the feature is off.
+     */
+    private function recordMissionProgress(Trip $trip): void
+    {
+        $context = ['trip_id' => $trip->id, 'corridor' => $trip->corridor->value];
+
+        if ($trip->is_free_volunteer) {
+            $this->missions->record($trip->driver, MissionActivityType::VolunteerRides, $context);
+        } else {
+            $this->missions->record($trip->driver, MissionActivityType::PaidRides, $context);
+        }
+
+        if ($this->isPeakHour($trip)) {
+            $this->missions->record($trip->driver, MissionActivityType::PeakHourRides, $context);
+        }
+
+        foreach ($trip->bookings as $booking) {
+            if (in_array($booking->status->value, ['boarded', 'completed'], true)) {
+                $this->missions->record($booking->passenger, MissionActivityType::PassengerRides, $context);
+
+                if ($this->isPeakHour($trip)) {
+                    $this->missions->record($booking->passenger, MissionActivityType::PeakHourRides, $context);
+                }
+            }
+        }
+    }
+
+    private function isPeakHour(Trip $trip): bool
+    {
+        $hour = (int) $trip->departure_time?->hour;
+
+        return $hour >= 6 && $hour < 9 || $hour >= 16 && $hour < 19;
     }
 
     /**

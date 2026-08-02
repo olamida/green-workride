@@ -29,6 +29,7 @@
                     <x-admin-nav-link :active="request()->routeIs('admin.road.*')" href="{{ route('admin.road.index') }}">Road Intelligence</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.employers.*')" href="{{ route('admin.employers.index') }}">Employers</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.rewards.*')" href="{{ route('admin.rewards.index') }}">Rewards</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.missions.*')" href="{{ route('admin.missions.index') }}">Missions</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.business.*')" href="{{ route('admin.business.index') }}">Business</x-admin-nav-link>
                 </nav>
 

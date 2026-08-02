@@ -178,4 +178,12 @@ return [
     'commodities' => [
         'enabled' => (bool) env('FEATURE_COMMODITIES', false),
     ],
+
+    // Promoted volunteer activities (Sprint 9 "Missions"). A promoter defines
+    // an activity + reward; the app observes performance and pays out (auto
+    // from real events, or after photo-proof review). Gated so it can be
+    // piloted per MDA/corporate sponsor.
+    'missions' => [
+        'enabled' => (bool) env('FEATURE_MISSIONS', false),
+    ],
 ];

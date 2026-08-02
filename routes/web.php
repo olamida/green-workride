@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\EmployerController;
 use App\Http\Controllers\Admin\GtfsController as AdminGtfsController;
+use App\Http\Controllers\Admin\MissionController as AdminMissionController;
 use App\Http\Controllers\Admin\RewardController as AdminRewardController;
 use App\Http\Controllers\Admin\RoadController as AdminRoadController;
 use App\Http\Controllers\Admin\SubsidyController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\ImpactCertificateController;
 use App\Http\Controllers\Web\ImpactController;
+use App\Http\Controllers\Web\MissionController;
 use App\Http\Controllers\Web\PaystackWebhookController;
 use App\Http\Controllers\Web\PwaController;
 use App\Http\Controllers\Web\ReceiptController;
@@ -102,6 +104,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/nin', [VerificationController::class, 'storeNin'])->name('nin');
     });
 
+    Route::prefix('missions')->name('missions.')->group(function () {
+        Route::get('/', [MissionController::class, 'index'])->name('index');
+        Route::post('/{mission}/proof', [MissionController::class, 'submitProof'])->name('proof');
+    });
+
     Route::prefix('receipts')->name('receipts.')->group(function () {
         Route::get('/booking/{booking}', [ReceiptController::class, 'booking'])->name('booking');
         Route::get('/earnings/{booking}', [ReceiptController::class, 'earnings'])->name('earnings');
@@ -162,5 +169,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/rewards/create', [AdminRewardController::class, 'create'])->name('rewards.create');
         Route::post('/rewards', [AdminRewardController::class, 'store'])->name('rewards.store');
         Route::post('/rewards/{campaign}/toggle', [AdminRewardController::class, 'toggle'])->name('rewards.toggle');
+
+        Route::get('/missions', [AdminMissionController::class, 'index'])->name('missions.index');
+        Route::get('/missions/create', [AdminMissionController::class, 'create'])->name('missions.create');
+        Route::post('/missions', [AdminMissionController::class, 'store'])->name('missions.store');
+        Route::get('/missions/{mission}', [AdminMissionController::class, 'show'])->name('missions.show');
+        Route::post('/missions/{mission}/toggle', [AdminMissionController::class, 'toggle'])->name('missions.toggle');
+        Route::post('/missions/submissions/{submission}/approve', [AdminMissionController::class, 'approveSubmission'])->name('missions.approve');
+        Route::post('/missions/submissions/{submission}/reject', [AdminMissionController::class, 'rejectSubmission'])->name('missions.reject');
     });
 });

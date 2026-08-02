@@ -79,15 +79,28 @@
         </div>
 
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
-            <h2 class="font-heading font-semibold text-ink-900">Your commute</h2>
+            <h2 class="font-heading font-semibold text-ink-900">Your corridor is live</h2>
             <p class="mt-2 text-sm text-ink-500">
-                Ride publishing and booking open in the next sprint. Your account is ready — complete
-                Level 1 workplace verification to unlock bookings when corridors go live.
+                Verified colleagues are matching on your corridor right now. Fixed prices, no surge —
+                find a ride or publish your own.
             </p>
             <div class="mt-4 flex gap-3">
                 <span class="rounded-full bg-forest-50 px-3 py-1 text-xs font-medium text-forest-700">KUBWA → CBD</span>
                 <span class="rounded-full bg-forest-50 px-3 py-1 text-xs font-medium text-forest-700">NYANYA → IDU</span>
                 <span class="rounded-full bg-forest-50 px-3 py-1 text-xs font-medium text-forest-700">LUGBE → CBD</span>
+            </div>
+            <div class="mt-5">
+                <x-matching-anim compact label="Live matching on your corridor…" />
+            </div>
+            <div class="mt-5 flex flex-wrap gap-3">
+                <a href="{{ route('trips.index') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
+                    Find a ride
+                </a>
+                @if (auth()->user()->canDriveVolunteer())
+                    <a href="{{ route('trips.create') }}" class="rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-ink-100">
+                        Publish a trip
+                    </a>
+                @endif
             </div>
         </div>
     </div>

@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             AdminUserSeeder::class,
             DemoUserSeeder::class,
             Sprint8DemoSeeder::class,
+            DemoMissionSeeder::class,
         ]);
     }
 }

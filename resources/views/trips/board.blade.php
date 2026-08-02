@@ -71,16 +71,19 @@
                 </div>
             </a>
         @empty
-            <div class="rounded-2xl border border-dashed border-ink-300 bg-white p-10 text-center">
-                <p class="font-heading text-lg font-semibold text-ink-900">No trips departing soon</p>
-                <p class="mt-1 text-sm text-ink-500">
-                    Check another corridor, or be the first to publish on this route.
-                </p>
-                @if (auth()->user()->canDriveVolunteer())
-                    <a href="{{ route('trips.create') }}" class="mt-4 inline-block rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
-                        Publish a trip
-                    </a>
-                @endif
+            <div class="overflow-hidden rounded-2xl border border-ink-200 bg-white">
+                <x-matching-anim compact label="Searching every corridor for a matching ride…" />
+                <div class="px-6 py-6 text-center">
+                    <p class="font-heading text-lg font-semibold text-ink-900">No trips departing soon</p>
+                    <p class="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                        The matcher keeps scanning — check another corridor, or be the first to publish on this route.
+                    </p>
+                    @if (auth()->user()->canDriveVolunteer())
+                        <a href="{{ route('trips.create') }}" class="mt-4 inline-block rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
+                            Publish a trip
+                        </a>
+                    @endif
+                </div>
             </div>
         @endforelse
     </div>

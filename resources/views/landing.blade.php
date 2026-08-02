@@ -61,6 +61,8 @@
                     </div>
 
                     <div class="space-y-3">
+                        <x-matching-anim label="Matching verified civil servants on the Kubwa → CBD corridor…" />
+
                         @php
                             $corridors = [
                                 ['KUBWA', '→ CBD', '₦800', '12 leaving · 6:45am', true],

@@ -1,7 +1,12 @@
-@props(['active' => false, 'href' => '#'])
+@props(['active' => false, 'href' => '#', 'icon' => null])
 
 <a href="{{ $href }}" @class([
-    'rounded-lg px-3 py-1.5 font-medium transition',
-    'bg-forest-600 text-white' => $active,
+    'flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium transition',
+    'bg-forest-600 text-white shadow-sm' => $active,
     'text-ink-600 hover:bg-ink-100 hover:text-ink-900' => ! $active,
-])>{{ $slot }}</a>
+])>
+    @if ($icon)
+        <x-icon :name="$icon" class="h-4 w-4" />
+    @endif
+    {{ $slot }}
+</a>

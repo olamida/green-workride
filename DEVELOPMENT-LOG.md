@@ -37,7 +37,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 3.5 complete — Time-Bank (ride credits) + Earned wallet + P2P transfers + Payouts (feature-gated `FEATURE_TIME_BANK`) |
 | Feature modules | ✅ Sprint 7 complete — Business dashboard (KPIs + revenue/corridor/subsidy charts) + 5 QR-verifiable financial receipts + CSV exports (transactions, settlements, subsidy) |
 | Feature modules | ✅ Sprint 8 complete — Employer Mobility Programs (org-funded commutes) + Reward Campaigns & Green Points economy + Commodity Commerce (wallet → gold/rice/maize/fuel positions + QR shop orders), all feature-gated |
-| Tests | ✅ 255 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce) |
+| Feature modules | ✅ Sprint 9 complete — Missions (sponsor-defined promoted activities with auto-verified + photo-proof rewards) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, searching-algorithm SVG brand mark) |
+| Tests | ✅ 274 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions) |
 
 ---
 
@@ -391,6 +392,48 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (46 new — 255 total, 765 assertions):** `EmployerTest` (11 — feature-gated, program coverage full/percent/capped, enroll, cover-on-board, cancel-refund, funding, CSV enroll, admin flows), `RewardTest` (14 — disabled no-award, cash/earned/green-points campaigns, budget exhaustion, period dedupe once/weekly, ended campaign skip, redeem + min threshold + over-balance, admin create/toggle), `CommodityCommerceTest` (21 — disabled gate, buy cash/earned, cash→earned split, subsidy never spendable, insufficient funds, inactive/non-tradable, sell partial/full/over-sell, orders cash/earned, subsidy order blocked, inactive item, cancel + foreign/closed cancel, fulfill, portfolio, web market/shop render, web buy/sell/order/cancel flows, validation).
 
+### 4.16 Sprint 9 — Missions + Global Nav Redesign (COMPLETE)
+
+**Missions: sponsor-defined promoted activities with automatic reward payout.**
+
+**Schema (3 migrations):** `missions` (name, unique `slug`, description, `sponsor_type`, `activity_type`, `metric_goal`, `metric_window_days`, `reward_type`, `reward_value`, `verification_mode` auto/proof, `status` draft/published/paused/completed, sponsor fields, starts_at/ends_at, created_by), `mission_progress` (unique `[user_id, mission_id]`, `current_metric`, `goal_metric`, `status` active/completed/awarded/expired), `mission_submissions` (mission_id, user_id, proof photo on `public` disk `mission-proofs`, lat/lng, note, `reward_awarded` flag).
+
+**Enums (5 new):** `MissionActivityType` (volunteer_rides, paid_rides, peak_hour_rides, passenger_rides, pothole_reports, potholes_confirmed, custom), `MissionVerificationMode` (auto/proof), `MissionStatus` (draft/published/paused/completed), `MissionProgressStatus` (active/completed/awarded/expired), `MissionSubmissionStatus` (pending/approved/rejected).
+
+**Models (3):** `Mission` (`sponsorType`/`activityType`/`rewardType`/`verificationMode`/`status` enum casts + `isRunningNow()` + `budgetAt()` + `currentCountFor()`), `MissionProgress` (`mission()`/`user()` relations, unique pair), `MissionSubmission` (`reward_awarded` + status casts).
+
+**`MissionService` (`app/Services/MissionService.php`)** — observation + payout engine:
+- `recordActivity(MissionActivityType, User, int $qty = 1)` — runs all published, running, correct-activity missions, `lockForUpdate` on the progress row, increments `current_metric` (capped at goal), completes → `creditReward()`.
+- `creditReward()` — idempotent payout keyed on `MIS-{mission}-{user}` / `MIS-PROOF-{mission}-{user}`: Cash → `creditCash`, Earned → `creditEarned`, Subsidy → `creditSubsidy`, GreenPoints → `user->increment('green_points')`; `ActivityLog::log` on both.
+- `submitProof(User, Mission, data)` — proof-mode missions only; photo on `public` disk `mission-proofs`, lat/lng/note stored, status pending.
+- `approveProof()` / `rejectProof()` — approve credits reward + marks submission awarded; reject no-op.
+- `activeFor(User)` — running missions with progress/status for the rider hub; `myAwards(User)` — awarded mission completions.
+
+**Event-flow wiring (auto-verify):**
+- `TripService::completeTrip()` (now construct-injected with `MissionService`) fires `volunteer_rides`/`paid_rides` (driver) and `passenger_rides`/`peak_hour_rides` (each boarded/completed booking, peak = 6–9 & 16–19 local hour via new `isPeakHour()` helper) as riders are counted.
+- `RoadIntelligenceService::recordEvent()` fires `pothole_reports` (every event) + `potholes_confirmed` (when `is_confirmed && type=Pothole`).
+
+**Controllers + routes:**
+- `Web\MissionController` — `GET /missions` rider hub (live missions cards with progress bars, proof-form toggle, my awards).
+- `Admin\MissionController` — `GET/POST /admin/missions` index/create/store, `GET /admin/missions/{mission}` show, `POST .../toggle`, `POST .../submissions/{submission}/approve|reject`.
+- Routes `missions.*` (auth) + `admin.missions.*` (admin group); admin sidebar gains "Missions".
+
+**Views:** `missions/index.blade.php` (mission cards, proof photo form), `admin/missions/{index,create,show}.blade.php` (Control Tower — create form has a `verification_mode` JS-hints toggle row).
+
+**Config:** `config/workride.php` → `workride.missions.enabled` (`FEATURE_MISSIONS` env, default false); `.env.example` documents the flag.
+
+**Seeder:** `DemoMissionSeeder` (pothole-weather brief + sample rewards), gate-guarded (no-ops when disabled), wired into `DatabaseSeeder` after `Sprint8DemoSeeder`. Sponsor types are ONLY `government`/`private`/`community`.
+
+**Global nav redesign (branding):**
+- Rewritten `layouts/app.blade.php`: top nav 5 destinations, ⌘K command palette (`resources/js/command-palette.js`, Alpine component in `components/command-palette.blade.php`), profile dropdown (`components/profile-menu.blade.php`), mobile bottom tab bar (`components/mobile-nav.blade.php`), brand mark `components/matching-anim.blade.php` (searching-algorithm SVG: radar scan + route probes + gold winner path, used on landing/dashboard/trips board).
+
+**Bugs fixed (found during Sprint 9 hardening):**
+- `MatchingAnim` probes mixed associative `$passenger` points with plain numeric-list points; `$a['x']` blew up on the numeric entries (`Undefined array key "x"`, 500 on `/`). Every probe's `$a` is now an associative `['x' =>, 'y' =>]` point.
+- `MissionsTest::mission()` used a static slug → UNIQUE constraint violation when a test created two missions. Now unique per call (`give-free-rides-{random}`).
+- Dynamic `:name`/`:class` on `<x-icon>` compiles as PHP and 500s — command palette icon fixed to static `name="search"`, rotation/arrows wrapped in Alpine `:class` `<span>`s (`command-palette` + `profile-menu` components).
+
+**Tests (19 new — 274 total, 819 assertions):** `MissionsTest` — gate off blocks hub + reward; auto-record volunteer rides awards cash once; no award when gate off; proof-mode submit requires photo + note; admin approve credits + marks awarded; reject no-op; duplicate approve idempotent; not-running/ended mission skipped; per-user progress isolation; rider hub renders live missions (name + reward); admin index/create/store/toggle; proof submission persisted; peak-hour + pothole triggers; rewards land in wallet balances.
+
 ---
 
 ## 5. Issues Resolved
@@ -571,6 +614,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 3.5 | Time-Bank (ride credits) + earned wallet + P2P transfers + payouts | ✅ Complete (feature-gated `FEATURE_TIME_BANK`) |
 | Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ✅ Complete |
 | Sprint 8 | Employer mobility programs + rewards/green points + commodity commerce | ✅ Complete (feature-gated `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES`) |
+| Sprint 9 | Missions + global nav redesign (⌘K palette, mobile tab bar, brand mark) | ✅ Complete (feature-gated `FEATURE_MISSIONS`) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -595,6 +639,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.6.5` | Sprint 3.5 — Time-Bank + Earned + P2P + Payouts | Ride credits (seats owed/repaid) + triple-balance wallet (subsidy→earned→cash hold priority) + driver earnings (fare − commission − union − insurance) + P2P transfers (1% cash fee, earned free) + Moniepoint-mocked payouts — gated on `FEATURE_TIME_BANK` | 184 (561) | 2026-08-01 |
 | `v0.7.0` | Sprint 7 — Business Dashboard + Receipts + Exports | Control Tower "Business" page (gross revenue, MRR, driver earnings, commission/union/insurance, subsidy issued/spent, corridor + revenue-per-day charts) + 5 QR-verifiable financial receipts (booking, driver earnings, wallet top-up, subsidy MDA, monthly statement) with public verify + 3 CSV exports (transactions, settlements, subsidy) | 209 (638) | 2026-08-01 |
 | `v0.8.0` | Sprint 8 — Employer Mobility + Rewards + Commodity Commerce | Employer programs (full/one-way/percent/capped coverage, org-funded commutes, employer wallet + COVER ledger) + reward campaigns (cash/earned/subsidy/green-points, period dedupe, budget caps) + Green Points economy + commodity market & shop (positions, buy/sell, QR orders; subsidy never spendable) — gated on `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES` | 255 (765) | 2026-08-01 |
+| `v0.9.0` | Sprint 9 — Missions + Global Nav Redesign | Sponsor-defined missions (auto-verified rewards via trip-completion + road-event observation, photo-proof review flow, rider hub + Control Tower) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, matching-anim SVG brand mark) — missions gated on `FEATURE_MISSIONS` | 274 (819) | 2026-08-02 |
 
 ---
 
