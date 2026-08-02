@@ -186,4 +186,20 @@ return [
     'missions' => [
         'enabled' => (bool) env('FEATURE_MISSIONS', false),
     ],
+
+    // Tiered KYC (Sprint 3.6) — open staff-ID liveness, licensed NIN lookup,
+    // commercial driver anti-spoof. Tier 1 is free and always available once
+    // the feature is on; Tiers 2/3 additionally need their provider enabled.
+    'verification' => [
+        'enabled' => (bool) env('FEATURE_LIVENESS', false),
+        // Anti-brute-force: attempts per tier per day before HTTP 429.
+        'attempts_per_day' => env('WORKRIDE_VERIFY_ATTEMPTS_PER_DAY', 5),
+        // Tier-1 auto-approval threshold (client liveness is a signal, not a
+        // gate: below this we drop to manual review instead of failing hard).
+        'liveness_min_score' => env('WORKRIDE_LIVENESS_MIN_SCORE', 75),
+        // NDPR retention: encrypted selfies are purged after this many days.
+        'selfie_retention_days' => env('WORKRIDE_SELFIE_RETENTION_DAYS', 30),
+        // Driver verification fee (₦) charged to cover the Tier-3 vendor cost.
+        'driver_verification_fee_naira' => env('WORKRIDE_DRIVER_VERIFICATION_FEE', 500),
+    ],
 ];

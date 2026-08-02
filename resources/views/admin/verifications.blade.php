@@ -9,11 +9,15 @@
         <div class="flex gap-2">
             <a href="{{ route('admin.verifications.index') }}"
                 @class(['rounded-full px-3 py-1 text-xs font-medium transition', request('status') ? 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100' : 'bg-ink-900 text-white'])>
-                All ({{ $counts['pending'] + $counts['approved'] + $counts['rejected'] }})
+                All ({{ $counts['pending'] + $counts['pending_manual_review'] + $counts['approved'] + $counts['rejected'] }})
             </a>
             <a href="{{ route('admin.verifications.index', ['status' => 'pending']) }}"
                 @class(['rounded-full px-3 py-1 text-xs font-medium transition', request('status') === 'pending' ? 'bg-gold-500 text-ink-900' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100'])>
                 Pending ({{ $counts['pending'] }})
+            </a>
+            <a href="{{ route('admin.verifications.index', ['status' => 'pending_manual_review']) }}"
+                @class(['rounded-full px-3 py-1 text-xs font-medium transition', request('status') === 'pending_manual_review' ? 'bg-gold-700 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100'])>
+                Needs review ({{ $counts['pending_manual_review'] }})
             </a>
             <a href="{{ route('admin.verifications.index', ['status' => 'approved']) }}"
                 @class(['rounded-full px-3 py-1 text-xs font-medium transition', request('status') === 'approved' ? 'bg-forest-600 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100'])>
@@ -36,6 +40,23 @@
             </a>
         </div>
     </div>
+
+    @if ($costs['identitypass'] > 0 || $costs['smile'] > 0)
+        <div class="mb-6 flex flex-wrap gap-3">
+            @if ($costs['identitypass'] > 0)
+                <div class="rounded-2xl border border-ink-200 bg-white px-4 py-3 text-sm">
+                    <span class="text-ink-500">IdentityPass (NIN) this month:</span>
+                    <span class="font-semibold text-ink-900">₦{{ number_format($costs['identitypass'], 2) }}</span>
+                </div>
+            @endif
+            @if ($costs['smile'] > 0)
+                <div class="rounded-2xl border border-ink-200 bg-white px-4 py-3 text-sm">
+                    <span class="text-ink-500">Smile Identity (drivers) this month:</span>
+                    <span class="font-semibold text-ink-900">₦{{ number_format($costs['smile'], 2) }}</span>
+                </div>
+            @endif
+        </div>
+    @endif
 
     <div class="overflow-hidden rounded-2xl border border-ink-200 bg-white">
         <div class="overflow-x-auto">
@@ -65,6 +86,25 @@
                                     {{ $verification->workplace->name }}
                                     <span class="ml-1 rounded-full bg-ink-100 px-2 py-0.5 text-xs text-ink-500">{{ $verification->workplace->acronym }}</span>
                                 @endif
+
+                                @if ($verification->provider || $verification->tier || $verification->liveness_score !== null)
+                                    <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                        @if ($verification->tier)
+                                            <span class="rounded-full bg-ink-900 px-2 py-0.5 text-[10px] font-semibold text-white">T{{ $verification->tier->value }}</span>
+                                        @endif
+                                        @if ($verification->provider)
+                                            <span class="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] font-medium text-ink-500">{{ $verification->provider->label() }}</span>
+                                        @endif
+                                        @if ($verification->liveness_score !== null)
+                                            <span @class([
+                                                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                                                $verification->liveness_score >= 80 ? 'bg-forest-100 text-forest-700' : ($verification->liveness_score >= 75 ? 'bg-gold-100 text-gold-800' : 'bg-red-100 text-red-700'),
+                                            ])>
+                                                liveness {{ $verification->liveness_score }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                @endif
                             </td>
                             <td class="px-5 py-4"><x-badge :status="$verification->status" /></td>
                             <td class="px-5 py-4 text-sm text-ink-500">
@@ -74,7 +114,7 @@
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-right">
-                                @if ($verification->status === 'pending')
+                                @if (in_array($verification->status, ['pending', 'pending_manual_review'], true))
                                     <div class="flex justify-end gap-2">
                                         <form method="POST" action="{{ route('admin.verifications.approve', $verification) }}">
                                             @csrf

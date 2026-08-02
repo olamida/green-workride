@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\P2pTransferController;
 use App\Http\Controllers\Api\V1\RideCreditController;
 use App\Http\Controllers\Api\V1\RoadSensorController;
+use App\Http\Controllers\Api\V1\SmileWebhookController;
 use App\Http\Controllers\Api\V1\TripController;
 use App\Http\Controllers\Api\V1\VerificationController;
 use App\Http\Controllers\Api\V1\WalletController;
@@ -17,6 +18,9 @@ Route::prefix('v1')->group(function () {
 
     // Public, anonymised road data for the heatmap (lat/lng/severity only).
     Route::get('/road-events', [RoadSensorController::class, 'index']);
+
+    // Smile Identity result callback — signature-verified, public like Paystack.
+    Route::post('/webhooks/smile', [SmileWebhookController::class, 'handle']);
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
@@ -32,8 +36,14 @@ Route::prefix('v1')->group(function () {
         Route::get('/ride-credits', [RideCreditController::class, 'index']);
 
         Route::get('/verifications', [VerificationController::class, 'index']);
+        Route::get('/verifications/status', [VerificationController::class, 'status']);
         Route::post('/verifications/workplace', [VerificationController::class, 'submitWorkplace']);
         Route::post('/verifications/nin', [VerificationController::class, 'submitNin']);
+
+        // Sprint 3.6 tiered KYC — feature-gated on FEATURE_LIVENESS.
+        Route::post('/verifications/tier1', [VerificationController::class, 'tier1']);
+        Route::post('/verifications/tier2', [VerificationController::class, 'tier2']);
+        Route::post('/verifications/tier3', [VerificationController::class, 'tier3']);
 
         Route::post('/road-events', [RoadSensorController::class, 'store']);
 

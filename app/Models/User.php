@@ -63,6 +63,11 @@ class User extends Authenticatable
         return $this->hasMany(Verification::class);
     }
 
+    public function verificationAttempts(): HasMany
+    {
+        return $this->hasMany(VerificationAttempt::class);
+    }
+
     public function vehicles(): HasMany
     {
         return $this->hasMany(Vehicle::class);

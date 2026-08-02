@@ -43,4 +43,26 @@ return [
         'base_url' => 'https://api.paystack.co',
     ],
 
+    // Tier 2 KYC — NIN verification via a NIMC-licensed partner (IdentityPass).
+    // Raw NIN is sent ONLY to this partner over TLS; we never persist it.
+    'identitypass' => [
+        'enabled' => (bool) env('USE_IDENTITYPASS', false),
+        'key' => env('IDENTITYPASS_API_KEY'),
+        'base_url' => env('IDENTITYPASS_BASE_URL', 'https://api.myidentitypass.com'),
+        'nin_endpoint' => '/api/v2/biometrics/merchant/data/verification/nin',
+        'cost_naira' => env('IDENTITYPASS_COST_NGN', 100),
+        'monthly_cap_naira' => env('IDENTITYPASS_MONTHLY_CAP_NGN', 50000),
+    ],
+
+    // Tier 3 KYC — driver anti-spoof liveness (Smile Identity SmartSelfie).
+    'smile' => [
+        'enabled' => (bool) env('USE_SMILE', false),
+        'partner_id' => env('SMILE_PARTNER_ID'),
+        'api_key' => env('SMILE_API_KEY'),
+        'sid_server' => env('SMILE_SID_SERVER', 'https://api.usesmileid.com'),
+        'webhook_secret' => env('SMILE_WEBHOOK_SECRET'),
+        'anti_spoof_threshold' => env('SMILE_ANTI_SPOOF_THRESHOLD', 80),
+        'cost_naira' => env('SMILE_COST_NGN', 400),
+    ],
+
 ];

@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 8 Complete — Employer Mobility + Rewards & Green Points + Commodity Commerce)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 Complete — Missions, Global Nav, Tiered KYC)
 
 | Area | Status |
 |------|--------|
@@ -38,7 +38,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 7 complete — Business dashboard (KPIs + revenue/corridor/subsidy charts) + 5 QR-verifiable financial receipts + CSV exports (transactions, settlements, subsidy) |
 | Feature modules | ✅ Sprint 8 complete — Employer Mobility Programs (org-funded commutes) + Reward Campaigns & Green Points economy + Commodity Commerce (wallet → gold/rice/maize/fuel positions + QR shop orders), all feature-gated |
 | Feature modules | ✅ Sprint 9 complete — Missions (sponsor-defined promoted activities with auto-verified + photo-proof rewards) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, searching-algorithm SVG brand mark) |
-| Tests | ✅ 274 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions) |
+| Feature modules | ✅ Sprint 3.6 complete — Tiered KYC (open staff-ID liveness $0 + NIMC-licensed NIN lookup + Smile Identity driver anti-spoof), verification attempts + rate limit, encrypted selfie retention, Control Tower cost dashboard (feature-gated `FEATURE_LIVENESS`, `USE_IDENTITYPASS`, `USE_SMILE`) |
+| Tests | ✅ 290 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions, tiered verification, selfie retention) |
 
 ---
 
@@ -434,6 +435,36 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 **Tests (19 new — 274 total, 819 assertions):** `MissionsTest` — gate off blocks hub + reward; auto-record volunteer rides awards cash once; no award when gate off; proof-mode submit requires photo + note; admin approve credits + marks awarded; reject no-op; duplicate approve idempotent; not-running/ended mission skipped; per-user progress isolation; rider hub renders live missions (name + reward); admin index/create/store/toggle; proof submission persisted; peak-hour + pothole triggers; rewards land in wallet balances.
 
+### 4.17 Sprint 3.6 — Tiered KYC: Open Liveness + NIMC Lookup + Driver Anti-Spoof (COMPLETE)
+
+Adopted from `WORKRIDE-PROMPT-ID-VERIFICATION-LIVENESS.md` (reviewed + corrected). The proposal's 3-tier model maps 1:1 onto the existing `VerificationLevel` (workplace=1, nin=2, driver=3). Corrections applied on adoption: client liveness is treated as a **signal, not a gate** (low score → `pending_manual_review`, never hard-fail); the `face_embedding_hash` idea (hash destroys comparability) was dropped; the Tier-2 frontend-hash theater was replaced with the honest relay (raw NIN → licensed partner over TLS only); the proposed duplicate `api_cost_logs` table was **not** re-created — the existing Sprint 5 table was extended instead; and the unverifiable client-side "tests" (tablet-video rejection etc.) were replaced with server-contract tests.
+
+**Schema (3 migrations):**
+- `verifications` gains `liveness_score`, `face_match_score`, `provider` (open/identitypass/smile/dojah), `tier` (1/2/3), `nimc_reference`, `selfie_path`, `selfie_retention_expires_at`.
+- `verification_attempts` — one row per KYC attempt (user_id, tier, provider, liveness_score, status, ip_address) driving the 5/day rate limit + audit trail.
+- `api_cost_logs` gains `user_id`, `purpose`, `reference` (unique) — idempotent per-user KYC cost ledger.
+- `config/filesystems.php` gains an explicit non-public `private` disk (`storage/app/private`).
+
+**Enums (2 new):** `VerificationProvider`, `VerificationTier`.
+
+**Models:** `VerificationAttempt`; `Verification` gains the new fillables + casts + `decryptedSelfie()` (Crypt-decrypt for reviewers); `ApiCostLog` gains `user_id`/`purpose`/`reference` + `user()`; `User` gains `verificationAttempts()`.
+
+**Services:**
+- `VerificationService` — `submitTier1()` (open staff-ID liveness: pass → auto-approve Level 1, low score → `pending_manual_review`), `assertWithinAttemptLimit()` (5/day/tier → `VerificationThrottledException`), `recordAttempt()`, `storeSelfie()`/`storeSelfieFile()`/`storeEncrypted()` (base64/file → Crypt-encrypted bytes on the private disk).
+- `NimcVerificationService` — Tier-2 NIN lookup: idempotent (same NIN re-submission never re-pays), global + per-provider caps checked *before* the call, raw NIN relayed only to the licensed partner, hash + last4 + partner ref stored, every call cost-logged (`identitypass`/`nin_check`), fail-safe → `pending_manual_review` on unconfigured/unreachable/cap-exhausted.
+- `SmileIdService` — Tier-3 driver anti-spoof: `start()` records the pending Level-3 job; `handleWebhook()` resolves it, HMAC-SHA256 signature is the only gate, anti-spoof score must clear `SMILE_ANTI_SPOOF_THRESHOLD`, cost logged on resolution.
+- `DeleteExpiredSelfiesJob` — nightly NDPR retention purge of selfies past `WORKRIDE_SELFIE_RETENTION_DAYS` (30).
+
+**API (`/api/v1`):** `GET /verifications/status`, `POST /verifications/tier1|tier2|tier3` (feature-gated on `FEATURE_LIVENESS`, 403 otherwise), public `POST /webhooks/smile` (signature-verified, Paystack-webhook contract).
+
+**Admin Control Tower:** verifications page gains a "Needs review" (`pending_manual_review`) queue chip, provider/tier/liveness-score badges (≥80 green, 75–79 gold, <75 red), a per-provider monthly cost summary (IdentityPass + Smile), and approve/reject actions now available on `pending_manual_review` rows.
+
+**Config:** `workride.verification.*` (enabled/attempts_per_day/liveness_min_score/selfie_retention_days/driver_verification_fee_naira), `services.identitypass.*`, `services.smile.*`; `.env.example` documents `FEATURE_LIVENESS`, `USE_IDENTITYPASS`, `USE_SMILE` and their tunables. `phpunit.xml` gains an `APP_KEY` (encryption-dependent tests now deterministic).
+
+**Bugs found & fixed during hardening:** the API gate read `workride.verification.liveness_enabled` while the config key is `enabled` (tests caught it as 403).
+
+**Tests (16 new — 290 total, 896 assertions):** `TieredVerificationTest` (13 — gate-off 403, tier1 auto-approve + encrypted-selfie round-trip, tier1 low-score manual review, tier1 2/day rate limit, tier2 IdentityPass approve + hash-only + cost log + level 2, not-found reject, unconfigured fallback, cap-exhausted no-call, same-NIN idempotency no second call, tier3 start, Smile webhook invalid-signature 400 / pass-approve / low-score reject, status endpoint), `SelfieRetentionTest` (2 — expired selfie purged, within-window kept).
+
 ---
 
 ## 5. Issues Resolved
@@ -615,6 +646,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 7 (Wk 8) | Business dashboard + receipts + exports | ✅ Complete |
 | Sprint 8 | Employer mobility programs + rewards/green points + commodity commerce | ✅ Complete (feature-gated `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES`) |
 | Sprint 9 | Missions + global nav redesign (⌘K palette, mobile tab bar, brand mark) | ✅ Complete (feature-gated `FEATURE_MISSIONS`) |
+| Sprint 3.6 | Tiered KYC — open liveness + NIMC lookup + driver anti-spoof | ✅ Complete (feature-gated `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE`) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -640,6 +672,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.7.0` | Sprint 7 — Business Dashboard + Receipts + Exports | Control Tower "Business" page (gross revenue, MRR, driver earnings, commission/union/insurance, subsidy issued/spent, corridor + revenue-per-day charts) + 5 QR-verifiable financial receipts (booking, driver earnings, wallet top-up, subsidy MDA, monthly statement) with public verify + 3 CSV exports (transactions, settlements, subsidy) | 209 (638) | 2026-08-01 |
 | `v0.8.0` | Sprint 8 — Employer Mobility + Rewards + Commodity Commerce | Employer programs (full/one-way/percent/capped coverage, org-funded commutes, employer wallet + COVER ledger) + reward campaigns (cash/earned/subsidy/green-points, period dedupe, budget caps) + Green Points economy + commodity market & shop (positions, buy/sell, QR orders; subsidy never spendable) — gated on `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES` | 255 (765) | 2026-08-01 |
 | `v0.9.0` | Sprint 9 — Missions + Global Nav Redesign | Sponsor-defined missions (auto-verified rewards via trip-completion + road-event observation, photo-proof review flow, rider hub + Control Tower) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, matching-anim SVG brand mark) — missions gated on `FEATURE_MISSIONS` | 274 (819) | 2026-08-02 |
+| `v0.9.1` | Sprint 3.6 — Tiered KYC | Open staff-ID liveness (auto-approve on pass, manual-review fallback) + verification attempts/rate limit + encrypted selfie retention purge + NIMC-licensed NIN lookup (idempotent, capped, cost-logged) + Smile anti-spoof driver webhook + Control Tower needs-review queue & KYC cost dashboard — gated on `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE` | 290 (896) | 2026-08-02 |
 
 ---
 

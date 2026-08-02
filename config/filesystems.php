@@ -47,6 +47,15 @@ return [
             'report' => false,
         ],
 
+        // Non-public disk for biometric data (encrypted selfies, driver docs).
+        // Never symlinked to public/. Files are Crypt-encrypted before storage.
+        'private' => [
+            'driver' => 'local',
+            'root' => storage_path('app/private'),
+            'throw' => false,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),
