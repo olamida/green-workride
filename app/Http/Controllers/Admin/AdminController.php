@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Models\User;
@@ -31,6 +32,12 @@ class AdminController extends Controller
 
         $recentUsers = User::with('workplace')->latest()->limit(8)->get();
 
-        return view('admin.dashboard', compact('stats', 'recentVerifications', 'recentUsers'));
+        $recentSos = ActivityLog::with('user')
+            ->where('action', 'sos')
+            ->latest()
+            ->limit(6)
+            ->get();
+
+        return view('admin.dashboard', compact('stats', 'recentVerifications', 'recentUsers', 'recentSos'));
     }
 }

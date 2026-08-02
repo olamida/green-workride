@@ -16,7 +16,10 @@ use Illuminate\Database\Eloquent\Collection;
  */
 class TripMatchingService
 {
-    public function __construct(private GeofenceService $geofence) {}
+    public function __construct(
+        private GeofenceService $geofence,
+        private RatingService $ratings,
+    ) {}
 
     /**
      * @return Collection<int, Trip>
@@ -44,20 +47,26 @@ class TripMatchingService
      * Upcoming bookable trips in the departure window, optionally by corridor.
      * Used by the web board where a passenger pickup point may not be known.
      *
+     * @param  bool|null  $womenOnly  when true, only women-only trips are returned
      * @return Collection<int, Trip>
      */
-    public function upcoming(?Corridor $corridor = null, ?int $withinMinutes = null): Collection
+    public function upcoming(?Corridor $corridor = null, ?int $withinMinutes = null, ?bool $womenOnly = null): Collection
     {
         $withinMinutes ??= (int) config('workride.departure_window_minutes', 30);
 
-        return Trip::query()
+        $trips = Trip::query()
             ->whereIn('status', [TripStatus::Scheduled, TripStatus::Active])
             ->where('available_seats', '>', 0)
             ->whereBetween('departure_time', [now(), now()->addMinutes($withinMinutes)])
             ->when($corridor, fn ($query) => $query->where('corridor', $corridor))
+            ->when($womenOnly, fn ($query) => $query->where('women_only', true))
             ->with(['driver', 'vehicle'])
             ->orderBy('departure_time')
             ->get();
+
+        $this->ratings->attachDriverRatingToTrips($trips);
+
+        return $trips;
     }
 
     /**

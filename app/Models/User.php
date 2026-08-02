@@ -23,6 +23,10 @@ class User extends Authenticatable
         'email',
         'password',
         'phone',
+        'gender',
+        'prefers_women_only',
+        'emergency_contact_name',
+        'emergency_contact_phone',
         'avatar',
         'role',
         'verification_level',
@@ -50,6 +54,7 @@ class User extends Authenticatable
             'is_banned' => 'boolean',
             'has_overdue_ride_credit' => 'boolean',
             'green_points' => 'integer',
+            'prefers_women_only' => 'boolean',
         ];
     }
 
@@ -131,6 +136,25 @@ class User extends Authenticatable
     public function activityLogs(): HasMany
     {
         return $this->hasMany(ActivityLog::class);
+    }
+
+    public function ratingsGiven(): HasMany
+    {
+        return $this->hasMany(RideRating::class, 'rater_id');
+    }
+
+    public function ratingsReceived(): HasMany
+    {
+        return $this->hasMany(RideRating::class, 'ratee_id');
+    }
+
+    /**
+     * Average rating received (driver score per the guide), or null when no
+     * ratings yet. Rendered as "★ 4.8" on trip cards and the trip detail page.
+     */
+    public function ratingSummary(): ?float
+    {
+        return $this->ratingsReceived()->avg('rating');
     }
 
     public function isAdmin(): bool

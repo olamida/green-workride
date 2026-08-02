@@ -83,6 +83,15 @@
                 </span>
             </label>
 
+            <label class="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                <input type="checkbox" name="women_only" value="1" @checked(old('women_only'))
+                       class="h-5 w-5 rounded border-ink-300 text-rose-600 focus:ring-rose-500">
+                <span>
+                    <span class="block text-sm font-semibold text-ink-900">Women-only ride</span>
+                    <span class="block text-xs text-ink-500">Only female riders can book this trip.</span>
+                </span>
+            </label>
+
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <label for="current_lat" class="mb-1 block text-sm font-medium text-ink-700">Latitude</label>

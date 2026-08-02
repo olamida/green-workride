@@ -50,7 +50,7 @@ class PwaController extends Controller
     {
         $content = <<<'JS'
 const CACHE = 'workride-v1';
-const SHELL = ['/', '/dashboard', '/trips', '/bookings', '/impact', '/road/map', '/manifest.json'];
+const SHELL = ['/', '/dashboard', '/trips', '/bookings', '/impact', '/road/map', '/manifest.json', '/offline'];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -68,6 +68,7 @@ self.addEventListener('activate', (event) => {
 });
 
 // Stale-while-revalidate: serve cached shell instantly, refresh in background.
+// Read-only caching — never cache POSTs, and never touch the FOR-UPDATE seat locks.
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
 
@@ -84,11 +85,20 @@ self.addEventListener('fetch', (event) => {
                     if (response && response.status === 200) cache.put(event.request, response.clone());
                     return response;
                 })
-                .catch(() => cached);
+                .catch(() => {
+                    // Navigation offline → offline board page (corridor chips + retry).
+                    if (event.request.mode === 'navigate') return caches.match('/offline');
+                    return cached;
+                });
 
             return cached || network;
         })
     );
+});
+
+// Let a newly installed service worker take control right away.
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 JS;
 

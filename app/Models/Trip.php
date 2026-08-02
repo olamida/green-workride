@@ -26,6 +26,7 @@ class Trip extends Model
         'available_seats',
         'fare_per_seat',
         'is_free_volunteer',
+        'women_only',
         'status',
         'departure_time',
         'waypoints',
@@ -40,6 +41,7 @@ class Trip extends Model
             'available_seats' => 'integer',
             'fare_per_seat' => 'decimal:2',
             'is_free_volunteer' => 'boolean',
+            'women_only' => 'boolean',
             'corridor' => Corridor::class,
             'status' => TripStatus::class,
             'departure_time' => 'datetime',
@@ -70,6 +72,11 @@ class Trip extends Model
     public function chatMessages(): HasMany
     {
         return $this->hasMany(ChatMessage::class);
+    }
+
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(RideRating::class);
     }
 
     /**

@@ -84,5 +84,34 @@
                 @endforelse
             </div>
         </div>
+
+        <div class="rounded-2xl border border-ink-200 bg-white p-6">
+            <div class="flex items-center justify-between">
+                <h2 class="font-heading font-semibold text-ink-900">Safety alerts (SOS)</h2>
+                <span class="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                    {{ $recentSos->count() }} recent
+                </span>
+            </div>
+            <div class="mt-4 space-y-3">
+                @forelse ($recentSos as $log)
+                    <div class="flex items-center justify-between gap-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-medium text-ink-800">
+                                {{ $log->user?->name ?? 'Unknown user' }}
+                            </p>
+                            <p class="truncate text-xs text-ink-500">
+                                SOS · {{ $log->changes['route_name'] ?? 'Unknown route' }}
+                                @if (isset($log->changes['lat']))
+                                    · {{ number_format((float) $log->changes['lat'], 5) }}, {{ number_format((float) $log->changes['lng'], 5) }}
+                                @endif
+                            </p>
+                        </div>
+                        <span class="shrink-0 text-xs text-ink-400">{{ $log->created_at->diffForHumans() }}</span>
+                    </div>
+                @empty
+                    <p class="text-sm text-ink-500">No SOS alerts. Riders feel safe.</p>
+                @endforelse
+            </div>
+        </div>
     </div>
 @endsection

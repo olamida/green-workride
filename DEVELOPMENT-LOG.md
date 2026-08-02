@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 Complete — Missions, Global Nav, Tiered KYC)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F Complete)
 
 | Area | Status |
 |------|--------|
@@ -39,7 +39,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 8 complete — Employer Mobility Programs (org-funded commutes) + Reward Campaigns & Green Points economy + Commodity Commerce (wallet → gold/rice/maize/fuel positions + QR shop orders), all feature-gated |
 | Feature modules | ✅ Sprint 9 complete — Missions (sponsor-defined promoted activities with auto-verified + photo-proof rewards) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, searching-algorithm SVG brand mark) |
 | Feature modules | ✅ Sprint 3.6 complete — Tiered KYC (open staff-ID liveness $0 + NIMC-licensed NIN lookup + Smile Identity driver anti-spoof), verification attempts + rate limit, encrypted selfie retention, Control Tower cost dashboard (feature-gated `FEATURE_LIVENESS`, `USE_IDENTITYPASS`, `USE_SMILE`) |
-| Tests | ✅ 290 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions, tiered verification, selfie retention) |
+| Feature modules | ✅ Investor-guide adoptions A–F complete — Mutual ride ratings + driver scoreboard (Control Tower) · Safety pack (public Share Trip page, one-tap SOS into change-control trail, emergency contact) · Women-only preference (never a hard sort) · Offline trip board (PWA SW read-only cache + `/offline`) · Design tokens file (`design-system.css`) · Landing investor KPI strip |
+| Tests | ✅ 309 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions, tiered verification, selfie retention, ratings, safety, women-only) |
 
 ---
 
@@ -465,6 +466,38 @@ Adopted from `WORKRIDE-PROMPT-ID-VERIFICATION-LIVENESS.md` (reviewed + corrected
 
 **Tests (16 new — 290 total, 896 assertions):** `TieredVerificationTest` (13 — gate-off 403, tier1 auto-approve + encrypted-selfie round-trip, tier1 low-score manual review, tier1 2/day rate limit, tier2 IdentityPass approve + hash-only + cost log + level 2, not-found reject, unconfigured fallback, cap-exhausted no-call, same-NIN idempotency no second call, tier3 start, Smile webhook invalid-signature 400 / pass-approve / low-score reject, status endpoint), `SelfieRetentionTest` (2 — expired selfie purged, within-window kept).
 
+### 4.18 Investor-Guide Adoptions A–F — Trust, Safety, Inclusivity, Offline, Design Tokens, Landing KPIs (COMPLETE)
+
+Six adoptions from the investor guide review, committed as one feature set (`v0.10.0`). All read from the existing trust/safety/design foundations; no schema redo, no full UI redesign, no hard sort, no FCM.
+
+**A. Mutual ride ratings + driver scoreboard**
+- Schema: `ride_ratings` — `booking_id` FK cascade, `trip_id` FK cascade, `rater_id`, `ratee_id`, `rating` (1–5 unsignedTinyInteger), `note`, unique `[booking_id, rater_id]`, index `[ratee_id, created_at]`.
+- `RatingService::rate(User, Booking, data)` — resolves the *other party* (passenger rates driver, driver rates passenger, strangers/admins rejected), requires `booking.status` Completed/Boarded **and** `trip.status` Completed, records `RideRating` + `ActivityLog::log('rated_ride', …)` in one transaction. Idempotent: a pre-insert `exists()` check plus a tolerant `QueryException` catch for both MySQL (23000) and SQLite (19) unique violations → "already rated".
+- `RatingService::attachDriverRating(Trip)` / `attachDriverRatingToTrips(Collection)` — ONE grouped `SELECT ratee_id, COUNT(*), AVG(rating)` query populates `driver_rating_count` / `driver_rating_avg` on trip cards. Replaces the nested builder `withCount('driver.ratingsReceived')` aggregate (see §5 — unsupported for dot-notation in this framework).
+- Web: `POST /ratings/{booking}` (Alpine 1–5 star picker component, note ≤500, submit disabled until a star is picked) wired into `bookings/index` for completed rides (passenger rates driver + driver rates each passenger). Admin `GET /admin/ratings` — driver scoreboard (avg desc, count desc) + recent ratings with stars/notes. Driver stars shown on `trips/board` cards and `trips/show`.
+
+**B. Safety pack — Share Trip, SOS, emergency contact**
+- `GET /trips/{trip}/share` — guest-safe public card (corridor, departure, seats, fare, women-only badge, driver + verification badge); 404 unless scheduled/active; no live location streamed. "Share this ride" copy-link button on `trips/show`.
+- `POST /trips/{trip}/sos` — participants only (`Trip::isParticipant`), writes `ActivityLog::log('sos', …)` with corridor, route, lat/lng, `reported_at`; Control Tower dashboard gains a **Safety alerts (SOS)** panel of recent SOS rows (name, route, coords, age).
+- Emergency contact (name + phone) on a new `GET/POST /profile` page (Profile & safety, linked from the profile menu). Never shared with other riders.
+
+**C. Women-only preference (never a hard sort)**
+- Schema: `users.gender` (nullable), `users.prefers_women_only` (bool, default false), `trips.women_only` (bool, default false) + composite index `[women_only, status, departure_time]`.
+- `TripService::publish` writes `women_only`; `BookingService::book` gates it (`women_only && gender !== 'female'` → ValidationException "This is a women-only ride."); board chip is an opt-in filter, **defaulted on from the rider's profile preference** — explicitly not a hard sort. `trips/create` gains a Women-only toggle; `trips/show` shows the badge + a women-only block panel for non-female riders with a link to Profile & safety.
+
+**D. Offline trip board (PWA)**
+- `/offline` page (guest-safe, cached-board copy + retry link) added to the service worker SHELL; navigation requests that fail fall back to `/offline`; new `SKIP_WAITING` message handler. Read-only caching only — never caches POSTs, so offline can never race the `FOR UPDATE` seat locks.
+
+**E. Design tokens file**
+- Extracted the entire Tailwind v4 `@theme` token block (fonts + forest/gold/ink/paper palettes) and the base layer out of `resources/css/app.css` into `resources/css/design-system.css`; `app.css` now imports it. Brand tokens live in exactly one file.
+
+**F. Landing investor KPI strip**
+- `HomeController` now passes live KPIs (scheduled trips, rides completed today, verified workers, free volunteer rides) and `landing.blade.php` renders a 4-cell strip between hero and value props — funder-ready "look, it's alive" numbers.
+
+**Tests (19 new — 309 total, 950 assertions):** `RatingsSafetyTest` — ratings gate/once-per-booking/mutual/stranger/not-completed/validation/scoreboard · women-only block + female allow + board pref default · public share + completed-404 · SOS audit log + non-participant 403 · profile safety/preference save · offline page · landing KPIs · service-worker offline fallback.
+
+### 4.19 (placeholder — next sprint)
+
 ---
 
 ## 5. Issues Resolved
@@ -579,6 +612,24 @@ Adopted from `WORKRIDE-PROMPT-ID-VERIFICATION-LIVENESS.md` (reviewed + corrected
 - **Fix:** `refund()` now returns early unless an `EMP-{booking}-COVER` transaction exists.
 - **Status:** ✅ Resolved — covered by `EmployerTest` cancel-refund cases.
 
+### Nested builder aggregate `withCount('driver.ratingsReceived')` crashed the trip board
+- **Symptom:** `/trips` 500 — `BadMethodCallException: Call to undefined method App\Models\Trip::driver.ratingsReceived()`.
+- **Root cause:** This framework's `Builder::withAggregate()` resolves the relation via `getRelationWithoutConstraints($name)` which calls `getModel()->{$name}()` **without** splitting dot-notation, so nested `withCount`/`withAvg` on the query builder is unsupported (`Trip->driver.ratingsReceived()`).
+- **Fix:** `RatingService::attachDriverRatingToTrips(Collection)` runs ONE grouped `SELECT ratee_id, COUNT(*), AVG(rating)` on `ride_ratings` for the trips' `driver_id`s and attaches `driver_rating_count` / `driver_rating_avg` as dynamic attributes. Both `TripMatchingService::upcoming()` and `TripBoardController::show()` now use it.
+- **Status:** ✅ Resolved — covered by `RatingsSafetyTest` board + show flows.
+
+### Duplicate rating on SQLite raised a raw PDO exception, not a friendly error
+- **Symptom:** The second rating attempt in `RatingsSafetyTest` 500'd — `PDOException: SQLSTATE[23000] Integrity constraint violation: 19 UNIQUE constraint failed`.
+- **Root cause:** The `QueryException` catch only accepted MySQL's driver code `23000`; SQLite reports `19`. The exception propagated as a 500 instead of "already rated".
+- **Fix:** Added a pre-insert `exists()` check inside the transaction plus a tolerant catch for both `'23000'` and `'19'`.
+- **Status:** ✅ Resolved.
+
+### Blade HTML-encodes apostrophes in rendered copy
+- **Symptom:** `assertSee("You're offline")` failed — the rendered page contains `You&#039;re offline`.
+- **Root cause:** Blade `{{ }}` HTML-encodes `'` to `&#039;`, so literal-copy assertions must match the encoded output or use a plain-text fragment.
+- **Fix:** Asserted the un-encoded sentence `Your connection dropped` instead.
+- **Status:** ✅ Resolved.
+
 ---
 
 ## 6. How to Work On This Project
@@ -647,6 +698,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 8 | Employer mobility programs + rewards/green points + commodity commerce | ✅ Complete (feature-gated `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES`) |
 | Sprint 9 | Missions + global nav redesign (⌘K palette, mobile tab bar, brand mark) | ✅ Complete (feature-gated `FEATURE_MISSIONS`) |
 | Sprint 3.6 | Tiered KYC — open liveness + NIMC lookup + driver anti-spoof | ✅ Complete (feature-gated `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE`) |
+| Investor Adoptions A–F | Mutual ratings + safety pack + women-only preference + offline board + design tokens + landing KPIs | ✅ Complete (v0.10.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -673,6 +725,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.8.0` | Sprint 8 — Employer Mobility + Rewards + Commodity Commerce | Employer programs (full/one-way/percent/capped coverage, org-funded commutes, employer wallet + COVER ledger) + reward campaigns (cash/earned/subsidy/green-points, period dedupe, budget caps) + Green Points economy + commodity market & shop (positions, buy/sell, QR orders; subsidy never spendable) — gated on `FEATURE_EMPLOYER_PROGRAMS` / `FEATURE_REWARDS` / `FEATURE_COMMODITIES` | 255 (765) | 2026-08-01 |
 | `v0.9.0` | Sprint 9 — Missions + Global Nav Redesign | Sponsor-defined missions (auto-verified rewards via trip-completion + road-event observation, photo-proof review flow, rider hub + Control Tower) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, matching-anim SVG brand mark) — missions gated on `FEATURE_MISSIONS` | 274 (819) | 2026-08-02 |
 | `v0.9.1` | Sprint 3.6 — Tiered KYC | Open staff-ID liveness (auto-approve on pass, manual-review fallback) + verification attempts/rate limit + encrypted selfie retention purge + NIMC-licensed NIN lookup (idempotent, capped, cost-logged) + Smile anti-spoof driver webhook + Control Tower needs-review queue & KYC cost dashboard — gated on `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE` | 290 (896) | 2026-08-02 |
+| `v0.10.0` | Investor-Guide Adoptions A–F | Mutual ride ratings (once per booking, change-control audited) + driver scoreboard · safety pack (public Share Trip page, one-tap SOS → Control Tower panel, emergency contact profile) · women-only preference (opt-in board filter, booking gate, never a hard sort) · offline trip board (PWA SW read-only navigation fallback + `/offline`) · design tokens file (`design-system.css`) · landing investor KPI strip | 309 (950) | 2026-08-02 |
 
 ---
 

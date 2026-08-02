@@ -8,6 +8,7 @@ use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Booking extends Model
 {
@@ -52,6 +53,20 @@ class Booking extends Model
     public function employer(): BelongsTo
     {
         return $this->belongsTo(Employer::class);
+    }
+
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(RideRating::class);
+    }
+
+    /**
+     * The rating this user gave on this booking, if any — used to hide the
+     * "rate your ride" form once it has been submitted.
+     */
+    public function ratingBy(int $userId): ?RideRating
+    {
+        return $this->ratings()->where('rater_id', $userId)->first();
     }
 
     /**

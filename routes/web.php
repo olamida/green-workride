@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\EmployerController;
 use App\Http\Controllers\Admin\GtfsController as AdminGtfsController;
 use App\Http\Controllers\Admin\MissionController as AdminMissionController;
+use App\Http\Controllers\Admin\RatingController as AdminRatingController;
 use App\Http\Controllers\Admin\RewardController as AdminRewardController;
 use App\Http\Controllers\Admin\RoadController as AdminRoadController;
 use App\Http\Controllers\Admin\SubsidyController;
@@ -21,10 +22,13 @@ use App\Http\Controllers\Web\ImpactCertificateController;
 use App\Http\Controllers\Web\ImpactController;
 use App\Http\Controllers\Web\MissionController;
 use App\Http\Controllers\Web\PaystackWebhookController;
+use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PwaController;
+use App\Http\Controllers\Web\RatingController;
 use App\Http\Controllers\Web\ReceiptController;
 use App\Http\Controllers\Web\RewardsController;
 use App\Http\Controllers\Web\RoadMapController;
+use App\Http\Controllers\Web\SafetyController;
 use App\Http\Controllers\Web\ShopController;
 use App\Http\Controllers\Web\TripBoardController;
 use App\Http\Controllers\Web\VerificationController;
@@ -36,6 +40,12 @@ Route::get('/', HomeController::class)->name('home');
 // PWA shell — installable manifest + offline service worker.
 Route::get('/manifest.json', [PwaController::class, 'manifest'])->name('pwa.manifest');
 Route::get('/sw.js', [PwaController::class, 'serviceWorker'])->name('pwa.sw');
+
+// Offline fallback page served by the service worker when the network drops.
+Route::get('/offline', fn () => view('offline'))->name('offline');
+
+// Public trip share page — "send this ride to your colleague".
+Route::get('/trips/{trip}/share', [SafetyController::class, 'share'])->name('trips.share');
 
 // Public Road Intelligence heatmap — confirmed potholes + segment condition.
 Route::get('/road/map', RoadMapController::class)->name('road.map');
@@ -68,6 +78,11 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+
+    Route::post('/ratings/{booking}', [RatingController::class, 'store'])->name('ratings.store');
 
     Route::prefix('impact')->name('impact.')->group(function () {
         Route::get('/', [ImpactController::class, 'index'])->name('index');
@@ -122,6 +137,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/trips/{trip}/complete', [TripBoardController::class, 'complete'])->name('trips.complete');
     Route::post('/trips/{trip}/cancel', [TripBoardController::class, 'cancel'])->name('trips.cancel');
     Route::post('/trips/{trip}/messages', [TripBoardController::class, 'storeMessage'])->name('trips.messages');
+    Route::post('/trips/{trip}/sos', [SafetyController::class, 'sos'])->name('trips.sos');
 
     Route::prefix('bookings')->name('bookings.')->group(function () {
         Route::get('/', [BookingController::class, 'index'])->name('index');
@@ -157,6 +173,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/business/export/transactions', [BusinessController::class, 'exportTransactions'])->name('business.export.transactions');
         Route::get('/business/export/settlements', [BusinessController::class, 'exportSettlements'])->name('business.export.settlements');
         Route::get('/business/export/subsidy', [BusinessController::class, 'exportSubsidy'])->name('business.export.subsidy');
+
+        Route::get('/ratings', [AdminRatingController::class, 'index'])->name('ratings.index');
 
         Route::get('/employers', [EmployerController::class, 'index'])->name('employers.index');
         Route::get('/employers/create', [EmployerController::class, 'create'])->name('employers.create');

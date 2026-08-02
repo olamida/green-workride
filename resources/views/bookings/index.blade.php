@@ -52,6 +52,14 @@
                                 @endif
                             </div>
                         </div>
+                        @if ($booking->status->value === 'completed' && $booking->trip?->status?->value === 'completed' && ! $booking->ratingBy($user->id))
+                            <div class="mt-4 border-t border-ink-100 pt-4">
+                                <x-rating-form
+                                    :action="route('ratings.store', $booking)"
+                                    title="Rate your driver — {{ $booking->trip?->driver?->name }}"
+                                    cta="Submit rating" />
+                            </div>
+                        @endif
                     </div>
                 @empty
                     <div class="rounded-2xl border border-dashed border-ink-300 bg-white p-8 text-center">
@@ -83,6 +91,16 @@
                                 </a>
                             </div>
                         </div>
+                        @foreach ($trip->bookings as $booking)
+                            @if ($booking->status->value === 'completed' && ! $booking->ratingBy($user->id))
+                                <div class="mt-4 border-t border-ink-100 pt-4">
+                                    <x-rating-form
+                                        :action="route('ratings.store', $booking)"
+                                        title="Rate passenger — {{ $booking->passenger?->name }}"
+                                        cta="Submit rating" />
+                                </div>
+                            @endif
+                        @endforeach
                     </div>
                 @empty
                     <div class="rounded-2xl border border-dashed border-ink-300 bg-white p-8 text-center">

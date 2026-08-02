@@ -51,4 +51,11 @@
         New to WorkRide?
         <a href="{{ route('register') }}" class="font-semibold text-forest-600 hover:underline">Create an account</a>
     </p>
+
+    <p class="mt-4 text-center text-sm">
+        <a href="{{ route('home') }}" class="inline-flex items-center gap-1 font-medium text-ink-500 transition hover:text-forest-600">
+            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25h10.638A.75.75 0 0 1 17 10Z" clip-rule="evenodd"/></svg>
+            Back to homepage
+        </a>
+    </p>
 @endsection

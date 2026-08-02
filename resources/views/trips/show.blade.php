@@ -18,6 +18,9 @@
                             @if ($trip->is_free_volunteer)
                                 <span class="rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-800">FREE volunteer</span>
                             @endif
+                            @if ($trip->women_only)
+                                <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">Women-only</span>
+                            @endif
                         </div>
                         <h1 class="mt-3 font-heading text-2xl font-bold text-ink-900">{{ $trip->route_name }}</h1>
                         <p class="mt-1 text-sm text-ink-500">
@@ -53,7 +56,13 @@
                         </span>
                         <span>
                             <span class="block text-sm font-medium text-ink-900">{{ $trip->driver?->name }}</span>
-                            <span class="block text-xs text-ink-500">Verified L{{ $trip->driver?->verification_level?->value }}</span>
+                            <span class="block text-xs text-ink-500">
+                                Verified L{{ $trip->driver?->verification_level?->value }}
+                                @if ($trip->driver_rating_count)
+                                    · <span class="text-gold-600">★ {{ number_format((float) $trip->driver_rating_avg, 1) }}</span>
+                                    <span class="text-ink-400">({{ $trip->driver_rating_count }})</span>
+                                @endif
+                            </span>
                         </span>
                     </div>
                     @if ($trip->vehicle)
@@ -63,6 +72,25 @@
                             </span>
                             <span class="font-mono text-xs text-ink-500">{{ $trip->vehicle->plate_number }}</span>
                         </div>
+                    @endif
+                </div>
+
+                <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-ink-100 pt-5">
+                    <div x-data="{ copied: false }">
+                        <button type="button" @click="navigator.clipboard.writeText('{{ route('trips.share', $trip) }}').then(() => { copied = true; setTimeout(() => copied = false, 2000); })"
+                                class="flex items-center gap-2 rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-ink-100">
+                            <x-icon name="arrow-right" class="h-4 w-4" />
+                            <span x-text="copied ? 'Link copied!' : 'Share this ride'"></span>
+                        </button>
+                    </div>
+                    @if ($isParticipant && in_array($trip->status->value, ['scheduled', 'active'], true))
+                        <form method="POST" action="{{ route('trips.sos', $trip) }}">
+                            @csrf
+                            <button class="flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
+                                <x-icon name="alert" class="h-4 w-4" />
+                                SOS
+                            </button>
+                        </form>
                     @endif
                 </div>
             </div>
@@ -166,7 +194,16 @@
         </div>
 
         <div class="space-y-6">
-            @if (! $myBooking && ! $canStart && $trip->driver_id !== $user->id && in_array($trip->status->value, ['scheduled', 'active']) && $trip->available_seats > 0 && $user->canBook())
+            @if ($womenOnlyBlocked && ! $myBooking && in_array($trip->status->value, ['scheduled', 'active'], true) && $trip->available_seats > 0)
+                <div class="rounded-2xl border border-rose-200 bg-rose-50 p-6">
+                    <h2 class="font-heading font-semibold text-rose-900">Women-only ride</h2>
+                    <p class="mt-1 text-sm text-rose-700">
+                        This trip is reserved for women riders. Update your gender preference in
+                        <a href="{{ route('profile.edit') }}" class="font-semibold underline">Profile & safety</a>
+                        to see and book it.
+                    </p>
+                </div>
+            @elseif (! $myBooking && ! $canStart && $trip->driver_id !== $user->id && in_array($trip->status->value, ['scheduled', 'active']) && $trip->available_seats > 0 && $user->canBook())
                 <div class="rounded-2xl border border-forest-200 bg-white p-6">
                     <h2 class="font-heading font-semibold text-ink-900">Book a seat</h2>
                     <form method="POST" action="{{ route('bookings.store', $trip) }}" class="mt-4 space-y-4">

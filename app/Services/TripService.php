@@ -33,6 +33,7 @@ class TripService
     public function publish(User $driver, array $data): Trip
     {
         $isFreeVolunteer = (bool) ($data['is_free_volunteer'] ?? false);
+        $womenOnly = (bool) ($data['women_only'] ?? false);
         $corridor = Corridor::from($data['corridor']);
         $totalSeats = (int) $data['total_seats'];
 
@@ -57,6 +58,7 @@ class TripService
             'available_seats' => $totalSeats,
             'fare_per_seat' => $this->pricing->fareFor($corridor, $isFreeVolunteer),
             'is_free_volunteer' => $isFreeVolunteer,
+            'women_only' => $womenOnly,
             'status' => TripStatus::Scheduled,
             'departure_time' => $data['departure_time'],
             'waypoints' => $data['waypoints'] ?? null,

@@ -37,6 +37,10 @@ class BookingService
             throw ValidationException::withMessages(['trip' => 'You cannot book your own trip.']);
         }
 
+        if ($trip->women_only && $passenger->gender !== 'female') {
+            throw ValidationException::withMessages(['trip' => 'This is a women-only ride.']);
+        }
+
         try {
             return DB::transaction(function () use ($trip, $passenger, $data) {
                 $trip = Trip::whereKey($trip->id)->lockForUpdate()->firstOrFail();

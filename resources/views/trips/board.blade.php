@@ -33,6 +33,13 @@
                 {{ $option->label() }}
             </a>
         @endforeach
+        <a href="{{ route('trips.index', array_filter(['corridor' => $corridor?->value, 'women_only' => $womenOnly ? null : '1'])) }}" @class([
+            'rounded-full px-4 py-2 text-sm font-semibold transition',
+            'bg-rose-600 text-white' => $womenOnly,
+            'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100' => ! $womenOnly,
+        ])>
+            ♀ Women-only
+        </a>
     </div>
 
     <div class="space-y-4">
@@ -44,6 +51,9 @@
                             <span class="rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">{{ $trip->corridor->short() }}</span>
                             @if ($trip->is_free_volunteer)
                                 <span class="rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-800">FREE volunteer</span>
+                            @endif
+                            @if ($trip->women_only)
+                                <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">Women-only</span>
                             @endif
                         </div>
                         <p class="mt-3 font-heading text-lg font-semibold text-ink-900">{{ $trip->route_name }}</p>
@@ -62,6 +72,9 @@
                     <span>⏰ {{ $trip->departure_time->format('D, M j · g:i A') }}</span>
                     <span>🚌 {{ $trip->available_seats }}/{{ $trip->total_seats }} seats</span>
                     <span>👤 {{ $trip->driver?->name }}</span>
+                    @if ($trip->driver_rating_count)
+                        <span class="text-gold-600">★ {{ number_format((float) $trip->driver_rating_avg, 1) }} ({{ $trip->driver_rating_count }})</span>
+                    @endif
                     @if ($trip->current_lat)
                         <span class="inline-flex items-center gap-1 text-forest-700">
                             <span class="h-2 w-2 rounded-full bg-forest-500"></span>

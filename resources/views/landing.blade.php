@@ -92,6 +92,27 @@
                 </div>
             </section>
 
+            <section class="border-y border-ink-200 bg-forest-50/60">
+                <div class="mx-auto grid max-w-6xl gap-px overflow-hidden rounded-2xl sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="bg-white p-6">
+                        <p class="font-mono text-3xl font-semibold text-forest-700">{{ number_format($kpis['scheduledTrips']) }}</p>
+                        <p class="mt-1 text-xs font-medium text-ink-500">Scheduled trips leaving now</p>
+                    </div>
+                    <div class="bg-white p-6">
+                        <p class="font-mono text-3xl font-semibold text-forest-700">{{ number_format($kpis['ridesToday']) }}</p>
+                        <p class="mt-1 text-xs font-medium text-ink-500">Rides completed today</p>
+                    </div>
+                    <div class="bg-white p-6">
+                        <p class="font-mono text-3xl font-semibold text-forest-700">{{ number_format($kpis['verifiedWorkers']) }}</p>
+                        <p class="mt-1 text-xs font-medium text-ink-500">Verified civil servants</p>
+                    </div>
+                    <div class="bg-white p-6">
+                        <p class="font-mono text-3xl font-semibold text-forest-700">{{ number_format($kpis['freeRides']) }}</p>
+                        <p class="mt-1 text-xs font-medium text-ink-500">Free volunteer rides given</p>
+                    </div>
+                </div>
+            </section>
+
             <section class="border-t border-ink-200 bg-white">
                 <div class="mx-auto grid max-w-6xl gap-8 px-4 py-12 sm:grid-cols-3">
                     <div>

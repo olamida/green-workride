@@ -6,6 +6,7 @@ use App\Enums\Corridor;
 use App\Events\NewChatMessage;
 use App\Http\Controllers\Controller;
 use App\Models\Trip;
+use App\Services\RatingService;
 use App\Services\TripMatchingService;
 use App\Services\TripService;
 use Illuminate\Http\Request;
@@ -14,7 +15,10 @@ use Illuminate\Validation\ValidationException;
 
 class TripBoardController extends Controller
 {
-    public function __construct(private TripService $trips) {}
+    public function __construct(
+        private TripService $trips,
+        private RatingService $ratings,
+    ) {}
 
     public function index(Request $request, TripMatchingService $matcher)
     {
@@ -22,9 +26,15 @@ class TripBoardController extends Controller
             ? Corridor::from($request->input('corridor'))
             : null;
 
-        $trips = $matcher->upcoming($corridor);
+        // Women-only is a preference, not a hard sort: riders who opt in get
+        // the filter defaulted on, everyone else sees it as an opt-in chip.
+        $womenOnly = $request->has('women_only')
+            ? $request->boolean('women_only')
+            : (bool) (auth()->user()->prefers_women_only ?? false);
 
-        return view('trips.board', compact('trips', 'corridor'));
+        $trips = $matcher->upcoming($corridor, null, $womenOnly);
+
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly'));
     }
 
     public function create()
@@ -67,6 +77,7 @@ class TripBoardController extends Controller
         $user = auth()->user();
 
         $trip->load(['driver', 'vehicle', 'waypoints', 'bookings.passenger', 'chatMessages.sender']);
+        $this->ratings->attachDriverRating($trip);
 
         $canStart = $trip->driver_id === $user->id && $trip->status->value === 'scheduled';
         $canComplete = $trip->driver_id === $user->id && $trip->status->value === 'active';
@@ -75,6 +86,7 @@ class TripBoardController extends Controller
 
         $myBooking = $user->bookings()->where('trip_id', $trip->id)->whereIn('status', ['requested', 'confirmed', 'boarded'])->first();
         $isParticipant = $trip->isParticipant($user);
+        $womenOnlyBlocked = $trip->women_only && $user->gender !== 'female';
 
         return view('trips.show', compact(
             'trip',
@@ -84,6 +96,7 @@ class TripBoardController extends Controller
             'canCancelTrip',
             'myBooking',
             'isParticipant',
+            'womenOnlyBlocked',
         ));
     }
 
@@ -158,6 +171,7 @@ class TripBoardController extends Controller
             'total_seats' => ['required', 'integer', 'min:1', 'max:60'],
             'departure_time' => ['required', 'date', 'after:now'],
             'is_free_volunteer' => ['sometimes', 'boolean'],
+            'women_only' => ['sometimes', 'boolean'],
             'current_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'current_lng' => ['nullable', 'numeric', 'between:-180,180'],
             'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],
