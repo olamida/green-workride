@@ -685,4 +685,4 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 - Dual-app: Blade+Tailwind+Alpine Rider PWA (public) + Filament-style Ops Control Tower
 - Design system: Forest Green `#2E7D32`, Gold `#FBC02D`, Slate `#0F172A`, Paper `#F6F9F6`; Sora/Inter/JetBrains Mono; 8px grid
 - Git: Conventional Commits (`feat|fix|test|refactor|chore|docs|perf(scope): subject`); never stage `.env`/secrets; tag each sprint (`v0.X.0`); update this log before every commit
-- Git cadence: commit after **every feature/process implementation** that passes the DoD ritual (pint → test → build → docs → stage → commit), one milestone commit + tag (`v0.X.0`) at each sprint boundary, and **`git push origin master && git push --tags` after every sprint** — per guide §19
+- Git cadence: commit after **every feature/process implementation** that passes the DoD ritual (pint → test → build → docs → stage → commit), one milestone commit + tag (`v0.X.0`) at each sprint boundary, and **`git push origin main && git push --tags` after every sprint** — per guide §19
