@@ -23,6 +23,7 @@ class User extends Authenticatable
         'email',
         'password',
         'phone',
+        'phone_verified_at',
         'gender',
         'prefers_women_only',
         'emergency_contact_name',
@@ -55,6 +56,7 @@ class User extends Authenticatable
             'has_overdue_ride_credit' => 'boolean',
             'green_points' => 'integer',
             'prefers_women_only' => 'boolean',
+            'phone_verified_at' => 'datetime',
         ];
     }
 
@@ -71,6 +73,11 @@ class User extends Authenticatable
     public function verificationAttempts(): HasMany
     {
         return $this->hasMany(VerificationAttempt::class);
+    }
+
+    public function phoneOtps(): HasMany
+    {
+        return $this->hasMany(PhoneOtp::class);
     }
 
     public function vehicles(): HasMany
@@ -167,7 +174,28 @@ class User extends Authenticatable
         return $this->role === UserRole::WorkplaceAdmin;
     }
 
+    /**
+     * True once an SMS OTP has proven the phone number is live. This is the
+     * Tier-0 entry gate: a phone-verified rider can book at the normal fixed
+     * fare, but benefits (subsidy, employer coverage, ride credits, volunteer
+     * rides, rewards) stay locked behind formal verification (Level 1+).
+     */
+    public function hasVerifiedPhone(): bool
+    {
+        return $this->phone_verified_at !== null;
+    }
+
     public function canBook(): bool
+    {
+        return ! $this->is_banned && ($this->hasVerifiedPhone() || $this->verification_level->canBook());
+    }
+
+    /**
+     * Benefit-tier booking: Level 1 (workplace) or above. Phone-only riders
+     * get instant entry but pay the normal fare — this flag separates the
+     * paid corridor economy from the subsidised/volunteer economy.
+     */
+    public function canBookBenefits(): bool
     {
         return ! $this->is_banned && $this->verification_level->canBook();
     }

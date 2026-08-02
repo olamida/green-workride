@@ -3,14 +3,19 @@
 namespace App\Services;
 
 use App\Enums\EmployerCoverageType;
+use App\Enums\EmployerJoinVia;
 use App\Enums\EmployerMemberStatus;
 use App\Enums\EmployerProgramType;
+use App\Enums\VerificationLevel;
+use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\Employer;
 use App\Models\EmployerMember;
 use App\Models\Trip;
 use App\Models\User;
+use App\Notifications\EmployerWelcome;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -22,6 +27,15 @@ use Illuminate\Validation\ValidationException;
  *   2. program policy (full / one_way / percent / capped)
  *   3. hard per-trip cap + per-employee monthly cap
  *   4. prepaid wallet affordability (never go negative)
+ *
+ * Two enrollment forms (guide §7):
+ *   Form 1 — the employee self-registers and requests to join (pending);
+ *            an admin approval activates the membership AND grants Level 1
+ *            workplace verification, because employer confirmation IS the
+ *            workplace check (guide's "workplace=1").
+ *   Form 2 — the organisation uploads a roster; staff without an account are
+ *            auto-created (phone-verified + Level 1) so they can book
+ *            immediately and use employer coverage.
  */
 class EmployerService
 {
@@ -162,47 +176,310 @@ class EmployerService
     }
 
     /**
-     * Enroll staff by CSV rows. Each row: email[, employee_id].
+     * Form 1 — an employee requests to join an employer program. The request
+     * sits at `pending` until the Control Tower approves it. Idempotent for
+     * active/pending members; rejected members may request again.
+     */
+    public function requestJoin(Employer $employer, User $user): EmployerMember
+    {
+        $this->assertEnabled();
+
+        if (! $employer->isActive()) {
+            throw ValidationException::withMessages(['employer' => 'This employer program is not active right now.']);
+        }
+
+        $existing = $employer->members()->where('user_id', $user->id)->first();
+
+        if ($existing && $existing->status === EmployerMemberStatus::Suspended) {
+            throw ValidationException::withMessages(['employer' => 'Your membership is suspended — contact your employer.']);
+        }
+
+        if ($existing && $existing->status !== EmployerMemberStatus::Rejected) {
+            return $existing;
+        }
+
+        if ($existing) {
+            $existing->update([
+                'status' => EmployerMemberStatus::Pending,
+                'joined_via' => EmployerJoinVia::Self,
+            ]);
+
+            return $existing->fresh();
+        }
+
+        return EmployerMember::create([
+            'employer_id' => $employer->id,
+            'user_id' => $user->id,
+            'status' => EmployerMemberStatus::Pending,
+            'joined_via' => EmployerJoinVia::Self,
+        ]);
+    }
+
+    /**
+     * Form 1 acceptance — activates the membership and grants Level 1
+     * workplace verification (employer confirmation = the workplace check).
+     */
+    public function approveMember(EmployerMember $member, User $admin): EmployerMember
+    {
+        if (! $member->isPending()) {
+            throw ValidationException::withMessages(['member' => 'Only pending members can be approved.']);
+        }
+
+        $member->update(['status' => EmployerMemberStatus::Active]);
+
+        $this->grantWorkplaceVerification($member->user);
+
+        ActivityLog::log($admin, 'employer_member_approved', $member->user, null, [
+            'employer_id' => $member->employer_id,
+            'employee_id' => $member->employee_id,
+        ]);
+
+        return $member->fresh();
+    }
+
+    public function rejectMember(EmployerMember $member, User $admin): EmployerMember
+    {
+        if (! $member->isPending()) {
+            throw ValidationException::withMessages(['member' => 'Only pending members can be rejected.']);
+        }
+
+        $member->update(['status' => EmployerMemberStatus::Rejected]);
+
+        ActivityLog::log($admin, 'employer_member_rejected', $member->user, null, [
+            'employer_id' => $member->employer_id,
+        ]);
+
+        return $member->fresh();
+    }
+
+    /**
+     * Employer confirmation grants Level 1 (workplace verified) and, when a
+     * phone number is on file, marks it verified so the employee can book
+     * instantly. Never downgrades a higher level (NIN/driver stay intact).
+     */
+    public function grantWorkplaceVerification(User $user): void
+    {
+        $attributes = [];
+
+        if ($user->verification_level->value < VerificationLevel::WorkplaceVerified->value) {
+            $attributes['verification_level'] = VerificationLevel::WorkplaceVerified;
+        }
+
+        if (! $user->hasVerifiedPhone() && $user->phone) {
+            $attributes['phone_verified_at'] = now();
+        }
+
+        if ($attributes) {
+            $user->update($attributes);
+        }
+    }
+
+    /**
+     * Form 2 — enroll staff by CSV rows. Each row:
+     *   email,name,phone,employee_id  (header row detected automatically)
+     *   email[,name][,phone][,employee_id]  (positional fallback)
+     *
+     * Existing users are linked and granted Level 1; staff without an account
+     * are auto-created (phone-verified + Level 1 + temporary password sent via
+     * notification) so they can book immediately.
      *
      * @param  array<int, array<int, string>>  $rows
-     * @return array{enrolled: int, missing: int, invalid: int}
+     * @return array{enrolled: int, created: int, missing: int, invalid: int}
      */
     public function enrollMany(Employer $employer, array $rows): array
     {
         $enrolled = 0;
+        $created = 0;
         $missing = 0;
         $invalid = 0;
 
         foreach ($rows as $row) {
-            $email = $this->extractEmail($row);
-            $employeeId = $this->extractEmployeeId($row);
+            $parsed = $this->parseRow($row);
 
-            if (! $email) {
+            if (! $parsed['email']) {
                 $invalid++;
 
                 continue;
             }
 
-            $user = User::where('email', $email)->first();
+            $user = User::where('email', $parsed['email'])->first();
 
-            if (! $user) {
+            if ($user) {
+                $this->grantWorkplaceVerification($user);
+
+                EmployerMember::updateOrCreate(
+                    ['employer_id' => $employer->id, 'user_id' => $user->id],
+                    [
+                        'employee_id' => $parsed['employee_id'],
+                        'joined_via' => EmployerJoinVia::Employer,
+                        'status' => EmployerMemberStatus::Active,
+                    ]
+                );
+
+                $enrolled++;
+
+                continue;
+            }
+
+            if (! $this->canAutoCreate($parsed)) {
                 $missing++;
 
                 continue;
             }
 
-            EmployerMember::updateOrCreate(
-                ['employer_id' => $employer->id, 'user_id' => $user->id],
-                [
-                    'employee_id' => $employeeId,
-                    'status' => EmployerMemberStatus::Active->value,
-                ]
-            );
+            $user = $this->createFromRoster($parsed);
 
-            $enrolled++;
+            EmployerMember::create([
+                'employer_id' => $employer->id,
+                'user_id' => $user->id,
+                'employee_id' => $parsed['employee_id'],
+                'joined_via' => EmployerJoinVia::Employer,
+                'status' => EmployerMemberStatus::Active,
+            ]);
+
+            $created++;
         }
 
-        return compact('enrolled', 'missing', 'invalid');
+        return compact('enrolled', 'created', 'missing', 'invalid');
+    }
+
+    /**
+     * @param  array{email: string, name: ?string, phone: ?string, employee_id: ?string}  $parsed
+     */
+    private function canAutoCreate(array $parsed): bool
+    {
+        return filter_var($parsed['email'], FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    /**
+     * @param  array{email: string, name: ?string, phone: ?string, employee_id: ?string}  $parsed
+     */
+    private function createFromRoster(array $parsed): User
+    {
+        $tempPassword = Str::password(12);
+
+        $user = User::create([
+            'name' => $parsed['name'] ?: Str::before($parsed['email'], '@'),
+            'email' => strtolower($parsed['email']),
+            'phone' => $parsed['phone'],
+            'phone_verified_at' => $parsed['phone'] ? now() : null,
+            'email_verified_at' => now(),
+            'password' => $tempPassword,
+            'verification_level' => VerificationLevel::WorkplaceVerified,
+        ]);
+
+        $user->notify(new EmployerWelcome($tempPassword));
+
+        return $user;
+    }
+
+    /**
+     * Normalise one CSV row. Detects a header row by name and maps columns
+     * positionally otherwise: email, name, phone, employee_id.
+     *
+     * @param  array<int, string>  $row
+     * @return array{email: string, name: ?string, phone: ?string, employee_id: ?string}
+     */
+    private function parseRow(array $row): array
+    {
+        $headers = array_map('strtolower', $row);
+
+        $isHeader = (bool) array_intersect($headers, ['email', 'name', 'phone', 'employee', 'employee id', 'employee_id', 'employeeid', 'staff id', 'staff_id']);
+
+        if ($isHeader) {
+            return $this->parseByHeader($row);
+        }
+
+        $cells = array_pad($row, 4, '');
+        $email = $this->extractEmail($cells);
+
+        return [
+            'email' => $email ?: '',
+            'name' => $this->looksLikeName($cells[1]) ? $cells[1] : null,
+            'phone' => $this->looksLikePhone($cells[2]) ? $cells[2] : null,
+            'employee_id' => $this->extractEmployeeId(array_filter([$cells[3], $cells[1]], fn ($c) => $c !== '')),
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $row
+     * @return array{email: string, name: ?string, phone: ?string, employee_id: ?string}
+     */
+    private function parseByHeader(array $row): array
+    {
+        $map = [];
+        foreach ($row as $index => $header) {
+            $map[strtolower(trim((string) $header))] = $index;
+        }
+
+        $cell = fn (string $key): ?string => isset($map[$key])
+            ? trim((string) ($row[$map[$key]] ?? ''))
+            : null;
+
+        $email = $cell('email');
+        $name = $cell('name');
+        $phone = $cell('phone') ?? $cell('mobile') ?? $cell('telephone');
+        $employeeId = $cell('employee_id') ?? $cell('employee') ?? $cell('employee id') ?? $cell('staff id') ?? $cell('staff_id');
+
+        if (! $email || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            $email = $this->extractEmail($row);
+        }
+
+        return [
+            'email' => $email ?: '',
+            'name' => $name,
+            'phone' => $phone && $this->looksLikePhone($phone) ? $phone : null,
+            'employee_id' => $employeeId,
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $row
+     */
+    private function extractEmail(array $row): ?string
+    {
+        foreach ($row as $cell) {
+            if (filter_var($cell, FILTER_VALIDATE_EMAIL)) {
+                return strtolower($cell);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, string>  $cells
+     */
+    private function extractEmployeeId(array $cells): ?string
+    {
+        foreach ($cells as $cell) {
+            $cell = trim($cell);
+
+            if ($cell !== '' && ! filter_var($cell, FILTER_VALIDATE_EMAIL) && ! $this->looksLikePhone($cell)) {
+                return $cell;
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikeName(string $value): bool
+    {
+        $value = trim($value);
+
+        if ($value === '' || $this->looksLikePhone($value) || filter_var($value, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        // A "name" has at least one letter and spaces between words.
+        return preg_match('/\p{L}.*\s.*\p{L}/u', $value) === 1;
+    }
+
+    private function looksLikePhone(string $value): bool
+    {
+        $digits = preg_replace('/\D/', '', trim($value));
+
+        return strlen($digits) >= 7 && strlen($digits) <= 15;
     }
 
     private function enabled(): bool
@@ -263,31 +540,10 @@ class EmployerService
         return ($zones[$corridor] ?? null) === $employerZone;
     }
 
-    /**
-     * @param  array<int, string>  $row
-     */
-    private function extractEmail(array $row): ?string
+    private function assertEnabled(): void
     {
-        foreach ($row as $cell) {
-            if (filter_var($cell, FILTER_VALIDATE_EMAIL)) {
-                return strtolower($cell);
-            }
+        if (! $this->enabled()) {
+            throw ValidationException::withMessages(['employer' => 'Employer programs are not enabled.']);
         }
-
-        return null;
-    }
-
-    /**
-     * @param  array<int, string>  $row
-     */
-    private function extractEmployeeId(array $row): ?string
-    {
-        foreach ($row as $cell) {
-            if (! filter_var($cell, FILTER_VALIDATE_EMAIL) && trim($cell) !== '') {
-                return $cell;
-            }
-        }
-
-        return null;
     }
 }

@@ -165,6 +165,24 @@ return [
         'enabled' => (bool) env('FEATURE_EMPLOYER_PROGRAMS', false),
     ],
 
+    // Tier-0 phone verification — the instant-booking entry gate. An OTP proves
+    // the number is live so a new rider can book at the normal fixed fare before
+    // formal KYC. Benefits (subsidy, employer coverage, ride credits, volunteer
+    // rides, rewards) stay locked behind Level 1+.
+    'phone_verification' => [
+        'enabled' => (bool) env('FEATURE_PHONE_VERIFICATION', true),
+        // How a long the code stays valid.
+        'otp_ttl_minutes' => env('WORKRIDE_PHONE_OTP_TTL_MINUTES', 10),
+        // Wrong-code attempts before the code is burned.
+        'otp_max_attempts' => env('WORKRIDE_PHONE_OTP_MAX_ATTEMPTS', 5),
+        // Minimum seconds between two sends to the same number.
+        'send_cooldown_seconds' => env('WORKRIDE_PHONE_SEND_COOLDOWN_SECONDS', 60),
+        // Maximum codes a user can request per day.
+        'send_daily_limit' => env('WORKRIDE_PHONE_SEND_DAILY_LIMIT', 5),
+        // Where the code goes: 'database' + 'log' now; plug an SMS channel later.
+        'sms_channel' => env('WORKRIDE_SMS_ENABLED') ? env('WORKRIDE_SMS_PROVIDER', 'termii') : 'log',
+    ],
+
     // Reward Campaigns + Green Points economy (Sprint 8).
     'rewards' => [
         'enabled' => (bool) env('FEATURE_REWARDS', false),

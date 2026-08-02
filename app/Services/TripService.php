@@ -32,6 +32,10 @@ class TripService
 
     public function publish(User $driver, array $data): Trip
     {
+        if (! $driver->canBookBenefits()) {
+            throw ValidationException::withMessages(['trip' => 'Publishing trips requires formal verification (Level 1+).']);
+        }
+
         $isFreeVolunteer = (bool) ($data['is_free_volunteer'] ?? false);
         $womenOnly = (bool) ($data['women_only'] ?? false);
         $corridor = Corridor::from($data['corridor']);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\EmployerJoinVia;
 use App\Enums\EmployerMemberStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,7 @@ class EmployerMember extends Model
         'employer_id',
         'user_id',
         'employee_id',
+        'joined_via',
         'status',
     ];
 
@@ -22,6 +24,7 @@ class EmployerMember extends Model
     {
         return [
             'status' => EmployerMemberStatus::class,
+            'joined_via' => EmployerJoinVia::class,
         ];
     }
 
@@ -38,5 +41,10 @@ class EmployerMember extends Model
     public function isActive(): bool
     {
         return $this->status === EmployerMemberStatus::Active;
+    }
+
+    public function isPending(): bool
+    {
+        return $this->status === EmployerMemberStatus::Pending;
     }
 }

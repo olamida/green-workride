@@ -16,6 +16,7 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\CommodityController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\EmployerRequestController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\ImpactCertificateController;
@@ -115,9 +116,19 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('verify')->name('verification.')->group(function () {
         Route::get('/', [VerificationController::class, 'index'])->name('index');
+        Route::get('/phone', [VerificationController::class, 'phone'])->name('phone');
+        Route::post('/phone', [VerificationController::class, 'sendPhoneOtp'])->name('phone.send');
+        Route::post('/phone/verify', [VerificationController::class, 'verifyPhone'])->name('phone.verify');
         Route::post('/workplace', [VerificationController::class, 'storeWorkplace'])->name('workplace');
         Route::post('/nin', [VerificationController::class, 'storeNin'])->name('nin');
     });
+
+    // Employer mobility, rider side (guide §7 Form 1) + self-service vehicles.
+    Route::get('/profile/employers', [EmployerRequestController::class, 'employers'])->name('employers.self');
+    Route::post('/employers/{employer}/join', [EmployerRequestController::class, 'join'])->name('employers.join');
+    Route::get('/employer/vehicles', [EmployerRequestController::class, 'vehicles'])->name('employer.vehicles');
+    Route::post('/employer/vehicles', [EmployerRequestController::class, 'storeVehicle'])->name('employer.vehicles.store');
+    Route::delete('/employer/vehicles/{vehicle}', [EmployerRequestController::class, 'destroyVehicle'])->name('employer.vehicles.destroy');
 
     Route::prefix('missions')->name('missions.')->group(function () {
         Route::get('/', [MissionController::class, 'index'])->name('index');
@@ -179,9 +190,15 @@ Route::middleware('auth')->group(function () {
         Route::get('/employers', [EmployerController::class, 'index'])->name('employers.index');
         Route::get('/employers/create', [EmployerController::class, 'create'])->name('employers.create');
         Route::post('/employers', [EmployerController::class, 'store'])->name('employers.store');
+        Route::get('/employers/members/pending', [EmployerController::class, 'pendingMembers'])->name('employers.members.pending');
         Route::get('/employers/{employer}', [EmployerController::class, 'show'])->name('employers.show');
+        Route::get('/employers/{employer}/members', [EmployerController::class, 'members'])->name('employers.members');
+        Route::get('/employers/{employer}/vehicles', [EmployerController::class, 'vehicles'])->name('employers.vehicles');
         Route::post('/employers/{employer}/fund', [EmployerController::class, 'fund'])->name('employers.fund');
         Route::post('/employers/{employer}/enroll', [EmployerController::class, 'enroll'])->name('employers.enroll');
+        Route::put('/employer-members/{member}/approve', [EmployerController::class, 'approveMember'])->name('employers.members.approve');
+        Route::put('/employer-members/{member}/reject', [EmployerController::class, 'rejectMember'])->name('employers.members.reject');
+        Route::put('/employer-members/{member}/review', [EmployerController::class, 'reviewMember'])->name('employers.members.review');
 
         Route::get('/rewards', [AdminRewardController::class, 'index'])->name('rewards.index');
         Route::get('/rewards/create', [AdminRewardController::class, 'create'])->name('rewards.create');

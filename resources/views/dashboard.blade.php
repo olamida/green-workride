@@ -30,6 +30,13 @@
                     <span class="h-1.5 flex-1 rounded-full {{ $user->verification_level->value > $i ? 'bg-forest-500' : 'bg-ink-200' }}"></span>
                 @endfor
             </div>
+            @if (! $user->hasVerifiedPhone())
+                <a href="{{ route('verification.phone') }}" class="mt-3 inline-block rounded-lg border border-forest-300 px-3 py-1.5 text-xs font-semibold text-forest-700 hover:bg-forest-50">
+                    Verify phone → book instantly
+                </a>
+            @else
+                <p class="mt-3 text-xs font-medium text-forest-700">✓ Phone verified</p>
+            @endif
         </div>
 
         <div class="rounded-2xl border border-ink-200 bg-white p-5">

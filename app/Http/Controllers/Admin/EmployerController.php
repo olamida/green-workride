@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\EmployerProgramType;
 use App\Http\Controllers\Controller;
 use App\Models\Employer;
+use App\Models\EmployerMember;
+use App\Models\Vehicle;
 use App\Models\Workplace;
 use App\Services\EmployerLedgerService;
 use App\Services\EmployerService;
@@ -96,21 +98,25 @@ class EmployerController extends Controller
         $file = $request->file('csv');
 
         if (! in_array(strtolower($file->getClientOriginalExtension()), ['csv', 'txt'], true)) {
-            return back()->withErrors(['csv' => 'Please upload a .csv or .txt file with email[,employee_id] rows.']);
+            return back()->withErrors(['csv' => 'Please upload a .csv or .txt file with email[,name][,phone][,employee_id] rows.']);
         }
 
         $rows = $this->readCsv($file->getRealPath());
 
         if (empty($rows)) {
-            return back()->withErrors(['csv' => 'No valid rows found. Expected CSV columns: email,employee_id (optional).']);
+            return back()->withErrors(['csv' => 'No valid rows found. Expected CSV columns: email,name,phone,employee_id.']);
         }
 
         $result = $service->enrollMany($employer, $rows);
 
         $summary = "Enrolled {$result['enrolled']} staff member(s) for {$employer->name}.";
 
+        if ($result['created']) {
+            $summary .= " Created {$result['created']} new account(s) with a temporary password.";
+        }
+
         if ($result['missing']) {
-            $summary .= " Skipped {$result['missing']} unknown email(s).";
+            $summary .= " Skipped {$result['missing']} row(s) without a valid email.";
         }
 
         if ($result['invalid']) {
@@ -118,6 +124,69 @@ class EmployerController extends Controller
         }
 
         return back()->with('status', $summary);
+    }
+
+    public function members(Employer $employer)
+    {
+        $employer->load('members.user');
+
+        return view('admin.employers.members', compact('employer'));
+    }
+
+    /**
+     * Cross-employer approval queue — everyone who self-requested (Form 1)
+     * and is still awaiting their employer's sign-off.
+     */
+    public function pendingMembers()
+    {
+        $members = EmployerMember::query()
+            ->where('status', 'pending')
+            ->with(['user', 'employer'])
+            ->latest()
+            ->get();
+
+        return view('admin.employers.members-pending', compact('members'));
+    }
+
+    public function approveMember(Request $request, EmployerMember $member, EmployerService $service)
+    {
+        $service->approveMember($member, $request->user());
+
+        return back()->with('status', $member->user->name.' approved — they can now book and use employer coverage.');
+    }
+
+    public function rejectMember(Request $request, EmployerMember $member, EmployerService $service)
+    {
+        $service->rejectMember($member, $request->user());
+
+        return back()->with('status', $member->user->name.' rejected.');
+    }
+
+    /**
+     * Re-open a membership for review (undo an approval/rejection). The member
+     * returns to the pending queue until the employer decides again.
+     */
+    public function reviewMember(Request $request, EmployerMember $member)
+    {
+        $member->update(['status' => 'pending']);
+
+        return back()->with('status', $member->user->name.' returned to the approval queue.');
+    }
+
+    /**
+     * Fleet view — vehicles registered by the employer's staff.
+     */
+    public function vehicles(Employer $employer)
+    {
+        $memberIds = $employer->members()->pluck('user_id');
+
+        $vehicles = Vehicle::query()
+            ->whereIn('user_id', $memberIds)
+            ->with('owner')
+            ->latest()
+            ->get();
+
+        return view('admin.employers.vehicles', compact('employer', 'vehicles'));
     }
 
     private function validated(Request $request): array
@@ -155,7 +224,9 @@ class EmployerController extends Controller
         while (($line = fgetcsv($handle, 4096)) !== false) {
             $line = array_map('trim', $line);
 
-            if (count($line) < 1 || $line[0] === '' || strtolower($line[0]) === 'email') {
+            // Header rows are passed through — EmployerService::parseRow
+            // detects them and maps columns by name (email,name,phone,employee_id).
+            if (count($line) < 1 || $line[0] === '') {
                 continue;
             }
 

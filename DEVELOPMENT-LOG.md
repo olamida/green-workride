@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-01
+> Last updated: 2026-08-02
 
 ---
 
@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F Complete)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 Complete)
 
 | Area | Status |
 |------|--------|
@@ -40,7 +40,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 9 complete — Missions (sponsor-defined promoted activities with auto-verified + photo-proof rewards) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, searching-algorithm SVG brand mark) |
 | Feature modules | ✅ Sprint 3.6 complete — Tiered KYC (open staff-ID liveness $0 + NIMC-licensed NIN lookup + Smile Identity driver anti-spoof), verification attempts + rate limit, encrypted selfie retention, Control Tower cost dashboard (feature-gated `FEATURE_LIVENESS`, `USE_IDENTITYPASS`, `USE_SMILE`) |
 | Feature modules | ✅ Investor-guide adoptions A–F complete — Mutual ride ratings + driver scoreboard (Control Tower) · Safety pack (public Share Trip page, one-tap SOS into change-control trail, emergency contact) · Women-only preference (never a hard sort) · Offline trip board (PWA SW read-only cache + `/offline`) · Design tokens file (`design-system.css`) · Landing investor KPI strip |
-| Tests | ✅ 309 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions, tiered verification, selfie retention, ratings, safety, women-only) |
+| Feature modules | ✅ Sprint 10 complete — Tier-0 phone-verified onboarding (OTP, rate-limited, SHA-256-hashed codes, single-use) unlocking booking before KYC + benefits string (subsidy/ride-credit/free-volunteer/women-only/employer-coverage/publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending queue → approve grants Level 1 + phone-verified, rejected/review lifecycle, CSV roster auto-creates staff accounts with temporary password + `EmployerWelcome`) |
+| Tests | ✅ 336 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions, tiered verification, selfie retention, ratings, safety, women-only, phone verification, employer enrollment) |
 
 ---
 
@@ -496,7 +497,46 @@ Six adoptions from the investor guide review, committed as one feature set (`v0.
 
 **Tests (19 new — 309 total, 950 assertions):** `RatingsSafetyTest` — ratings gate/once-per-booking/mutual/stranger/not-completed/validation/scoreboard · women-only block + female allow + board pref default · public share + completed-404 · SOS audit log + non-participant 403 · profile safety/preference save · offline page · landing KPIs · service-worker offline fallback.
 
-### 4.19 (placeholder — next sprint)
+### 4.19 Sprint 10 — Tier-0 Phone-Verified Onboarding + Employer Enrollment Forms 1 & 2 (COMPLETE)
+
+**The instant-booking gate (Tier-0) — a new phone-only trust tier below KYC.**
+
+**Schema (3 migrations):**
+- `add_phone_verified_at_to_users_table` — `users.phone_verified_at` (nullable datetime) as the Tier-0 trust signal; the `VerificationLevel` ladder (0 unverified → 1 workplace → 2 NIN → 3 driver) is untouched.
+- `create_phone_otps_table` — `phone_otps`: `user_id`, `token_hash` (SHA-256, **raw code never stored**), `purpose`, `expires_at`, `consumed_at`, `attempts`; indexed `[user_id, purpose]`.
+- `add_joined_via_to_employer_members_table` — `employer_members.joined_via` ENUM `self|employer` (default `employer`).
+
+**Models + enums:**
+- `App\Models\PhoneOtp` — `isExpired()/isConsumed()/isUsable()/matches()/recordAttempt()/consume()` + datetime/int casts.
+- `App\Enums\EmployerMemberStatus` gains `Pending` + `Rejected` (labels); new `App\Enums\EmployerJoinVia`.
+- `App\Models\User` — new entry gates: `hasVerifiedPhone()`, `canBook()` = not banned && (phone-verified **or** Level 1+), `canBookBenefits()` = not banned && Level 1+. `phoneOtps()` HasMany, `phone_verified_at` fillable + datetime cast.
+- `App\Models\EmployerMember` — `joined_via` cast + `isPending()`.
+
+**Services:**
+- `PhoneVerificationService` — `sendOtp()` (validates phone format, cooldown + daily send limits, hashes the token, invalidates earlier un-consumed codes so only the newest works, notifies via `SendPhoneOtp`), `verifyOtp()` (latest usable code, cap attempts then burn, wrong codes count, expiry handled, sets `phone_verified_at` + `phone_verified` change-control log).
+- `BookingService::book()` — benefits gates: women-only and free-volunteer rides require `canBookBenefits()`; employer coverage is skipped for phone-only riders; `resolvePaymentMethod()` throws for `SubsidyCredit|RideCredit` when not benefits-eligible ("Pay with wallet or cash").
+- `TripService::publish()` — requires `canBookBenefits()` (phone-only users cannot publish trips even free volunteer rides).
+- `VehicleService` — shared `store()` (plate unique, type enum, seats 1–100) + `assertNotOwned()` for the self-service fleet page.
+- `EmployerService` — `requestJoin()` (pending lifecycle: active returns existing, suspended blocked, rejected may re-request), `approveMember()` (pending→active + `grantWorkplaceVerification()` + audit), `rejectMember()`, `grantWorkplaceVerification()` (sets Level 1 — **never downgrades** — and marks the phone verified when one is on file), `enrollMany()` Form 2 rewrite: **unknown emails are now auto-created** (temporary `Str::password(12)`, `EmployerWelcome` notification, Level 1 + phone-verified), header row auto-detected (email/name/phone/employee id).
+
+**Controllers + routes (web):**
+- `VerificationController` — `phone()` / `sendPhoneOtp()` / `verifyPhone()`; routes `verification.phone`, `verification.phone.send`, `verification.phone.verify`.
+- `EmployerRequestController` — `employers()` (open programs), `join()`, `vehicles()` / `storeVehicle()` / `destroyVehicle()`; routes `employers.self`, `employers.join`, `employer.vehicles.{store,destroy}`.
+- Admin `EmployerController` — `members()` / `pendingMembers()` (cross-employer approval queue) / `approveMember()` / `rejectMember()` / `reviewMember()` (return to queue) / `vehicles()`; routes `admin.employers.members`, `admin.employers.members.pending`, `admin.employers.members.approve|reject|review`, `admin.employers.vehicles`.
+
+**Notifications:** `SendPhoneOtp` (channels `database`+`log`; code expires via `workride.phone_verification.otp_ttl_minutes`), `EmployerWelcome` (channels `database`+`mail`, temporary password).
+
+**Views:** `verification/phone.blade.php` (two-step send/verify, `@error` inline), Tier-0 CTA banner on `verification/index`, phone status card + link on `dashboard`, phone row + employer mobility card on `profile/edit`, `employers/join` (open programs + my memberships), `employers/vehicles` (self-service fleet), admin `employers/{members,members-pending,vehicles}` + updated `show` CSV copy, landing pitch, `badge` gains active/suspended styles, profile menu Employer link.
+
+**Gates & config:** `workride.phone_verification.enabled` (**true** — OTP on by default; other insurer/portfolio switches stay false) with `otp_ttl_minutes`, `otp_max_attempts`, `send_cooldown_seconds`, `send_daily_limit`; `workride.employer_programs.enabled` (**true**). `config/services.php` gains `termii` + `twilio` blocks (pluggable SMS provider slots); `.env.example` documents `FEATURE_PHONE_VERIFICATION`, `WORKRIDE_PHONE_*`, `WORKRIDE_SMS_*`, `TERMII_*`, `TWILIO_*`.
+
+**Bugs found & fixed during hardening:**
+- `EmployerService::parseRow()` called `extractEmail($cells[0])` (a string) against an `array` parameter → `TypeError` on every CSV enroll. Now `extractEmail($cells)` only.
+- `EmployerTest::test_csv_enrollment_*` expected unknown emails to be **skipped** — the Form 2 rewrite auto-creates them, so the test now asserts the created user (Level 1, member active, `EmployerWelcome` sent).
+
+**Tests (27 new — 336 total, 1057 assertions):**
+- `PhoneVerificationTest` (15) — auth redirect, page render, send updates phone + stores hash only, no-phone error, earlier codes invalidated, verify marks verified + audits, wrong-code attempts then burn, expiry, send cooldown, daily limit, phone-verified wallet booking, subsidy blocked for phone-only, volunteer blocked, publish blocked (403).
+- `EmployerEnrollmentTest` (12) — auth redirect, self-request pending + joined_via self, inactive blocked, rejected re-request, suspended blocked, approve grants Level 1 + phone-verified + audit, never downgrades NIN, non-pending approve blocked, reject + review lifecycle, admin members + pending queue render, header-labeled CSV auto-creates staff account, vehicle register/delete + foreign-vehicle 403.
 
 ---
 
@@ -699,6 +739,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 9 | Missions + global nav redesign (⌘K palette, mobile tab bar, brand mark) | ✅ Complete (feature-gated `FEATURE_MISSIONS`) |
 | Sprint 3.6 | Tiered KYC — open liveness + NIMC lookup + driver anti-spoof | ✅ Complete (feature-gated `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE`) |
 | Investor Adoptions A–F | Mutual ratings + safety pack + women-only preference + offline board + design tokens + landing KPIs | ✅ Complete (v0.10.0) |
+| Sprint 10 | Tier-0 phone-verified onboarding + employer enrollment Forms 1 & 2 | ✅ Complete (v0.11.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -726,6 +767,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.9.0` | Sprint 9 — Missions + Global Nav Redesign | Sponsor-defined missions (auto-verified rewards via trip-completion + road-event observation, photo-proof review flow, rider hub + Control Tower) + global nav redesign (⌘K command palette, profile menu, mobile tab bar, matching-anim SVG brand mark) — missions gated on `FEATURE_MISSIONS` | 274 (819) | 2026-08-02 |
 | `v0.9.1` | Sprint 3.6 — Tiered KYC | Open staff-ID liveness (auto-approve on pass, manual-review fallback) + verification attempts/rate limit + encrypted selfie retention purge + NIMC-licensed NIN lookup (idempotent, capped, cost-logged) + Smile anti-spoof driver webhook + Control Tower needs-review queue & KYC cost dashboard — gated on `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE` | 290 (896) | 2026-08-02 |
 | `v0.10.0` | Investor-Guide Adoptions A–F | Mutual ride ratings (once per booking, change-control audited) + driver scoreboard · safety pack (public Share Trip page, one-tap SOS → Control Tower panel, emergency contact profile) · women-only preference (opt-in board filter, booking gate, never a hard sort) · offline trip board (PWA SW read-only navigation fallback + `/offline`) · design tokens file (`design-system.css`) · landing investor KPI strip | 309 (950) | 2026-08-02 |
+| `v0.11.0` | Sprint 10 — Tier-0 Phone Onboarding + Employer Enrollment | Tier-0 phone-verified booking gate (OTP, SHA-256-hashed, rate-limited, single-use) unlocking `canBook()` before KYC, with the benefits string (subsidy / ride-credit / free-volunteer / women-only / employer-coverage / publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending → approve grants Level 1 + phone-verified, rejected/review lifecycle, header-detecting CSV roster that auto-creates staff accounts with temp password + `EmployerWelcome`) · shared `VehicleService` self-service fleet page · Control Tower pending-approval queue | 336 (1057) | 2026-08-02 |
 
 ---
 

@@ -37,12 +37,26 @@ class BookingService
             throw ValidationException::withMessages(['trip' => 'You cannot book your own trip.']);
         }
 
+        $benefitsEligible = $passenger->canBookBenefits();
+
+        // Women-only rides are a trust feature — phone-only riders can't join
+        // until they complete formal verification (Level 1+).
+        if ($trip->women_only && ! $benefitsEligible) {
+            throw ValidationException::withMessages(['trip' => 'Women-only rides are reserved for verified workers.']);
+        }
+
         if ($trip->women_only && $passenger->gender !== 'female') {
             throw ValidationException::withMessages(['trip' => 'This is a women-only ride.']);
         }
 
+        // Free volunteer rides are the supply-bootstrap benefit — a phone-only
+        // rider free-loading on them would gut the Green-Points incentive.
+        if ($trip->is_free_volunteer && ! $benefitsEligible) {
+            throw ValidationException::withMessages(['trip' => 'Volunteer rides are reserved for verified workers.']);
+        }
+
         try {
-            return DB::transaction(function () use ($trip, $passenger, $data) {
+            return DB::transaction(function () use ($trip, $passenger, $data, $benefitsEligible) {
                 $trip = Trip::whereKey($trip->id)->lockForUpdate()->firstOrFail();
 
                 if (! in_array($trip->status, [TripStatus::Scheduled, TripStatus::Active], true)) {
@@ -61,10 +75,12 @@ class BookingService
                     throw ValidationException::withMessages(['trip' => 'You already have a booking on this trip.']);
                 }
 
-                $paymentMethod = $this->resolvePaymentMethod($trip, $data);
+                $paymentMethod = $this->resolvePaymentMethod($trip, $data, $benefitsEligible);
 
                 $fare = $trip->fare_per_seat;
-                [$employerContribution, $employerCoverage, $employer] = $this->employers->bestCoverage($trip, $passenger, (float) $fare);
+                [$employerContribution, $employerCoverage, $employer] = $benefitsEligible
+                    ? $this->employers->bestCoverage($trip, $passenger, (float) $fare)
+                    : [0.0, null, null];
 
                 $booking = $trip->bookings()->create([
                     'passenger_id' => $passenger->id,
@@ -232,18 +248,28 @@ class BookingService
         );
     }
 
-    private function resolvePaymentMethod(Trip $trip, array $data): PaymentMethod
+    private function resolvePaymentMethod(Trip $trip, array $data, bool $benefitsEligible): PaymentMethod
     {
         if ($trip->is_free_volunteer) {
             return PaymentMethod::Free;
         }
 
-        return match ($data['payment_method'] ?? 'wallet') {
+        $method = match ($data['payment_method'] ?? 'wallet') {
             'cash' => PaymentMethod::Cash,
             'subsidy_credit' => PaymentMethod::SubsidyCredit,
             'ride_credit' => PaymentMethod::RideCredit,
             default => PaymentMethod::Wallet,
         };
+
+        // Subsidised economies (MDA credits, Time-Bank seats) and ride credits
+        // are verified-worker benefits — phone-only riders must pay wallet/cash.
+        if (! $benefitsEligible && in_array($method, [PaymentMethod::SubsidyCredit, PaymentMethod::RideCredit], true)) {
+            throw ValidationException::withMessages([
+                'payment_method' => 'Subsidy and ride credits are reserved for verified workers. Pay with wallet or cash.',
+            ]);
+        }
+
+        return $method;
     }
 
     private function needsHold(Trip $trip, PaymentMethod $method): bool

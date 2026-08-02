@@ -15,9 +15,11 @@ use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Models\Wallet;
+use App\Notifications\EmployerWelcome;
 use App\Services\EmployerLedgerService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class EmployerTest extends TestCase
@@ -227,8 +229,10 @@ class EmployerTest extends TestCase
         $this->assertEquals(BookingStatus::Cancelled, $booking->fresh()->status);
     }
 
-    public function test_csv_enrollment_skips_unknown_emails(): void
+    public function test_csv_enrollment_auto_creates_unknown_emails(): void
     {
+        Notification::fake();
+
         $employer = $this->employer();
         $passenger = $this->passenger();
 
@@ -248,7 +252,17 @@ class EmployerTest extends TestCase
             'user_id' => $passenger->id,
             'status' => EmployerMemberStatus::Active->value,
         ]);
-        $this->assertDatabaseCount('employer_members', 1);
+
+        $created = User::where('email', 'unknown@nowhere.ng')->firstOrFail();
+        $this->assertSame(VerificationLevel::WorkplaceVerified, $created->verification_level);
+        $this->assertDatabaseHas('employer_members', [
+            'employer_id' => $employer->id,
+            'user_id' => $created->id,
+            'status' => EmployerMemberStatus::Active->value,
+        ]);
+        $this->assertDatabaseCount('employer_members', 2);
+
+        Notification::assertSentTo($created, EmployerWelcome::class);
     }
 
     public function test_admin_can_create_fund_and_view_employer(): void

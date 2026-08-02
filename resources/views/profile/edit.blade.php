@@ -34,7 +34,24 @@
                     <label for="phone" class="mb-1 block text-sm font-medium text-ink-700">Phone</label>
                     <input id="phone" name="phone" type="text" maxlength="30" value="{{ old('phone', $user->phone) }}" placeholder="+234…"
                            class="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-200">
+                    @if ($user->hasVerifiedPhone())
+                        <p class="mt-1 text-xs font-medium text-forest-700">✓ Phone verified</p>
+                    @else
+                        <a href="{{ route('verification.phone') }}" class="mt-1 inline-block text-xs font-semibold text-forest-600 hover:underline">
+                            Verify this phone to book instantly →
+                        </a>
+                    @endif
                 </div>
+            </div>
+
+            <div class="flex items-center justify-between rounded-xl border border-ink-200 p-4">
+                <div>
+                    <p class="text-sm font-semibold text-ink-900">Employer mobility</p>
+                    <p class="mt-0.5 text-xs text-ink-500">Join your employer's program so they cover your commute.</p>
+                </div>
+                <a href="{{ route('employers.self') }}" class="shrink-0 rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
+                    Employers
+                </a>
             </div>
 
             <div class="rounded-xl border border-ink-200 p-4">

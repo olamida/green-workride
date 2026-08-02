@@ -65,4 +65,18 @@ return [
         'cost_naira' => env('SMILE_COST_NGN', 400),
     ],
 
+    // Tier-0 OTP delivery — pluggable SMS providers (Termii/Twilio). The code
+    // goes to the database + application log until WORKRIDE_SMS_ENABLED is set.
+    'termii' => [
+        'key' => env('TERMII_API_KEY'),
+        'sender_id' => env('TERMII_SENDER_ID', 'WorkRide'),
+        'base_url' => env('TERMII_BASE_URL', 'https://api.ng.termii.com'),
+    ],
+
+    'twilio' => [
+        'sid' => env('TWILIO_SID'),
+        'token' => env('TWILIO_TOKEN'),
+        'from' => env('TWILIO_FROM'),
+    ],
+
 ];

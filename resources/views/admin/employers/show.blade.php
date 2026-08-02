@@ -56,10 +56,10 @@
         </div>
 
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
-            <h2 class="font-heading font-semibold text-ink-900">Enroll staff (CSV)</h2>
+            <h2 class="font-heading font-semibold text-ink-900">Enroll staff (CSV roster)</h2>
             <p class="mt-1 text-sm text-ink-500">
-                Upload a CSV with <code class="rounded bg-paper px-1 font-mono text-xs">email[,employee_id]</code> rows.
-                Unknown emails are skipped.
+                Upload a roster with <code class="rounded bg-paper px-1 font-mono text-xs">email,name,phone,employee_id</code>
+                columns. Unknown emails are <strong>auto-created</strong> (temporary password sent by email) and get Level 1.
             </p>
             <form method="POST" action="{{ route('admin.employers.enroll', $employer) }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                 @csrf
@@ -74,8 +74,17 @@
     </div>
 
     <div class="mt-8 overflow-hidden rounded-2xl border border-ink-200 bg-white">
-        <div class="border-b border-ink-100 px-6 py-4">
-            <h2 class="font-heading font-semibold text-ink-900">Enrolled staff</h2>
+        <div class="flex items-center justify-between border-b border-ink-100 px-6 py-4">
+            <div>
+                <h2 class="font-heading font-semibold text-ink-900">Enrolled staff</h2>
+                <a href="{{ route('admin.employers.members', $employer) }}" class="text-xs font-medium text-forest-600 hover:underline">View all members →</a>
+            </div>
+            @php $pendingCount = $employer->members->where('isPending', true)->count(); @endphp
+            @if ($pendingCount > 0)
+                <a href="{{ route('admin.employers.members', $employer) }}" class="inline-flex items-center gap-1.5 rounded-full bg-gold-50 px-3 py-1.5 text-xs font-semibold text-gold-700 hover:bg-gold-100">
+                    {{ $pendingCount }} pending approval
+                </a>
+            @endif
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-ink-100">
@@ -87,7 +96,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-ink-100">
-                    @forelse ($employer->members as $member)
+                    @forelse ($employer->members->take(8) as $member)
                         <tr>
                             <td class="px-5 py-4">
                                 <p class="text-sm font-medium text-ink-900">{{ $member->user?->name ?? 'Unknown' }}</p>
@@ -95,12 +104,12 @@
                             </td>
                             <td class="px-5 py-4 font-mono text-xs text-ink-500">{{ $member->employee_id ?: '—' }}</td>
                             <td class="px-5 py-4">
-                                <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">Active</span>
+                                <x-badge :status="$member->status->value" />
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="px-5 py-10 text-center text-sm text-ink-500">No staff enrolled yet. Upload a CSV to start covering commutes.</td>
+                            <td colspan="3" class="px-5 py-10 text-center text-sm text-ink-500">No staff enrolled yet. Upload a roster CSV to start covering commutes.</td>
                         </tr>
                     @endforelse
                 </tbody>

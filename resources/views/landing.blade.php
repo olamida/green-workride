@@ -56,7 +56,8 @@
                             </a>
                         </div>
                         <p class="mt-6 text-xs text-ink-400">
-                            NIN-hashed, never stored · 1,240 verified riders · Works on any phone
+                            Verify your phone in 60 seconds — book instantly, no ID needed · NIN-hashed, never stored ·
+                            1,240 verified riders · Works on any phone
                         </p>
                     </div>
 

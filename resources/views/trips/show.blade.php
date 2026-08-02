@@ -212,7 +212,9 @@
                             <label for="payment_method" class="mb-1 block text-sm font-medium text-ink-700">Pay with</label>
                             <select id="payment_method" name="payment_method" class="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-200">
                                 <option value="wallet">Wallet (₦{{ number_format((float) $user->wallet?->cash_balance ?? 0, 2) }})</option>
-                                <option value="subsidy_credit">Subsidy credits (₦{{ number_format((float) $user->wallet?->subsidy_credits ?? 0, 2) }})</option>
+                                @if ($user->canBookBenefits())
+                                    <option value="subsidy_credit">Subsidy credits (₦{{ number_format((float) $user->wallet?->subsidy_credits ?? 0, 2) }})</option>
+                                @endif
                                 <option value="cash">Cash to driver</option>
                                 @if (config('workride.time_bank.enabled') && $user->verification_level->value >= \App\Enums\VerificationLevel::NinVerified->value)
                                     <option value="ride_credit">Ride credit — repay by driving</option>

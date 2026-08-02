@@ -37,6 +37,9 @@
             <a href="{{ route('verification.index') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
                 <x-icon name="shield" class="h-4 w-4 text-ink-400" /> Verify
             </a>
+            <a href="{{ route('employers.self') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
+                <x-icon name="building" class="h-4 w-4 text-ink-400" /> Employer
+            </a>
             <a href="{{ route('commodities.index') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
                 <x-icon name="coins" class="h-4 w-4 text-ink-400" /> Commodities
             </a>

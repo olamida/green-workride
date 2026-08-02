@@ -10,11 +10,27 @@
         </p>
     </div>
 
+    @if (! $user->hasVerifiedPhone())
+        <div class="mb-6 flex flex-col gap-4 rounded-2xl border border-forest-200 bg-forest-50 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <span class="inline-flex items-center gap-2 rounded-full bg-forest-600 px-3 py-1 text-xs font-semibold text-white">Tier 0 · Instant booking</span>
+                <h2 class="mt-2 font-heading font-semibold text-ink-900">Verify your phone, book a ride in 60 seconds</h2>
+                <p class="mt-1 text-sm text-ink-600">
+                    An SMS code proves your number is live — no ID needed yet. You pay the normal fixed fare;
+                    subsidies, volunteer rides and employer coverage unlock at Level 1+.
+                </p>
+            </div>
+            <a href="{{ route('verification.phone') }}" class="shrink-0 rounded-xl bg-forest-600 px-5 py-2.5 text-center text-sm font-semibold text-white transition hover:bg-forest-700">
+                Verify my phone
+            </a>
+        </div>
+    @endif
+
     <div class="grid gap-6 lg:grid-cols-3">
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
             <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-forest-100 text-sm font-bold text-forest-700">1</span>
             <h2 class="mt-3 font-heading font-semibold text-ink-900">Workplace ID</h2>
-            <p class="mt-1 text-sm text-ink-500">Level 1. Confirms you work at an MDA. Unlocks booking.</p>
+            <p class="mt-1 text-sm text-ink-500">Level 1. Confirms you work at an MDA. Unlocks subsidies, volunteer rides and employer coverage.</p>
 
             <form method="POST" action="{{ route('verification.workplace') }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                 @csrf
