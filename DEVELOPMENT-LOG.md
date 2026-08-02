@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI)
 
 | Area | Status |
 |------|--------|
@@ -43,7 +43,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 10 complete — Tier-0 phone-verified onboarding (OTP, rate-limited, SHA-256-hashed codes, single-use) unlocking booking before KYC + benefits string (subsidy/ride-credit/free-volunteer/women-only/employer-coverage/publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending queue → approve grants Level 1 + phone-verified, rejected/review lifecycle, CSV roster auto-creates staff accounts with temporary password + `EmployerWelcome`) |
 | Feature modules | ✅ UI Compact & Mobile Pass complete — tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm on dashboard/wallet/bookings/trips), tablet/phone-usable responsive rules, PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine), nav dedup (Impact/Missions removed from profile menu — already primary nav), 3 new page-specific animated SVG cards (`trip-fill-anim`, `demand-map-anim`, `navigation-anim`) |
 | Feature modules | ✅ Sprint 11 complete — Operations & Demand Research schema pass (guide v4.0): 17 enums, 7 migrations (21 tables + `trips.asset_id`), 21 models, Fleet/Stakeholder/Forecast/Demand services + `CalculateDriverScoresJob`, Control Tower demand calendar + fleet + stakeholder + driver-scoreboard pages, rider demand check-in page + API field kit (surveys/check-ins/probes), Ops demo seeder (feature-gated) |
-| Tests | ✅ 368 feature tests passing (… previous + ops schema, fleet lifecycle gate, stakeholder remittances, demand research + forecasting, driver scores) |
+| Feature modules | ✅ Fleet Driver App UI complete — driver-facing `/fleet` page (assigned assets, status pill, pre-trip inspection form with photos, fault reporting, maintenance preview) + `POST /api/v1/fleet/{asset}/telemetry` OBD2 intake + fleet gate banner on trip publish (feature-gated `FEATURE_FLEET`) |
+| Tests | ✅ 380 feature tests passing (… + fleet driver app UI) |
 
 ---
 
@@ -613,6 +614,23 @@ The guide v3.0/v4.0 operations pass: fleet lifecycle, stakeholder remittance, de
 
 **Tests (32 new — 368 total, 1151 assertions):** `OpsSchemaTest` (tables exist, `trips.asset_id`, unique references, `defaultMultiplier` map), `FleetGateTest` (no-asset no-gate, active passes, grounded blocks, failed-then-passing inspection clears, fault ticket on failure, resolution, preventive due_km, telemetry mileage + preventive queue, trip publishes asset_id, foreign asset rejected), `StakeholderRemittanceTest` (pending record, volunteer none, idempotent, settle flips to paid, corridor-match union), `DemandForecastTest` (survey API auth + create, check-in inside FCT + outside 422, probe merge 150 m, OD matrix from surveys, forecast multiplier math 0.75×2.0=1.5, all 5 admin ops pages + non-admin 403, forecast event default multiplier, driver score job weekly snapshot).
 
+### 4.22 Fleet Driver App UI — Driver-Facing Fleet Page + OBD2 Telemetry Intake (COMPLETE)
+
+Rider-facing UI layer on top of the Sprint 11 fleet schema/service layer (guide §11 asset-light model: leased 18-seaters, pre-trip inspection before publish, OBD2 telemetry, preventive maintenance).
+
+**Controllers:**
+- `Web\DriverFleetController` (`/fleet`) — index (feature gate → off-notice panel; assigned assets via `User::assets()`, today's inspections keyed by asset, open faults by reporter, upcoming maintenance), `inspect()` (403 unless `assigned_driver_id` matches, photo uploads to `inspections/{assetId}` on the `public` disk → `FleetService::recordInspection`, failed inspection auto-opens a fault ticket), `storeFault()` (description + severity 1–5), `storePhoto()`.
+- `Api\V1\FleetController` — `POST /api/v1/fleet/{asset}/telemetry` (422 unless `assigned_driver_id === user->id`; validates lat/lng/speed/fuel_level/engine_fault_code/harsh_braking/mileage; calls `FleetService::recordTelemetry`, which updates asset mileage and auto-queues the next preventive maintenance).
+
+**Views:** `resources/views/fleet/index.blade.php` — feature-off notice, empty state ("No bus assigned to you yet"), asset card with status pill (`x-badge` gained a `neutral` style), pre-trip inspection form (date + photos + oil level + pass/fail), fault-report form with severity select, My open faults + Upcoming maintenance panels.
+
+**Wiring:**
+- `routes/web.php` — `fleet.` routes (`fleet.index`, `fleet.inspect`, `fleet.faults`) in the auth group; `routes/api.php` — telemetry endpoint in `auth:sanctum`.
+- Profile menu gains "My fleet" behind `@if (config('workride.fleet.enabled'))`.
+- `TripBoardController::create()` loads `$asset` (single assigned asset when fleet enabled) + `$todayInspection` and passes them to `trips/create`; the publish form gains a fleet gate banner (cleared / failed / not-inspected → links to `route('fleet.index')`), matching the `FleetService::assertPublishable` gate already enforced in `TripService::publish` (latest inspection today wins).
+
+**Tests (12 new — 380 total, 1189 assertions):** `DriverFleetTest` (guest redirect, feature-off notice, empty state, sees assigned asset, passing inspection persists, failed inspection opens fault ticket, foreign-asset 403, fault report + validation, API telemetry mileage + preventive schedule, API foreign-asset 422, trip-create gate status banner).
+
 ---
 
 ## 5. Issues Resolved
@@ -821,7 +839,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
 2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
-3. Wire the fleet lifecycle into the Driver App UI (inspection checklist + OBD2 telemetry intake) — schema + services are ready
+3. ✅ DONE — Fleet Driver App UI wired (see §4.22); next: rich demo seeder, rider-facing driver scorecards
 
 ---
 

@@ -46,7 +46,20 @@ class TripBoardController extends Controller
         $vehicles = $user->vehicles()->get();
         $corridors = Corridor::cases();
 
-        return view('trips.create', compact('vehicles', 'corridors'));
+        // Fleet gate preview: the driver's single assigned asset + today's
+        // inspection status so they know whether publishing is blocked.
+        $asset = null;
+        $todayInspection = null;
+
+        if (config('workride.fleet.enabled')) {
+            $assigned = $user->assets()->get();
+            $asset = $assigned->count() === 1 ? $assigned->first() : null;
+            $todayInspection = $asset
+                ? $asset->inspections()->whereDate('date', today())->latest('id')->first()
+                : null;
+        }
+
+        return view('trips.create', compact('vehicles', 'corridors', 'asset', 'todayInspection'));
     }
 
     public function store(Request $request)

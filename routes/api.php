@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\DemandController;
+use App\Http\Controllers\Api\V1\FleetController;
 use App\Http\Controllers\Api\V1\P2pTransferController;
 use App\Http\Controllers\Api\V1\RideCreditController;
 use App\Http\Controllers\Api\V1\RoadSensorController;
@@ -52,6 +53,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/demand/surveys', [DemandController::class, 'surveys']);
         Route::post('/demand/checkins', [DemandController::class, 'checkIns']);
         Route::post('/demand/probes', [DemandController::class, 'probes']);
+
+        // OBD2 telemetry intake (guide §11) — assigned driver only.
+        Route::post('/fleet/{asset}/telemetry', [FleetController::class, 'telemetry']);
 
         Route::get('/trips', [TripController::class, 'index']);
         Route::post('/trips', [TripController::class, 'store']);

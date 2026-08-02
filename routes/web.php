@@ -22,6 +22,7 @@ use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\CommodityController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DemandController;
+use App\Http\Controllers\Web\DriverFleetController;
 use App\Http\Controllers\Web\EmployerRequestController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
@@ -145,6 +146,13 @@ Route::middleware('auth')->group(function () {
     Route::prefix('demand')->name('demand.')->group(function () {
         Route::get('/', [DemandController::class, 'index'])->name('index');
         Route::post('/checkin', [DemandController::class, 'checkIn'])->name('checkin');
+    });
+
+    // Driver fleet (guide §11) — daily pre-trip inspection, fault reporting.
+    Route::prefix('fleet')->name('fleet.')->group(function () {
+        Route::get('/', [DriverFleetController::class, 'index'])->name('index');
+        Route::post('/{asset}/inspect', [DriverFleetController::class, 'inspect'])->name('inspect');
+        Route::post('/{asset}/faults', [DriverFleetController::class, 'storeFault'])->name('faults');
     });
 
     Route::prefix('receipts')->name('receipts.')->group(function () {

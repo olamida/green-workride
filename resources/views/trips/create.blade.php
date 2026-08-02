@@ -12,6 +12,26 @@
             </p>
         </div>
 
+        @if (config('workride.fleet.enabled') && $asset)
+            @php
+                $fleetCleared = $asset->isServiceable() && $todayInspection && $todayInspection->is_passed;
+            @endphp
+            <div class="mb-6 rounded-2xl border px-4 py-3 text-sm
+                {{ $fleetCleared ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-800' }}">
+                <p class="font-semibold">
+                    {{ $asset->make }} {{ $asset->model }} · {{ $asset->plate_number }}
+                    — {{ $fleetCleared ? 'cleared to publish' : ($todayInspection ? 'failed inspection today' : 'not inspected today') }}
+                </p>
+                <p class="mt-0.5 text-xs opacity-80">
+                    @if ($fleetCleared)
+                        Pre-trip inspection passed. Good to go.
+                    @else
+                        Complete the pre-trip inspection in <a href="{{ route('fleet.index') }}" class="font-semibold underline">My fleet</a> before publishing.
+                    @endif
+                </p>
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <ul class="list-inside list-disc space-y-1">

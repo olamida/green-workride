@@ -12,6 +12,7 @@
         'good' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
         'fair' => 'border-gold-200 bg-gold-50 text-gold-800',
         'poor' => 'border-red-200 bg-red-50 text-red-700',
+        'neutral' => 'border-ink-200 bg-ink-50 text-ink-600',
     ];
     $labels = [
         'pending_manual_review' => 'Needs review',
