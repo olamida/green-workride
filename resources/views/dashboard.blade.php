@@ -3,7 +3,7 @@
 @section('title', 'Dashboard')
 
 @section('content')
-    <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="font-heading text-2xl font-bold text-ink-900">Good day, {{ Str::before($user->name, ' ') }} 👋</h1>
             <p class="mt-1 text-sm text-ink-500">
@@ -20,7 +20,7 @@
         @endif
     </div>
 
-    <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-2xl border border-ink-200 bg-white p-5">
             <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Verification</p>
             <p class="mt-2 font-heading text-lg font-semibold text-ink-900">Level {{ $user->verification_level->value }}</p>
@@ -58,8 +58,8 @@
         </div>
     </div>
 
-    <div class="mt-8 grid gap-6 lg:grid-cols-2">
-        <div class="rounded-2xl border border-ink-200 bg-white p-6">
+    <div class="mt-6 grid gap-5 lg:grid-cols-2">
+        <div class="rounded-2xl border border-ink-200 bg-white p-5">
             <h2 class="font-heading font-semibold text-ink-900">Verification status</h2>
             <div class="mt-4 space-y-3">
                 @forelse ($user->verifications as $verification)
@@ -85,7 +85,7 @@
             </a>
         </div>
 
-        <div class="rounded-2xl border border-ink-200 bg-white p-6">
+        <div class="rounded-2xl border border-ink-200 bg-white p-5">
             <h2 class="font-heading font-semibold text-ink-900">Your corridor is live</h2>
             <p class="mt-2 text-sm text-ink-500">
                 Verified colleagues are matching on your corridor right now. Fixed prices, no surge —
@@ -97,7 +97,7 @@
                 <span class="rounded-full bg-forest-50 px-3 py-1 text-xs font-medium text-forest-700">LUGBE → CBD</span>
             </div>
             <div class="mt-5">
-                <x-matching-anim compact label="Live matching on your corridor…" />
+                <x-demand-map-anim label="Live demand on your corridor — 12 people waiting at Berger." />
             </div>
             <div class="mt-5 flex flex-wrap gap-3">
                 <a href="{{ route('trips.index') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">

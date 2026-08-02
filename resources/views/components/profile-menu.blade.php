@@ -28,12 +28,6 @@
             <a href="{{ route('wallet.index') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
                 <x-icon name="wallet" class="h-4 w-4 text-ink-400" /> Wallet
             </a>
-            <a href="{{ route('impact.index') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
-                <x-icon name="activity" class="h-4 w-4 text-ink-400" /> Impact
-            </a>
-            <a href="{{ route('missions.index') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
-                <x-icon name="target" class="h-4 w-4 text-ink-400" /> Missions
-            </a>
             <a href="{{ route('verification.index') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
                 <x-icon name="shield" class="h-4 w-4 text-ink-400" /> Verify
             </a>
@@ -60,6 +54,12 @@
                 <x-icon name="command" class="h-4 w-4 text-ink-400" /> Control Tower
             </a>
         @endif
+
+        <div x-data="installApp" x-show="canInstall" x-cloak class="mt-2 border-t border-ink-100 pt-2">
+            <button type="button" @click="install()" class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
+                <x-icon name="download" class="h-4 w-4 text-ink-400" /> Install app
+            </button>
+        </div>
 
         <div class="mt-2 border-t border-ink-100 pt-2">
             <form method="POST" action="{{ route('logout') }}">

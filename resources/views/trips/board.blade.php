@@ -17,7 +17,7 @@
         @endif
     </div>
 
-    <div class="mb-8 flex flex-wrap gap-3">
+    <div class="mb-6 flex flex-wrap gap-3">
         <a href="{{ route('trips.index') }}" @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
             'bg-ink-900 text-white' => ! $corridor,
@@ -40,6 +40,10 @@
         ])>
             ♀ Women-only
         </a>
+    </div>
+
+    <div class="mb-6">
+        <x-trip-fill-anim label="Seats filling on this corridor — board before it departs." />
     </div>
 
     <div class="space-y-4">

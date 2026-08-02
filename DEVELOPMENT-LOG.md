@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 Complete)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass Complete)
 
 | Area | Status |
 |------|--------|
@@ -41,6 +41,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Sprint 3.6 complete — Tiered KYC (open staff-ID liveness $0 + NIMC-licensed NIN lookup + Smile Identity driver anti-spoof), verification attempts + rate limit, encrypted selfie retention, Control Tower cost dashboard (feature-gated `FEATURE_LIVENESS`, `USE_IDENTITYPASS`, `USE_SMILE`) |
 | Feature modules | ✅ Investor-guide adoptions A–F complete — Mutual ride ratings + driver scoreboard (Control Tower) · Safety pack (public Share Trip page, one-tap SOS into change-control trail, emergency contact) · Women-only preference (never a hard sort) · Offline trip board (PWA SW read-only cache + `/offline`) · Design tokens file (`design-system.css`) · Landing investor KPI strip |
 | Feature modules | ✅ Sprint 10 complete — Tier-0 phone-verified onboarding (OTP, rate-limited, SHA-256-hashed codes, single-use) unlocking booking before KYC + benefits string (subsidy/ride-credit/free-volunteer/women-only/employer-coverage/publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending queue → approve grants Level 1 + phone-verified, rejected/review lifecycle, CSV roster auto-creates staff accounts with temporary password + `EmployerWelcome`) |
+| Feature modules | ✅ UI Compact & Mobile Pass complete — tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm on dashboard/wallet/bookings/trips), tablet/phone-usable responsive rules, PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine), nav dedup (Impact/Missions removed from profile menu — already primary nav), 3 new page-specific animated SVG cards (`trip-fill-anim`, `demand-map-anim`, `navigation-anim`) |
 | Tests | ✅ 336 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions, tiered verification, selfie retention, ratings, safety, women-only, phone verification, employer enrollment) |
 
 ---
@@ -538,6 +539,32 @@ Six adoptions from the investor guide review, committed as one feature set (`v0.
 - `PhoneVerificationTest` (15) — auth redirect, page render, send updates phone + stores hash only, no-phone error, earlier codes invalidated, verify marks verified + audits, wrong-code attempts then burn, expiry, send cooldown, daily limit, phone-verified wallet booking, subsidy blocked for phone-only, volunteer blocked, publish blocked (403).
 - `EmployerEnrollmentTest` (12) — auth redirect, self-request pending + joined_via self, inactive blocked, rejected re-request, suspended blocked, approve grants Level 1 + phone-verified + audit, never downgrades NIN, non-pending approve blocked, reject + review lifecycle, admin members + pending queue render, header-labeled CSV auto-creates staff account, vehicle register/delete + foreign-vehicle 403.
 
+### 4.20 UI Compact & Mobile Pass — Tightened Layout + PWA Install + Nav Dedup + Page-Specific Animations (COMPLETE)
+
+Adopted from the UI polish request: the app felt airy and wasn't comfortable on phones/tablets, the profile menu repeated primary nav, and the brand needed more page-specific animated SVG cards beyond `matching-anim`. No schema changes; pure Blade/Tailwind/CSS/JS polish.
+
+**Compact layout (`resources/views/layouts/app.blade.php`):**
+- Header `h-16` → `h-14`, logo mark 8→7, main container `max-w-6xl` → `max-w-5xl`, main padding `py-8` → `py-6` + `px-4 sm:px-6`, body bottom pad `pb-20` → `pb-16` (mobile tab bar clearance).
+- Wallet pill + ⌘K search now appear from `sm:` up (were `md:`); desktop primary nav stays `lg:` (so tablet 640–1024 uses the bottom tab bar — never both).
+- Page rhythm tightened: `mb-8`→`mb-6`, `mt-8`→`mt-6`, `gap-6`→`gap-5`, `p-6`→`p-5` cards, `space-y-8`→`space-y-6` on `dashboard`, `trips/board`, `wallet/index`, `bookings/index`, `trips/show`.
+
+**PWA install CTA (installable on phone/laptop):**
+- iOS/metas: `mobile-web-app-capable`, `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style=default`, `apple-mobile-web-app-title=WorkRide` added to the head.
+- New `installApp` + `mobileNav` Alpine data components (`resources/js/app.js`) — track `canInstall` from the existing `beforeinstallprompt` → `wr-install-ready` dispatch, call `prompt()`, and hide after `appinstalled`/`userChoice`.
+- "Install app" entries wired into the profile dropdown (`resources/views/components/profile-menu.blade.php`) and the mobile More sheet (`resources/views/components/mobile-nav.blade.php`, which now uses `x-data="mobileNav"`). Gated by `x-show="canInstall" x-cloak` (new `[x-cloak]{display:none}` rule) so it only appears when the browser offers an install prompt.
+- New `download` + `smartphone` icons in `icon.blade.php`.
+
+**Nav dedup:** profile menu's "Your workspace" grid dropped the Impact + Missions links — they were already primary top-nav destinations, so the dropdown now only holds overflow (Dashboard, Wallet, Verify, Employer, Commodities, Shop, Road map, Profile & safety) per the guide's "everything else lives in ⌘K / profile menu / mobile More" rule.
+
+**Three new page-specific animated SVG brand cards (following the `matching-anim` pattern):**
+- `trip-fill-anim.blade.php` (dark ink-950) — a corridor stop with seat-fill dots that light up per car (`wr-seat-fill`, staggered delays) and a car that drives off along the route (`wr-car-drive` via `offset-path` + `wr-car-bob`). Wired into `trips/board` as a banner above the list ("Seats filling on this corridor — board before it departs").
+- `demand-map-anim.blade.php` (light map pane, forest→gold gradient) — a `wr-map-pan` road map pans gently behind static demand pins (Kubwa/Berger/Banex/CBD) with pulsing `wr-ring` hotspots, a gold "12 people · almost filled" chip, and clustered car icons. Wired into `dashboard` "Your corridor is live" replacing the old `matching-anim` compact.
+- `navigation-anim.blade.php` (dark, Google-directions style) — a route base lane, gold `wr-route-draw` path, `wr-dash-flow` overlay, moving gold car, origin/destination pins (Pickup/Work), and a live ETA + distance chip. Wired into `trips/show` sidebar for participants on scheduled/active trips.
+
+**CSS (`resources/css/app.css`):** new keyframes `wr-seat-fill`, `wr-car-drive`, `wr-map-pan`, `wr-ring`, `wr-route-draw`, `wr-car-bob` + their classes; `[x-cloak]` helper for Alpine-gated UI.
+
+**Tests:** no behavioral change — existing suite still green (336 tests, 1057 assertions) after `npm run build`. `pint` clean.
+
 ---
 
 ## 5. Issues Resolved
@@ -740,6 +767,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 3.6 | Tiered KYC — open liveness + NIMC lookup + driver anti-spoof | ✅ Complete (feature-gated `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE`) |
 | Investor Adoptions A–F | Mutual ratings + safety pack + women-only preference + offline board + design tokens + landing KPIs | ✅ Complete (v0.10.0) |
 | Sprint 10 | Tier-0 phone-verified onboarding + employer enrollment Forms 1 & 2 | ✅ Complete (v0.11.0) |
+| UI Compact & Mobile Pass | Compact layout + PWA install CTA + nav dedup + 3 page-specific animated cards | ✅ Complete (v0.12.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -768,6 +796,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.9.1` | Sprint 3.6 — Tiered KYC | Open staff-ID liveness (auto-approve on pass, manual-review fallback) + verification attempts/rate limit + encrypted selfie retention purge + NIMC-licensed NIN lookup (idempotent, capped, cost-logged) + Smile anti-spoof driver webhook + Control Tower needs-review queue & KYC cost dashboard — gated on `FEATURE_LIVENESS` / `USE_IDENTITYPASS` / `USE_SMILE` | 290 (896) | 2026-08-02 |
 | `v0.10.0` | Investor-Guide Adoptions A–F | Mutual ride ratings (once per booking, change-control audited) + driver scoreboard · safety pack (public Share Trip page, one-tap SOS → Control Tower panel, emergency contact profile) · women-only preference (opt-in board filter, booking gate, never a hard sort) · offline trip board (PWA SW read-only navigation fallback + `/offline`) · design tokens file (`design-system.css`) · landing investor KPI strip | 309 (950) | 2026-08-02 |
 | `v0.11.0` | Sprint 10 — Tier-0 Phone Onboarding + Employer Enrollment | Tier-0 phone-verified booking gate (OTP, SHA-256-hashed, rate-limited, single-use) unlocking `canBook()` before KYC, with the benefits string (subsidy / ride-credit / free-volunteer / women-only / employer-coverage / publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending → approve grants Level 1 + phone-verified, rejected/review lifecycle, header-detecting CSV roster that auto-creates staff accounts with temp password + `EmployerWelcome`) · shared `VehicleService` self-service fleet page · Control Tower pending-approval queue | 336 (1057) | 2026-08-02 |
+| `v0.12.0` | UI Compact & Mobile Pass | Tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm) + PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine, iOS metas, `x-cloak`) + nav dedup (Impact/Missions dropped from profile menu — already primary nav) + 3 new page-specific animated SVG cards (`trip-fill-anim` on trips board, `demand-map-anim` on dashboard corridor card, `navigation-anim` on trips/show for participants) with new keyframes (`wr-seat-fill`, `wr-car-drive`, `wr-map-pan`, `wr-ring`, `wr-route-draw`, `wr-car-bob`) | 336 (1057) | 2026-08-02 |
 
 ---
 

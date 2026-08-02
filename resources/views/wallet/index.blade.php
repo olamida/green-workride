@@ -3,14 +3,14 @@
 @section('title', 'Wallet')
 
 @section('content')
-    <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="font-heading text-2xl font-bold text-ink-900">Wallet</h1>
             <p class="mt-1 text-sm text-ink-500">Triple balance — cash for top-ups, earned balance from driving, and subsidy credits from your employer (spent first on rides).</p>
         </div>
     </div>
 
-    <div class="grid gap-6 sm:grid-cols-3">
+    <div class="grid gap-5 sm:grid-cols-3">
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
             <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Cash balance</p>
             <p class="mt-2 font-mono text-3xl font-semibold text-ink-900">₦{{ number_format((float) $wallet->cash_balance, 2) }}</p>
@@ -30,8 +30,8 @@
         </div>
     </div>
 
-    <div class="mt-8 grid gap-6 lg:grid-cols-5">
-        <div class="space-y-6 lg:col-span-2">
+    <div class="mt-6 grid gap-5 lg:grid-cols-5">
+        <div class="space-y-5 lg:col-span-2">
             <div class="rounded-2xl border border-ink-200 bg-white p-6">
                 <h2 class="font-heading font-semibold text-ink-900">Top up</h2>
                 <p class="mt-1 text-sm text-ink-500">Amount in naira (₦). Minimum ₦100.</p>
@@ -171,7 +171,7 @@
             @endif
         </div>
 
-        <div class="space-y-6 lg:col-span-3">
+        <div class="space-y-5 lg:col-span-3">
             <div class="rounded-2xl border border-ink-200 bg-white p-6">
                 <div class="flex items-center justify-between">
                     <h2 class="font-heading font-semibold text-ink-900">Recent transactions</h2>

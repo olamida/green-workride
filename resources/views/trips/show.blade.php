@@ -7,8 +7,8 @@
         <a href="{{ route('trips.index') }}" class="text-sm font-semibold text-forest-600 hover:underline">← Trip Board</a>
     </div>
 
-    <div class="grid gap-6 lg:grid-cols-3">
-        <div class="space-y-6 lg:col-span-2">
+    <div class="grid gap-5 lg:grid-cols-3">
+        <div class="space-y-5 lg:col-span-2">
             <div class="rounded-2xl border border-ink-200 bg-white p-6">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -193,7 +193,14 @@
             @endif
         </div>
 
-        <div class="space-y-6">
+        <div class="space-y-5">
+            @if ($isParticipant && in_array($trip->status->value, ['scheduled', 'active'], true))
+                <x-navigation-anim
+                    origin="{{ $trip->origin_text }}"
+                    destination="{{ $trip->destination_text }}"
+                    label="Your car is on the way — live route to {{ $trip->destination_text }}." />
+            @endif
+
             @if ($womenOnlyBlocked && ! $myBooking && in_array($trip->status->value, ['scheduled', 'active'], true) && $trip->available_seats > 0)
                 <div class="rounded-2xl border border-rose-200 bg-rose-50 p-6">
                     <h2 class="font-heading font-semibold text-rose-900">Women-only ride</h2>

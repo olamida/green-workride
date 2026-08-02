@@ -30,3 +30,53 @@ window.addEventListener('beforeinstallprompt', (event) => {
     window.deferredInstallPrompt = event;
     window.dispatchEvent(new CustomEvent('wr-install-ready'));
 });
+
+// Install-app Alpine component — used in the profile menu + mobile "More" sheet.
+Alpine.data('installApp', () => ({
+    canInstall: false,
+    init() {
+        this.canInstall = Boolean(window.deferredInstallPrompt);
+        window.addEventListener('wr-install-ready', () => {
+            this.canInstall = true;
+        });
+        window.addEventListener('appinstalled', () => {
+            this.canInstall = false;
+            window.deferredInstallPrompt = null;
+        });
+    },
+    install() {
+        const prompt = window.deferredInstallPrompt;
+        if (! prompt) return;
+        prompt.prompt();
+        prompt.userChoice.finally(() => {
+            window.deferredInstallPrompt = null;
+            this.canInstall = false;
+        });
+    },
+}));
+
+// Mobile bottom nav — the More sheet + install entry (shares installApp state).
+Alpine.data('mobileNav', () => ({
+    more: false,
+    canInstall: false,
+    init() {
+        this.canInstall = Boolean(window.deferredInstallPrompt);
+        window.addEventListener('wr-install-ready', () => {
+            this.canInstall = true;
+        });
+        window.addEventListener('appinstalled', () => {
+            this.canInstall = false;
+            window.deferredInstallPrompt = null;
+        });
+    },
+    install() {
+        this.more = false;
+        const prompt = window.deferredInstallPrompt;
+        if (! prompt) return;
+        prompt.prompt();
+        prompt.userChoice.finally(() => {
+            window.deferredInstallPrompt = null;
+            this.canInstall = false;
+        });
+    },
+}));

@@ -15,7 +15,7 @@
         </a>
     </div>
 
-    <div class="space-y-8">
+    <div class="space-y-6">
         <section>
             <h2 class="mb-3 font-heading font-semibold text-ink-900">As passenger</h2>
             <div class="space-y-4">

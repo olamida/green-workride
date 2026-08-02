@@ -1,4 +1,4 @@
-<div x-data="{ more: false }" @keydown.escape.window="more = false">
+<div x-data="mobileNav" @keydown.escape.window="more = false">
     {{-- Bottom tab bar — the Uber/Bolt mobile pattern: 5 core destinations. --}}
     <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-ink-200/80 bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-lg lg:hidden">
         <div class="mx-auto grid max-w-lg grid-cols-5">
@@ -87,6 +87,10 @@
                 <a href="{{ route('dashboard') }}" class="flex flex-col items-center gap-1.5 rounded-2xl border border-ink-100 bg-paper px-2 py-3.5 text-center text-[11px] font-medium text-ink-700">
                     <x-icon name="grid" class="h-5 w-5 text-forest-600" /> Dashboard
                 </a>
+                <button type="button" @click="more = false; install()" x-show="canInstall" x-cloak
+                        class="flex flex-col items-center gap-1.5 rounded-2xl border border-ink-100 bg-paper px-2 py-3.5 text-center text-[11px] font-medium text-ink-700">
+                    <x-icon name="download" class="h-5 w-5 text-forest-600" /> Install app
+                </button>
                 @if (auth()->user()->isAdmin())
                     <a href="{{ route('admin.dashboard') }}" class="flex flex-col items-center gap-1.5 rounded-2xl border border-ink-100 bg-paper px-2 py-3.5 text-center text-[11px] font-medium text-ink-700">
                         <x-icon name="command" class="h-5 w-5 text-forest-600" /> Control Tower
