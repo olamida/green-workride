@@ -155,6 +155,26 @@ class User extends Authenticatable
         return $this->hasMany(RideRating::class, 'ratee_id');
     }
 
+    public function assets(): HasMany
+    {
+        return $this->hasMany(Asset::class, 'assigned_driver_id');
+    }
+
+    public function driverScores(): HasMany
+    {
+        return $this->hasMany(DriverScore::class);
+    }
+
+    public function fuelAdvances(): HasMany
+    {
+        return $this->hasMany(FuelAdvance::class);
+    }
+
+    public function demandRequests(): HasMany
+    {
+        return $this->hasMany(DemandRequest::class);
+    }
+
     /**
      * Average rating received (driver score per the guide), or null when no
      * ratings yet. Rendered as "★ 4.8" on trip cards and the trip detail page.

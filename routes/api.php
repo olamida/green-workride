@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
+use App\Http\Controllers\Api\V1\DemandController;
 use App\Http\Controllers\Api\V1\P2pTransferController;
 use App\Http\Controllers\Api\V1\RideCreditController;
 use App\Http\Controllers\Api\V1\RoadSensorController;
@@ -46,6 +47,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/verifications/tier3', [VerificationController::class, 'tier3']);
 
         Route::post('/road-events', [RoadSensorController::class, 'store']);
+
+        // Demand research field kit (guide §9B) — junction counts, rider check-ins, probe dwells.
+        Route::post('/demand/surveys', [DemandController::class, 'surveys']);
+        Route::post('/demand/checkins', [DemandController::class, 'checkIns']);
+        Route::post('/demand/probes', [DemandController::class, 'probes']);
 
         Route::get('/trips', [TripController::class, 'index']);
         Route::post('/trips', [TripController::class, 'store']);

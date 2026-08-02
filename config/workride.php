@@ -220,4 +220,32 @@ return [
         // Driver verification fee (₦) charged to cover the Tier-3 vendor cost.
         'driver_verification_fee_naira' => env('WORKRIDE_DRIVER_VERIFICATION_FEE', 500),
     ],
+
+    // Demand research (guide §9B) — junction counts, OD surveys, probe points,
+    // rider check-ins. On by default: it is the cheapest way to prove BRT
+    // demand (₦50k interns + phones vs ₦100k consultants).
+    'demand' => [
+        'enabled' => (bool) env('FEATURE_DEMAND', true),
+    ],
+
+    // Fleet lifecycle (guide §11) — assets, daily inspections, faults, OBD2
+    // telemetry. Asset-light: leases first, buy later.
+    'fleet' => [
+        'enabled' => (bool) env('FEATURE_FLEET', false),
+    ],
+
+    // Stakeholder remittances (guide §10) — per-trip union shares. Make the
+    // unions agents, not enemies.
+    'stakeholders' => [
+        'enabled' => (bool) env('FEATURE_STAKEHOLDER_REMITTANCES', false),
+    ],
+
+    // Demand forecasting (guide §9) — event multipliers over last-4-same-
+    // weekday booking averages.
+    'forecasts' => [
+        'enabled' => (bool) env('FEATURE_FORECASTING', false),
+        // Assumed seats per bus used to convert predicted demand into a
+        // recommended number of extra vehicles.
+        'seats_per_vehicle' => env('WORKRIDE_FORECAST_SEATS_PER_VEHICLE', 15),
+    ],
 ];

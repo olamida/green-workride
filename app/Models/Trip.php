@@ -16,6 +16,7 @@ class Trip extends Model
     protected $fillable = [
         'driver_id',
         'vehicle_id',
+        'asset_id',
         'route_name',
         'corridor',
         'origin_text',
@@ -57,6 +58,11 @@ class Trip extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    public function asset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class);
     }
 
     public function waypoints(): HasMany

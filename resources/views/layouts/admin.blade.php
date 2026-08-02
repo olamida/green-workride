@@ -32,6 +32,11 @@
                     <x-admin-nav-link :active="request()->routeIs('admin.missions.*')" href="{{ route('admin.missions.index') }}">Missions</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.ratings.*')" href="{{ route('admin.ratings.index') }}">Ratings</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.business.*')" href="{{ route('admin.business.index') }}">Business</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.ops.demand')" href="{{ route('admin.ops.demand') }}">Demand Research</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.forecasts.*')" href="{{ route('admin.forecasts.index') }}">Demand Calendar</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.fleet.*', 'admin.faults.*', 'admin.maintenance.*')" href="{{ route('admin.fleet.index') }}">Fleet</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.stakeholders.*')" href="{{ route('admin.stakeholders.index') }}">Stakeholders</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.scoreboard.*')" href="{{ route('admin.scoreboard.index') }}">Driver Scores</x-admin-nav-link>
                 </nav>
 
                 <div class="border-t border-ink-800 p-4 text-sm">

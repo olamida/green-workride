@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             DemoUserSeeder::class,
             Sprint8DemoSeeder::class,
             DemoMissionSeeder::class,
+            DemoOpsSeeder::class,
         ]);
     }
 }

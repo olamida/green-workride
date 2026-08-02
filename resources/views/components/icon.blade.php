@@ -124,6 +124,13 @@
             '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/>',
             '<path d="M12 18h.01"/>',
         ],
+        'signal' => [
+            '<path d="M2 20h.01"/>',
+            '<path d="M7 20v-4"/>',
+            '<path d="M12 20v-8"/>',
+            '<path d="M17 20V8"/>',
+            '<path d="M22 20V4"/>',
+        ],
     ];
 @endphp
 

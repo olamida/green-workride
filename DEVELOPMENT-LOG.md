@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass Complete)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete)
 
 | Area | Status |
 |------|--------|
@@ -42,7 +42,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Investor-guide adoptions A–F complete — Mutual ride ratings + driver scoreboard (Control Tower) · Safety pack (public Share Trip page, one-tap SOS into change-control trail, emergency contact) · Women-only preference (never a hard sort) · Offline trip board (PWA SW read-only cache + `/offline`) · Design tokens file (`design-system.css`) · Landing investor KPI strip |
 | Feature modules | ✅ Sprint 10 complete — Tier-0 phone-verified onboarding (OTP, rate-limited, SHA-256-hashed codes, single-use) unlocking booking before KYC + benefits string (subsidy/ride-credit/free-volunteer/women-only/employer-coverage/publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending queue → approve grants Level 1 + phone-verified, rejected/review lifecycle, CSV roster auto-creates staff accounts with temporary password + `EmployerWelcome`) |
 | Feature modules | ✅ UI Compact & Mobile Pass complete — tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm on dashboard/wallet/bookings/trips), tablet/phone-usable responsive rules, PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine), nav dedup (Impact/Missions removed from profile menu — already primary nav), 3 new page-specific animated SVG cards (`trip-fill-anim`, `demand-map-anim`, `navigation-anim`) |
-| Tests | ✅ 336 feature tests passing (auth, verification, admin, trips, bookings, chat, wallet, subsidy, GTFS, road sensor, road intelligence, routing, impact, PWA, ride credit, earned wallet, P2P transfer, business dashboard, receipts, employer programs, rewards/green points, commodity commerce, missions, tiered verification, selfie retention, ratings, safety, women-only, phone verification, employer enrollment) |
+| Feature modules | ✅ Sprint 11 complete — Operations & Demand Research schema pass (guide v4.0): 17 enums, 7 migrations (21 tables + `trips.asset_id`), 21 models, Fleet/Stakeholder/Forecast/Demand services + `CalculateDriverScoresJob`, Control Tower demand calendar + fleet + stakeholder + driver-scoreboard pages, rider demand check-in page + API field kit (surveys/check-ins/probes), Ops demo seeder (feature-gated) |
+| Tests | ✅ 368 feature tests passing (… previous + ops schema, fleet lifecycle gate, stakeholder remittances, demand research + forecasting, driver scores) |
 
 ---
 
@@ -565,6 +566,53 @@ Adopted from the UI polish request: the app felt airy and wasn't comfortable on 
 
 **Tests:** no behavioral change — existing suite still green (336 tests, 1057 assertions) after `npm run build`. `pint` clean.
 
+### 4.21 Sprint 11 — Operations & Demand Research Schema (v4.0) + Control Tower + Rider Demand Check-in (COMPLETE)
+
+The guide v3.0/v4.0 operations pass: fleet lifecycle, stakeholder remittance, demand forecasting, and the BRT pre-design demand-research field kit (manual junction counts, probe dwell points, workplace OD surveys, rider check-ins, OD matrix) — "with ₦50k interns + phones vs $100k consultants."
+
+**Enums (17 new, `app/Enums`):** `AssetStatus`, `AssetAcquisitionType`, `AssetType`, `FaultStatus`, `InspectionStatus`-style maintenance set — `MaintenanceStatus` (Scheduled/Due/InProgress/Done), `MaintenanceType` (Preventive5000km/MonthlyInspection), `RemittanceStatus`, `UnionCategory`-style — `StakeholderType`, `ForecastEventType` (Govt/Church/Mosque/Festive/Weather/FuelScarcity), `DemandDayType`, `DemandRequestStatus`, `OdSurveyMode`, `DutyRosterStatus`, `DriverScorePeriod`, `GtfsValidationStatus`, `PermitStatus`. (17 enum files total incl. `DutyRole`.)
+
+**Schema (7 migrations, 21 new tables + `trips.asset_id`):**
+- `2026_08_02_130000_create_demand_research_tables` — `junctions` (known waiting points Berger/Banex/Kubwa/Nyanya/Lugbe), `demand_surveys` (manual junction counts, `[junction_id, day_type, hour]` index), `probe_demand_points` (slow-car dwell aggregation, `[lat, lng]` + `last_seen_at` indexes), `od_surveys` (workplace OD survey, `[workplace_id, home_area]` index), `demand_requests` (rider check-ins, `[status, requested_at]` index), `od_matrix` (origin→destination snapshot, `[origin_area, destination_area]` + `[period_start, period_end]` indexes).
+- `2026_08_02_130001_create_fleet_tables` — `assets` (`[status, corridor]` index), `maintenance_schedules` (`due_date` NOT NULL), `inspections` (`[asset_id, date]` index), `faults` (`[asset_id, status]` index), `telemetry` (`[asset_id, recorded_at]` index).
+- `2026_08_02_130002_create_stakeholder_tables` — `unions`, `stakeholder_remittances` (unique `reference`).
+- `2026_08_02_130003_create_forecast_tables` — `forecasts` (event calendar with `expected_demand_multiplier`).
+- `2026_08_02_130004_create_ops_roster_tables` — `duty_rosters`, `schedules`, `car_pool`, `car_pool_availability`, `driver_scores` (unique `[user_id, period_start]`), `fuel_advances`, `subsidy_reports`.
+- `2026_08_02_130005_create_gtfs_validation_tables` — `permits`, `gtfs_validations`.
+- `2026_08_02_130006_add_asset_id_to_trips_table` — nullable FK `trips.asset_id` → `assets`.
+
+**Models (21 new):** `Junction`, `DemandSurvey`, `ProbeDemandPoint`, `OdSurvey`, `DemandRequest`, `OdMatrix` (table `od_matrix` — Eloquent's default pluralization `od_matrices` was wrong), `Asset`, `MaintenanceSchedule`, `Inspection`, `Fault`, `Telemetry` (table `telemetry`), `Union`, `StakeholderRemittance`, `Forecast`, `DutyRoster`, `Schedule`, `CarPool`, `CarPoolAvailability`, `DriverScore`, `FuelAdvance`, `SubsidyReport`, `GtfsValidation`, `Permit`. `Trip` gains `asset()`; `User` gains `assets()`.
+
+**Services:**
+- `FleetService` — trip-publish gate: `assertPublishable()` (asset-light: no asset → no gate; explicit `asset_id` must belong to the driver; the *latest* inspection today decides — a failed inspection blocks until a later passing one clears it); `recordInspection()` (failed → auto-opens a fault ticket), `recordFault()`/`resolveFault()`, `scheduleMaintenance()` (preventive 5,000 km, monthly inspection; `due_date` always set), `recordTelemetry()` (mileage update + auto-queues the next preventive).
+- `StakeholderService` — `recordForTrip()` idempotent per `REM-{bookingId}` reference (volunteer rides remit nothing; only carried paid bookings count), `settleDue()` (pending → paid with `paid_at`), `unionFor()` (corridor match preferred over generic chapter).
+- `ForecastService` — Phase-1 manual multiplier: `suggest()` (predicted = avg last-4-same-weekday boarded/completed bookings × multiplier, weekday counted in PHP so MySQL/SQLite share one SQL path), `upcoming()` (event calendar), `defaultMultiplier()` (Govt/Festive/FuelScarcity 1.6, Weather 1.4, Church 1.3, Mosque 0.7).
+- `DemandService` — BRT pre-design field kit: `recordSurvey()`, `junctionCounts()` (per-junction totals + top destinations), `recordProbePoint()` (150 m haversine merge via portable bounding-box + PHP distance), `checkIn()` (FCT-geofenced), `generateOdMatrix()` (derives the destination from the respondent's workplace zone — `od_surveys` has no `destination_area` column), `pendingRequests()`.
+- `CalculateDriverScoresJob` (`app/Jobs`) — weekly per-driver snapshot: rides completed (status=completed, driven by `updated_at` — `trips` has no `completed_at`), green points, average rating, pothole reports.
+
+**Controllers + routes:**
+- Web `Web\DemandController` — `/demand` rider check-in page (junction picker + GPS + destination + passengers + "my check-ins" list).
+- API field kit `Api\V1\DemandController` — `POST /api/v1/demand/surveys`, `/demand/checkins`, `/demand/probes` (Sanctum, geofenced).
+- Admin: `Admin\OpsController` (`/admin/ops/demand` — junctions table + pending check-ins + OD matrix), `Admin\FleetController` (`/admin/fleet`), `Admin\ForecastController` (`/admin/forecasts` demand calendar + event POST), `Admin\StakeholderController` (`/admin/stakeholders` remittance ledger), `Admin\ScoreboardController` (`/admin/driver-scores`), plus `/admin/faults` + `/admin/maintenance`. Sidebar links wired for all six.
+
+**Views:** `admin/ops/demand`, `admin/fleet/index`, `admin/forecasts/index`, `admin/stakeholders/index`, `admin/scoreboard/index`, rider `demand/index` with `signal` icon added to the icon set; profile menu + admin sidebar links.
+
+**Config:** `workride.demand.enabled` (**on by default** — `FEATURE_DEMAND`, env default true, the rider check-in is the marquee ops feature), `workride.fleet.enabled`, `workride.stakeholders.enabled`, `workride.forecasts.enabled` (all off by default), plus `forecasts.seats_per_vehicle`; mirrored in `.env.example`.
+
+**Seeder:** `DemoOpsSeeder` (gated — no-ops when features disabled): a few junctions, one union, one asset + inspection, one forecast event. Wired into `DatabaseSeeder` last.
+
+**Bugs fixed during hardening (SQLite test DB surfaced what MySQL hides):**
+- `OdMatrix`/`Telemetry` models relied on Eloquent pluralization (`od_matrices`, `telemetries`) while the migrations create `od_matrix`/`telemetry` — added explicit `$table`.
+- `ForecastService` used MySQL-only `DAYOFWEEK()` — now counts the same weekday in PHP over the 4-week window.
+- `DemandService::generateOdMatrix()` selected a `destination_area` column that doesn't exist on `od_surveys` — destination now derived from the joined workplace `zone`.
+- Probe-point radius used `SQRT/POW` raw SQL (no SQRT on SQLite) — replaced with a portable bounding-box query + PHP haversine.
+- The OD-matrix return count compared `period_start` with `= 'Y-m-d'` but the `date` cast stores `Y-m-d H:i:s` on SQLite — now `whereDate()`.
+- The failed-inspection gate blocked *any* failed inspection today forever — now the **latest** inspection decides.
+- `resolveAsset()` filtered to Active-only, so a grounded single assigned asset never blocked publishing — now resolves the single assigned asset regardless of status and lets `isServiceable()` throw.
+- `recordForTrip()` incremented the created-count even when `firstOrCreate` matched an existing reference — now gated on `wasRecentlyCreated`.
+
+**Tests (32 new — 368 total, 1151 assertions):** `OpsSchemaTest` (tables exist, `trips.asset_id`, unique references, `defaultMultiplier` map), `FleetGateTest` (no-asset no-gate, active passes, grounded blocks, failed-then-passing inspection clears, fault ticket on failure, resolution, preventive due_km, telemetry mileage + preventive queue, trip publishes asset_id, foreign asset rejected), `StakeholderRemittanceTest` (pending record, volunteer none, idempotent, settle flips to paid, corridor-match union), `DemandForecastTest` (survey API auth + create, check-in inside FCT + outside 422, probe merge 150 m, OD matrix from surveys, forecast multiplier math 0.75×2.0=1.5, all 5 admin ops pages + non-admin 403, forecast event default multiplier, driver score job weekly snapshot).
+
 ---
 
 ## 5. Issues Resolved
@@ -768,11 +816,12 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Investor Adoptions A–F | Mutual ratings + safety pack + women-only preference + offline board + design tokens + landing KPIs | ✅ Complete (v0.10.0) |
 | Sprint 10 | Tier-0 phone-verified onboarding + employer enrollment Forms 1 & 2 | ✅ Complete (v0.11.0) |
 | UI Compact & Mobile Pass | Compact layout + PWA install CTA + nav dedup + 3 page-specific animated cards | ✅ Complete (v0.12.0) |
+| Sprint 11 | Operations & Demand Research schema pass (fleet, stakeholder, forecasts, demand field kit) + Control Tower pages | ✅ Complete (v0.13.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
 2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
-3. Add the v3.0/v4.0 operations tables (demand surveys, forecasts, assets, maintenance) as a follow-up schema pass
+3. Wire the fleet lifecycle into the Driver App UI (inspection checklist + OBD2 telemetry intake) — schema + services are ready
 
 ---
 
@@ -797,6 +846,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.10.0` | Investor-Guide Adoptions A–F | Mutual ride ratings (once per booking, change-control audited) + driver scoreboard · safety pack (public Share Trip page, one-tap SOS → Control Tower panel, emergency contact profile) · women-only preference (opt-in board filter, booking gate, never a hard sort) · offline trip board (PWA SW read-only navigation fallback + `/offline`) · design tokens file (`design-system.css`) · landing investor KPI strip | 309 (950) | 2026-08-02 |
 | `v0.11.0` | Sprint 10 — Tier-0 Phone Onboarding + Employer Enrollment | Tier-0 phone-verified booking gate (OTP, SHA-256-hashed, rate-limited, single-use) unlocking `canBook()` before KYC, with the benefits string (subsidy / ride-credit / free-volunteer / women-only / employer-coverage / publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending → approve grants Level 1 + phone-verified, rejected/review lifecycle, header-detecting CSV roster that auto-creates staff accounts with temp password + `EmployerWelcome`) · shared `VehicleService` self-service fleet page · Control Tower pending-approval queue | 336 (1057) | 2026-08-02 |
 | `v0.12.0` | UI Compact & Mobile Pass | Tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm) + PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine, iOS metas, `x-cloak`) + nav dedup (Impact/Missions dropped from profile menu — already primary nav) + 3 new page-specific animated SVG cards (`trip-fill-anim` on trips board, `demand-map-anim` on dashboard corridor card, `navigation-anim` on trips/show for participants) with new keyframes (`wr-seat-fill`, `wr-car-drive`, `wr-map-pan`, `wr-ring`, `wr-route-draw`, `wr-car-bob`) | 336 (1057) | 2026-08-02 |
+| `v0.13.0` | Sprint 11 — Operations & Demand Research (v4.0) | Guide v4.0 ops + BRT pre-design field kit: 17 enums, 7 migrations (21 tables + `trips.asset_id`), 21 models (fleet assets/maintenance/inspections/faults/telemetry, unions + stakeholder remittances, forecast demand calendar, demand surveys/probe points/OD surveys/check-ins/OD matrix, duty rosters/car pool/driver scores/fuel advances/permits/GTFS validations) + FleetService publish gate (latest-inspection-wins) + StakeholderService idempotent remittances + ForecastService weekday-multiplier suggestion + DemandService junction counts/150 m probe merge/FCT-geofenced check-ins/OD matrix + CalculateDriverScoresJob + Control Tower demand calendar/fleet/stakeholder/driver-scoreboard pages + rider `/demand` check-in + API field kit + gated `DemoOpsSeeder` — demand on by default (`FEATURE_DEMAND`) | 368 (1151) | 2026-08-02 |
 
 ---
 

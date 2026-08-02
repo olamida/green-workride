@@ -28,6 +28,8 @@ class TripService
         private RideCreditService $rideCredits,
         private RewardService $rewards,
         private MissionService $missions,
+        private FleetService $fleet,
+        private StakeholderService $stakeholders,
     ) {}
 
     public function publish(User $driver, array $data): Trip
@@ -43,6 +45,8 @@ class TripService
 
         $vehicle = $this->resolveVehicle($driver, $data, $isFreeVolunteer);
 
+        $asset = $this->fleet->assertPublishable($driver, isset($data['asset_id']) ? (int) $data['asset_id'] : null);
+
         $lat = isset($data['current_lat']) && $data['current_lat'] !== '' ? (float) $data['current_lat'] : null;
         $lng = isset($data['current_lng']) && $data['current_lng'] !== '' ? (float) $data['current_lng'] : null;
 
@@ -52,6 +56,7 @@ class TripService
 
         $trip = $driver->trips()->create([
             'vehicle_id' => $vehicle?->id,
+            'asset_id' => $asset?->id,
             'route_name' => $corridor->label(),
             'corridor' => $corridor,
             'origin_text' => $data['origin_text'],
@@ -142,6 +147,7 @@ class TripService
 
         dispatch(new CalculateImpactJob($trip->id));
 
+        $this->stakeholders->recordForTrip($trip->fresh());
         $this->awardCompletionRewards($trip);
         $this->recordMissionProgress($trip);
 

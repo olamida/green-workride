@@ -3,11 +3,16 @@
 use App\Http\Controllers\Admin\AdminController;
 use App\Http\Controllers\Admin\BusinessController;
 use App\Http\Controllers\Admin\EmployerController;
+use App\Http\Controllers\Admin\FleetController;
+use App\Http\Controllers\Admin\ForecastController;
 use App\Http\Controllers\Admin\GtfsController as AdminGtfsController;
 use App\Http\Controllers\Admin\MissionController as AdminMissionController;
+use App\Http\Controllers\Admin\OpsController;
 use App\Http\Controllers\Admin\RatingController as AdminRatingController;
 use App\Http\Controllers\Admin\RewardController as AdminRewardController;
 use App\Http\Controllers\Admin\RoadController as AdminRoadController;
+use App\Http\Controllers\Admin\ScoreboardController;
+use App\Http\Controllers\Admin\StakeholderController;
 use App\Http\Controllers\Admin\SubsidyController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
@@ -16,6 +21,7 @@ use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingController;
 use App\Http\Controllers\Web\CommodityController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DemandController;
 use App\Http\Controllers\Web\EmployerRequestController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\HomeController;
@@ -135,6 +141,12 @@ Route::middleware('auth')->group(function () {
         Route::post('/{mission}/proof', [MissionController::class, 'submitProof'])->name('proof');
     });
 
+    // Rider demand check-in (guide §9B Method 5) — "I'm at Berger, need a ride".
+    Route::prefix('demand')->name('demand.')->group(function () {
+        Route::get('/', [DemandController::class, 'index'])->name('index');
+        Route::post('/checkin', [DemandController::class, 'checkIn'])->name('checkin');
+    });
+
     Route::prefix('receipts')->name('receipts.')->group(function () {
         Route::get('/booking/{booking}', [ReceiptController::class, 'booking'])->name('booking');
         Route::get('/earnings/{booking}', [ReceiptController::class, 'earnings'])->name('earnings');
@@ -184,6 +196,23 @@ Route::middleware('auth')->group(function () {
         Route::get('/business/export/transactions', [BusinessController::class, 'exportTransactions'])->name('business.export.transactions');
         Route::get('/business/export/settlements', [BusinessController::class, 'exportSettlements'])->name('business.export.settlements');
         Route::get('/business/export/subsidy', [BusinessController::class, 'exportSubsidy'])->name('business.export.subsidy');
+
+        Route::get('/ops/demand', [OpsController::class, 'index'])->name('ops.demand');
+
+        Route::get('/fleet', [FleetController::class, 'index'])->name('fleet.index');
+        Route::post('/fleet/{asset}/inspect', [FleetController::class, 'recordInspection'])->name('fleet.inspect');
+        Route::post('/fleet/{asset}/schedule', [FleetController::class, 'scheduleMaintenance'])->name('fleet.schedule');
+        Route::post('/faults/{fault}/resolve', [FleetController::class, 'resolveFault'])->name('faults.resolve');
+        Route::post('/maintenance/{schedule}/complete', [FleetController::class, 'completeMaintenance'])->name('maintenance.complete');
+
+        Route::get('/forecasts', [ForecastController::class, 'index'])->name('forecasts.index');
+        Route::post('/forecasts', [ForecastController::class, 'store'])->name('forecasts.store');
+
+        Route::get('/stakeholders', [StakeholderController::class, 'index'])->name('stakeholders.index');
+        Route::post('/stakeholders/settle', [StakeholderController::class, 'settle'])->name('stakeholders.settle');
+
+        Route::get('/driver-scores', [ScoreboardController::class, 'index'])->name('scoreboard.index');
+        Route::post('/driver-scores/run', [ScoreboardController::class, 'run'])->name('scoreboard.run');
 
         Route::get('/ratings', [AdminRatingController::class, 'index'])->name('ratings.index');
 
