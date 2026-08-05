@@ -36,7 +36,7 @@
 |---|-----|---------------|----------------|-----------|
 | 3.1 | **USSD fallback `*347*WORK#`** | Not started (noted as "future" in spec) | Low-smartphone riders; demand bot for junctions | USSD gateway wired; "where you dey go?" flow saves to `demand_surveys` |
 | 3.2 | **FCM push notifications** | Notifications go to `database` + `log` channels | "500m away" nudges need to reach a closed browser | `NotificationService` sends FCM; `UserArrivedAtPickup` fires it |
-| 3.3 | **Trust float ledger** | Time-Bank exists; no reconcilable Trust balance | The 15% Community Trust share + ride-credit float must be auditable | `community_trust` table; reconciliation report for board |
+| 3.3 | **Trust float ledger** | ✅ Done — `community_trust` table + `TrustService` (idempotent credit/debit/balance) since v0.17.0; Control Tower `/admin/trust` reconciliation report (from-scratch running-balance rebuild flagging drifted `balance_after`) + CSV export since v0.18.0 | The 15% Community Trust share + ride-credit float must be auditable | Reconcilable ledger + board report shipped; remaining: pay-it-forward statement (3.11) |
 | 3.4 | **Ride-credit reminders** | Debt silently ages to overdue | Overdue book needs gentle churn-recovery | Pre-due SMS/database reminder job + test |
 | 3.5 | **Employer enrollment CSV self-service** | Admin uploads CSV; Form 1/2 done | MDAs should manage their own rosters | MDA-scoped upload page behind `employer_admin` |
 | 3.6 | **Corridor fare config UI** | `config/workride.php` only; guide §8 wants Settings UI | Ops must tune fares without deploys | `/admin/settings` writes `workride.*` to DB/cache |

@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\RoadController as AdminRoadController;
 use App\Http\Controllers\Admin\ScoreboardController;
 use App\Http\Controllers\Admin\StakeholderController;
 use App\Http\Controllers\Admin\SubsidyController;
+use App\Http\Controllers\Admin\TrustController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\VerificationController as AdminVerificationController;
 use App\Http\Controllers\Admin\WorkplaceController as AdminWorkplaceController;
@@ -222,6 +223,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/driver-scores', [ScoreboardController::class, 'index'])->name('scoreboard.index');
         Route::post('/driver-scores/run', [ScoreboardController::class, 'run'])->name('scoreboard.run');
+
+        Route::get('/trust', [TrustController::class, 'index'])->name('trust.index');
+        Route::get('/trust/export', [TrustController::class, 'export'])->name('trust.export');
 
         Route::get('/ratings', [AdminRatingController::class, 'index'])->name('ratings.index');
 

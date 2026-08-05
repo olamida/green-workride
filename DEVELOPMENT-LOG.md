@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report)
 
 | Area | Status |
 |------|--------|
@@ -50,7 +50,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Site search button fixed — header ⌘K button no longer depends on Alpine `$dispatch` outside an `x-data` scope (native event dispatch) |
 | Feature modules | ✅ Docs pass complete — `WORKRIDE-DESIGN-REVIEWS.md` (critiques of the seeding-data prompt + plan-ahead/live-loading + Time-Bank + EV lease-to-own, with ADOPT/ADAPT/DEFER verdicts) · `WORKRIDE-USER-GUIDE.md` (role-based rider/driver/volunteer/MDA/ops guide) · `WORKRIDE-DEV-GUIDE.md` (world-class engineering standards + known-traps table) · `WORKRIDE-ROADMAP.md` (honest gap list of unimplemented spec items, priority-ranked with "done when" criteria) |
 | Feature modules | ✅ Realtime board + demand-aware planning pass complete — Trip interest (idempotent `trip_interests` per trip+user, Pending→Matched on booking, revert on cancel) + live seat-counter channel (`TripSeatsUpdated` on the public `trips` channel, `board-live.js` seat/Full/book-link updates) + active-first "Leaving soon" sort + demand-aware empty state (`demandSnapshot` → "N people want this journey" + top destinations) + "How to book / Next departure" guide + interest panel on `trips/show` + Community Trust float ledger (`community_trust` table + `TrustService` credit/debit/balance, idempotent `TB-FLOAT-{bookingId}` on Time-Bank float creation + `TB-REPAY-{bookingId}-{seats}` on repayment) |
-| Tests | ✅ 395 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger)
+| Feature modules | ✅ Community Trust reconciliation report complete — Control Tower `/admin/trust` (net balance + per-fund credit/debit/balance breakdown, float issued/released/outstanding KPIs, from-scratch running-balance rebuild flagging any drifted `balance_after`, recent movements) + full-ledger CSV export — closes the P3.3 ledger reconciliation backlog |
+| Tests | ✅ 407 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger)
 
 ---
 
@@ -742,6 +743,20 @@ The board stops being static between requests, and the Time-Bank float becomes a
 
 **Tests (11 new — 395 total, 1254 assertions):** `TripInterestTest` — register interest, idempotent per trip+user, driver-own trip rejected, completed/departed rejected, booking upgrades to matched, cancel reverts to pending, demand-aware empty state, next-departure guide, active-first sort, leaving-soon/book-ahead badges, `TripSeatsUpdated` dispatch on wallet booking.
 
+### 4.27 Community Trust Reconciliation Report + Trust Ledger Tests (COMPLETE)
+
+Closes roadmap P3.3 — the ledger half shipped in §4.26, and now it can *prove* itself. The report rebuilds every running balance from the entries themselves, so a drift in `balance_after` (manual edit, double-write, missed entry) surfaces as a flagged mismatch instead of a silent black box.
+
+**Controller (`Admin\TrustController`):**
+- `index()` — loads the ledger ordered by `recorded_at, id`; aggregates per-fund credit/debit/balance (all five `TrustLedgerType` funds), totals the net Trust balance, tracks Time-Bank float issued/released, and runs a **from-scratch reconciliation pass**: for every entry it recomputes the running balance per type (in the same write order `TrustService` uses) and compares against the stored `balance_after` (0.005 tolerance). Any mismatch collects into `$mismatchReferences`.
+- `export()` — full-ledger CSV (reference, type, direction, amount, balance_after, recorded_at, meta JSON) via `php://temp`, `text/csv` + attachment disposition.
+
+**View (`admin/trust/index.blade.php`):** 4 KPI cards (Trust balance, Float issued, Float released, Float outstanding) · reconciliation banner ("Ledger balanced" vs "Reconciliation needs review" with the drifted references) · per-fund breakdown table (credits/debits/balance) · recent movements ledger (reverse-chron, credit green / debit ink with − sign) · empty state. "Community Trust" link added to the Control Tower sidebar.
+
+**Routes:** `GET /admin/trust` (`admin.trust.index`) + `GET /admin/trust/export` (`admin.trust.export`) in the admin group.
+
+**Tests (12 new — 407 total, 1298 assertions):** `TrustLedgerTest` — credit idempotent on reference (no duplicate row), debit idempotent, net + per-type `balance()`, running `balance_after` per write, admin report render with KPIs + balanced banner, per-fund breakdown numbers, drifted `balance_after` flagged for review, CSV download (headers + rows + meta JSON round-trip parsed via `str_getcsv`), guest/admin gate (403 non-admin on both routes), empty-ledger state.
+
 ---
 
 ## 5. Issues Resolved
@@ -955,7 +970,8 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Rich Demo Seeder Suite | 13-seeder 100-account operations-ready demo world + seeder test | ✅ Complete (v0.14.0) |
 | Trip Board Planning + Animations Off + Search Fix | 48h board window, window/women-only filters, "How to book" guide, book-ahead/live badges, animation gate, ⌘K fix | ✅ Complete (v0.15.0) |
 | Docs Pass | `WORKRIDE-DESIGN-REVIEWS.md` + `WORKRIDE-USER-GUIDE.md` + `WORKRIDE-DEV-GUIDE.md` + `WORKRIDE-ROADMAP.md` | ✅ Complete (v0.16.0) |
-| Realtime Board + Demand-Aware Planning | Trip interest (pending→matched/revert) + live seat-counter channel + active-first leaving-soon sort + demand-aware empty state + next-departure guide + Community Trust float ledger (`community_trust`, `TrustService`) | ✅ Complete |
+| Realtime Board + Demand-Aware Planning | Trip interest (pending→matched/revert) + live seat-counter channel + active-first leaving-soon sort + demand-aware empty state + next-departure guide + Community Trust float ledger (`community_trust`, `TrustService`) | ✅ Complete (v0.17.0) |
+| Community Trust Reconciliation Report | Control Tower `/admin/trust` (per-fund + net balance, float KPIs, from-scratch running-balance rebuild flagging drifted `balance_after`) + full-ledger CSV export + `TrustLedgerTest` | ✅ Complete (v0.18.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -965,6 +981,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 5. ✅ DONE — Trip board planning + animations gate + search fix (see §4.24); next: live seat-counter channel (see `WORKRIDE-ROADMAP.md` 1.3)
 6. ✅ DONE — Docs pass (see §4.25); backlog lives in `WORKRIDE-ROADMAP.md`
 7. ✅ DONE — Realtime board + demand-aware planning + trust float ledger (see §4.26); next: Trust reconciliation report + ledger tests
+8. ✅ DONE — Trust reconciliation report + ledger tests (see §4.27); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -993,6 +1010,8 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.14.0` | Rich Demo Seeder Suite | 13 idempotent seeders + `InteractsWithDemoData` trait (activity-log completion marker) building a 100-account / 80-trip / 554-booking / 102-road-event / 92-survey operations-ready demo world + regenerated GTFS feed; `RichSeederTest` locks the whole chain on SQLite | 381 (1220) | 2026-08-02 |
 | `v0.15.0` | Trip Board Planning + Animations Off + Search Fix | 48h board horizon (`board_window_minutes`, presets) + `?window=`/`?women_only=` filters + "How to book" strip + Book-ahead/Live-now badges (live matcher keeps its 30-min window) · animated brand cards gated behind `WORKRIDE_ANIMATIONS=false` · header ⌘K native-event dispatch · register homepage link | 384 (1230) | 2026-08-02 |
 | `v0.16.0` | Docs Pass | `WORKRIDE-DESIGN-REVIEWS.md` (ADOPT/ADAPT/DEFER reviews: seeding-data prompt, plan-ahead/live-loading, Time-Bank trust float, EV lease-to-own) · `WORKRIDE-USER-GUIDE.md` (role-based usage) · `WORKRIDE-DEV-GUIDE.md` (engineering standards + known-traps table) · `WORKRIDE-ROADMAP.md` (priority-ranked gap list with "done when") | 384 (1230) | 2026-08-02 |
+| `v0.17.0` | Realtime Board + Demand-Aware Planning | Trip interest (idempotent `trip_interests`, Pending→Matched on book / revert on cancel) + live seat-counter `TripSeatsUpdated` channel (`board-live.js`) + active-first "Leaving soon" sort + demand-aware empty state + "How to book / Next departure" guide + interest panel + Community Trust float ledger (`community_trust` + `TrustService`, idempotent `TB-FLOAT-{bookingId}` / `TB-REPAY-{bookingId}-{seats}`) | 395 (1254) | 2026-08-05 |
+| `v0.18.0` | Community Trust Reconciliation Report | Control Tower `/admin/trust` — net + per-fund credit/debit/balance, float issued/released/outstanding KPIs, from-scratch running-balance rebuild flagging drifted `balance_after` (0.005 tolerance) + recent-movements ledger + full-ledger CSV export (meta JSON round-trip) + sidebar link + `TrustLedgerTest` (12) | 407 (1298) | 2026-08-05 |
 
 ---
 
