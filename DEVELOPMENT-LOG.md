@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-02
+> Last updated: 2026-08-05
 
 ---
 
@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass)
 
 | Area | Status |
 |------|--------|
@@ -48,6 +48,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Trip board planning pass complete — 48h board window (day-ahead trips visible + bookable), departure-window filters (Leaving soon / Later today / Tomorrow / Anytime), "How to book" guide, book-ahead/live badges, cleaner empty state |
 | Feature modules | ✅ Animations silenced site-wide (config `WORKRIDE_ANIMATIONS=false`) — the animated SVG brand cards are gated out until the site-wide animation language is reviewed |
 | Feature modules | ✅ Site search button fixed — header ⌘K button no longer depends on Alpine `$dispatch` outside an `x-data` scope (native event dispatch) |
+| Feature modules | ✅ Docs pass complete — `WORKRIDE-DESIGN-REVIEWS.md` (critiques of the seeding-data prompt + plan-ahead/live-loading + Time-Bank + EV lease-to-own, with ADOPT/ADAPT/DEFER verdicts) · `WORKRIDE-USER-GUIDE.md` (role-based rider/driver/volunteer/MDA/ops guide) · `WORKRIDE-DEV-GUIDE.md` (world-class engineering standards + known-traps table) · `WORKRIDE-ROADMAP.md` (honest gap list of unimplemented spec items, priority-ranked with "done when" criteria) |
 | Tests | ✅ 384 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate)
 
 ---
@@ -692,6 +693,19 @@ Root-cause fixes from the post-fleet review. The board looked empty except at pe
 
 **Tests (3 new — 384 total, 1230 assertions):** `TripTest::test_board_shows_day_ahead_trips_by_default` (48h board shows + books a next-day trip with "Book ahead" badge), `TripTest::test_board_now_window_hides_day_ahead_trips` (Leaving soon filters them out with a clear empty state), `RatingsSafetyTest::test_landing_does_not_render_brand_animations_by_default` (gate keeps the SVG + label off the landing page).
 
+### 4.25 Docs Pass — Design Reviews + User Guide + Dev Guide + Roadmap (COMPLETE)
+
+Four companion docs so the spec stops being the only artifact. No schema/code changes — pure documentation that encodes the lessons of §5 and the honest gap list.
+
+- **`WORKRIDE-DESIGN-REVIEWS.md`** — the "critique before backlog" contract. Reviews the seeding-data prompt (ADOPT: what shipped vs. asked, guard-rails added — idempotency marker, money invariants, no real PII, deterministic names), the plan-ahead/live-loading board idea (ADAPT: "the board shows ahead, the matcher books near" rule + missing predictive rail, live seat-counter, demand-aware empty state), Time-Bank ride-now-pay-later (ADOPT gated: the correction that the float must be real money and eligibility must guarantee repayability + backlog additions: trust float ledger, pre-due reminders, pay-it-forward statement), and FMWASD EV lease-to-own (DEFER hardware / ADOPT schema seams: `assets.propulsion`, `telemetry.battery_soc`, `lease_agreements`, `charging_stations`, gated `FEATURE_EV_LEASE`). Ends with a copy-paste template for new reviews.
+- **`WORKRIDE-USER-GUIDE.md`** — role-based usage: Tier-0 phone onboarding + benefits ladder, passenger (find/book/ride/rate/receipts/safety/demand check-in), driver (Level 3, publish, pre-trip inspection via fleet, board/no-show/complete, withdrawal), volunteer (free rides + Green Points), workplace admin (subsidy bulk credit, employer Forms 1 & 2, coverage models), Control Tower (verifications/users/road/business/receipts/rewards/missions/GTFS + the Sprint 11 ops pages), feature-flag table, public surfaces, and a 5-step pitch-demo quickstart.
+- **`WORKRIDE-DEV-GUIDE.md`** — the engineering contract: non-negotiables (hashed NIN, decimal money, atomic FOR UPDATE money moves, idempotency references, feature gates, board-vs-matcher split, change control), architecture, coding standards, the **known-traps table** (every §5 bug distilled into a row: enum-vs-string, null in-memory attributes, nested withCount, Storage::get, MySQL-only SQL, TransientToken, shouldRenderJsonWhen, Carbon signed diffs, $dispatch outside x-data, Eloquent pluralization, duplicate indexes, assignable roles, assertHeaderContains, Blade encoding, SQLite vs MySQL driver codes), and the Definition-of-Done ritual.
+- **`WORKRIDE-ROADMAP.md`** — the honest gap list, priority-ranked with "Done when" criteria: P1 demo-critical cheap (seeder README, Google OAuth, live seat-counter, "Leaving soon" boost, demand-aware empty state), P2 production wiring (Paystack/Termii/IdentityPass/Smile/Moniepoint live, Redis, OSRM self-hosted, Google Transit submission), P3 guide features not yet built (USSD, FCM, trust float ledger, ride-credit reminders, employer CSV self-service, corridor-fare config UI, maatwebsite/excel, EV schema seams, forecast ML job, rider-facing driver scorecards, pay-it-forward statement, multi-tenant cities, demand bot, employer CO₂ report), P4 explicitly deferred 2028 ideas (AR/voice/haptics, insurance, union shares, FERMA MOU).
+
+**Docs updated:** `DEVELOPMENT-LOG.md` status table (§2), roadmap (§7), version history (§7.1).
+
+**Tests:** no code change — 384 total, 1230 assertions remain green; `pint` clean.
+
 ---
 
 ## 5. Issues Resolved
@@ -897,12 +911,16 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | UI Compact & Mobile Pass | Compact layout + PWA install CTA + nav dedup + 3 page-specific animated cards | ✅ Complete (v0.12.0) |
 | Sprint 11 | Operations & Demand Research schema pass (fleet, stakeholder, forecasts, demand field kit) + Control Tower pages | ✅ Complete (v0.13.0) |
 | Rich Demo Seeder Suite | 13-seeder 100-account operations-ready demo world + seeder test | ✅ Complete (v0.14.0) |
+| Trip Board Planning + Animations Off + Search Fix | 48h board window, window/women-only filters, "How to book" guide, book-ahead/live badges, animation gate, ⌘K fix | ✅ Complete (v0.15.0) |
+| Docs Pass | `WORKRIDE-DESIGN-REVIEWS.md` + `WORKRIDE-USER-GUIDE.md` + `WORKRIDE-DEV-GUIDE.md` + `WORKRIDE-ROADMAP.md` | ✅ Complete (v0.16.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
 2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
 3. ✅ DONE — Fleet Driver App UI wired (see §4.22)
 4. ✅ DONE — Rich demo seeder suite (see §4.23); next: rider-facing driver scorecards
+5. ✅ DONE — Trip board planning + animations gate + search fix (see §4.24); next: live seat-counter channel (see `WORKRIDE-ROADMAP.md` 1.3)
+6. ✅ DONE — Docs pass (see §4.25); backlog lives in `WORKRIDE-ROADMAP.md`
 
 ---
 
@@ -929,6 +947,8 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.12.0` | UI Compact & Mobile Pass | Tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm) + PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine, iOS metas, `x-cloak`) + nav dedup (Impact/Missions dropped from profile menu — already primary nav) + 3 new page-specific animated SVG cards (`trip-fill-anim` on trips board, `demand-map-anim` on dashboard corridor card, `navigation-anim` on trips/show for participants) with new keyframes (`wr-seat-fill`, `wr-car-drive`, `wr-map-pan`, `wr-ring`, `wr-route-draw`, `wr-car-bob`) | 336 (1057) | 2026-08-02 |
 | `v0.13.0` | Sprint 11 — Operations & Demand Research (v4.0) | Guide v4.0 ops + BRT pre-design field kit: 17 enums, 7 migrations (21 tables + `trips.asset_id`), 21 models (fleet assets/maintenance/inspections/faults/telemetry, unions + stakeholder remittances, forecast demand calendar, demand surveys/probe points/OD surveys/check-ins/OD matrix, duty rosters/car pool/driver scores/fuel advances/permits/GTFS validations) + FleetService publish gate (latest-inspection-wins) + StakeholderService idempotent remittances + ForecastService weekday-multiplier suggestion + DemandService junction counts/150 m probe merge/FCT-geofenced check-ins/OD matrix + CalculateDriverScoresJob + Control Tower demand calendar/fleet/stakeholder/driver-scoreboard pages + rider `/demand` check-in + API field kit + gated `DemoOpsSeeder` — demand on by default (`FEATURE_DEMAND`) | 368 (1151) | 2026-08-02 |
 | `v0.14.0` | Rich Demo Seeder Suite | 13 idempotent seeders + `InteractsWithDemoData` trait (activity-log completion marker) building a 100-account / 80-trip / 554-booking / 102-road-event / 92-survey operations-ready demo world + regenerated GTFS feed; `RichSeederTest` locks the whole chain on SQLite | 381 (1220) | 2026-08-02 |
+| `v0.15.0` | Trip Board Planning + Animations Off + Search Fix | 48h board horizon (`board_window_minutes`, presets) + `?window=`/`?women_only=` filters + "How to book" strip + Book-ahead/Live-now badges (live matcher keeps its 30-min window) · animated brand cards gated behind `WORKRIDE_ANIMATIONS=false` · header ⌘K native-event dispatch · register homepage link | 384 (1230) | 2026-08-02 |
+| `v0.16.0` | Docs Pass | `WORKRIDE-DESIGN-REVIEWS.md` (ADOPT/ADAPT/DEFER reviews: seeding-data prompt, plan-ahead/live-loading, Time-Bank trust float, EV lease-to-own) · `WORKRIDE-USER-GUIDE.md` (role-based usage) · `WORKRIDE-DEV-GUIDE.md` (engineering standards + known-traps table) · `WORKRIDE-ROADMAP.md` (priority-ranked gap list with "done when") | 384 (1230) | 2026-08-02 |
 
 ---
 
