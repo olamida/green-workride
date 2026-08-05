@@ -73,6 +73,36 @@ class TripTest extends TestCase
             ->assertSee('Kubwa → CBD');
     }
 
+    public function test_board_shows_day_ahead_trips_by_default(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Tomorrow morning run',
+            'departure_time' => now()->addDay()->setTime(6, 45),
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertSee('Tomorrow morning run')
+            ->assertSee('Book ahead');
+    }
+
+    public function test_board_now_window_hides_day_ahead_trips(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Next-day planning run',
+            'departure_time' => now()->addDay()->setTime(6, 45),
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips?window=now')
+            ->assertOk()
+            ->assertDontSee('Next-day planning run')
+            ->assertSee('No trips in this window yet');
+    }
+
     public function test_unverified_user_cannot_publish_paid_trip(): void
     {
         $user = User::factory()->create();

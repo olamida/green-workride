@@ -1,5 +1,11 @@
 @props(['label' => null, 'compact' => false, 'online' => '1,240 verified civil servants online'])
 
+@if (! config('workride.animations.enabled', false))
+    {{-- Animated SVG brand cards are decorative. They are disabled site-wide
+         until the animation language is reviewed (config/workride.php). --}}
+    @php return; @endphp
+@endif
+
 @php
     // Fixed coordinate system (640×320). The passenger sits centre-right and a
     // search wave radiates outward while the route-finder probes candidate

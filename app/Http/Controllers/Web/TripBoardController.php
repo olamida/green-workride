@@ -32,9 +32,16 @@ class TripBoardController extends Controller
             ? $request->boolean('women_only')
             : (bool) (auth()->user()->prefers_women_only ?? false);
 
-        $trips = $matcher->upcoming($corridor, null, $womenOnly);
+        // Departure window: the board defaults to the full planning horizon
+        // (48h) so day-ahead trips are visible and bookable; "now" narrows it
+        // to the classic 30-minute "leaving soon" view.
+        $presets = (array) config('workride.board_window_presets', []);
+        $window = $request->input('window', 'any');
+        $withinMinutes = $presets[$window] ?? (int) config('workride.board_window_minutes', 2880);
 
-        return view('trips.board', compact('trips', 'corridor', 'womenOnly'));
+        $trips = $matcher->upcoming($corridor, $withinMinutes, $womenOnly);
+
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets'));
     }
 
     public function create()

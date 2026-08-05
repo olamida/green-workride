@@ -1,5 +1,9 @@
 @props(['label' => null, 'compact' => false, 'origin' => 'Kubwa', 'destination' => 'CBD', 'eta' => '≈ 45 min', 'distance' => '22 km'])
 
+@if (! config('workride.animations.enabled', false))
+    @php return; @endphp
+@endif
+
 @php
     // Fixed coordinate system (640×300). A Google-directions style route from the
     // passenger's pickup to the office destination — blue path revealed in gold,

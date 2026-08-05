@@ -292,6 +292,15 @@ class RatingsSafetyTest extends TestCase
         $this->get('/')->assertOk()->assertSee('Scheduled trips leaving now');
     }
 
+    public function test_landing_does_not_render_brand_animations_by_default(): void
+    {
+        $this->get('/')
+            ->assertOk()
+            ->assertDontSee('Matching verified civil servants on the Kubwa → CBD corridor')
+            ->assertDontSee('wr-dash-flow')
+            ->assertDontSee('wr-scan');
+    }
+
     public function test_service_worker_offline_fallback(): void
     {
         $this->get('/sw.js')

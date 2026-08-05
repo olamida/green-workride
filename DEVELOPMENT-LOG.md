@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite)
 
 | Area | Status |
 |------|--------|
@@ -44,7 +44,11 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ UI Compact & Mobile Pass complete — tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm on dashboard/wallet/bookings/trips), tablet/phone-usable responsive rules, PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine), nav dedup (Impact/Missions removed from profile menu — already primary nav), 3 new page-specific animated SVG cards (`trip-fill-anim`, `demand-map-anim`, `navigation-anim`) |
 | Feature modules | ✅ Sprint 11 complete — Operations & Demand Research schema pass (guide v4.0): 17 enums, 7 migrations (21 tables + `trips.asset_id`), 21 models, Fleet/Stakeholder/Forecast/Demand services + `CalculateDriverScoresJob`, Control Tower demand calendar + fleet + stakeholder + driver-scoreboard pages, rider demand check-in page + API field kit (surveys/check-ins/probes), Ops demo seeder (feature-gated) |
 | Feature modules | ✅ Fleet Driver App UI complete — driver-facing `/fleet` page (assigned assets, status pill, pre-trip inspection form with photos, fault reporting, maintenance preview) + `POST /api/v1/fleet/{asset}/telemetry` OBD2 intake + fleet gate banner on trip publish (feature-gated `FEATURE_FLEET`) |
-| Tests | ✅ 380 feature tests passing (… + fleet driver app UI) |
+| Feature modules | ✅ Rich Demo Seeder Suite complete — 13 seeders + shared trait building a 100-account, 554-booking, 102-road-event, 92-survey demo world with a re-runnable completion marker |
+| Feature modules | ✅ Trip board planning pass complete — 48h board window (day-ahead trips visible + bookable), departure-window filters (Leaving soon / Later today / Tomorrow / Anytime), "How to book" guide, book-ahead/live badges, cleaner empty state |
+| Feature modules | ✅ Animations silenced site-wide (config `WORKRIDE_ANIMATIONS=false`) — the animated SVG brand cards are gated out until the site-wide animation language is reviewed |
+| Feature modules | ✅ Site search button fixed — header ⌘K button no longer depends on Alpine `$dispatch` outside an `x-data` scope (native event dispatch) |
+| Tests | ✅ 384 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate)
 
 ---
 
@@ -631,6 +635,63 @@ Rider-facing UI layer on top of the Sprint 11 fleet schema/service layer (guide 
 
 **Tests (12 new — 380 total, 1189 assertions):** `DriverFleetTest` (guest redirect, feature-off notice, empty state, sees assigned asset, passing inspection persists, failed inspection opens fault ticket, foreign-asset 403, fault report + validation, API telemetry mileage + preventive schedule, API foreign-asset 422, trip-create gate status banner).
 
+### 4.23 Rich Demo Seeder Suite — 100-Account, Operations-Ready Demo World (COMPLETE)
+
+The rich demo suite (`WORKRIDE-PROMPT-SEEDING-DATA.md`) turns a clean install into a fundable, operable demo in one `db:seed` — no manual data entry for pitches or Ops walkthroughs.
+
+**Shared trait (`database/seeders/Concerns/InteractsWithDemoData.php`):**
+- `demoSynced()` / `markSuiteSeeded()` — the suite is guarded by an `activity_logs` marker (`action = rich_suite_seeded`) written by the **last** seeder, so re-running `db:seed` never duplicates. ⚠️ Deliberately NOT keyed on the first demo user (`demo001@workride.ng`): that user exists after `RichUserSeeder` alone, so using it as the guard made every later seeder skip itself on a fresh run (caught during validation — MySQL had seeded only users + junctions).
+- `demoPasswordHash()` — one bcrypt hash shared across 100 users (the `hashed` cast skips re-hash, ~1 bcrypt cost per suite).
+- `demoPhone(int)`, `ninFor(email)` (deterministic SHA-256 hash + last 4, raw NIN never stored), `demoReference(prefix, i)` (`PREFIX-DEMO-00001`).
+
+**13 seeders (all idempotent):**
+- `JunctionSeeder` — 45 Abuja junctions (Kubwa/Nyanya/Lugbe corridors).
+- `RichUserSeeder` — 100 accounts: 30 L3 drivers, 15 L3 both, 10 L1 volunteers, 40 L1–2 passengers, 5 workplace admins (FMF/FMW/FMOT/NASS/CBN); phone-verified, NIN-hashed for L2+, women-only preference on a few.
+- `RichVerificationSeeder` — workplace_id/nin/driver approvals + verification_attempts per tier.
+- `RichVehicleSeeder` — 40 vehicles (coasters/staff buses/danfos/sedans).
+- `RichWalletSeeder` — 100 wallets + 200 top-up/subsidy/earned transactions.
+- `RichTripSeeder` — 80 trips (40 completed / 10 active / 22 scheduled / 8 cancelled) with relational waypoints + JSON snapshot; Carbon `roundMinute()`/`floorMinute()` don't exist in this version → `startOfMinute()`.
+- `RichBookingSeeder` — 554 bookings, seat-safe, no duplicate `(trip_id, passenger_id)`, wallet holds/captures/refunds + cash/subsidy/ride-credit/free methods.
+- `RichRideCreditSeeder` — 30 Time-Bank credits (owed/repaid/overdue/waived) + overdue flags.
+- `RichTransferSeeder` — 40 P2P transfers (1% cash fee / free earned) + 20 driver payouts, each with ledger transactions.
+- `RichRoadSeeder` — 102 road events (72 raw + 30 in 6 confirmed 5-report clusters) + 20 IRI segments (World Bank RoadLab bands).
+- `RichDemandSeeder` — 92 junction counts, 40 rider check-ins, 25 OD surveys, 30 probe dwell points, 11 OD-matrix rows.
+- `RichGtfsSeeder` — regenerates `gtfs.zip` (171 stops, 3 routes, 32 trips) from the seeded trips.
+- `RichChatImpactSeeder` — 120 chat messages + 70 impact stats; **last** seeder → writes the suite marker.
+
+**Wiring:** all 13 appended to `DatabaseSeeder` (after `DemoOpsSeeder`), `DemoOpsSeeder::seedJunctions()` left intact — both use idempotent `updateOrCreate(['name'])` so the 4 legacy + 45 rich junctions coexist.
+
+**Bugs found & fixed during validation:**
+- Marker-as-first-user guard (above) → replaced with an `activity_logs` completion marker.
+- `ChatMessage` collection `whereIn('status', ['boarded','completed'])` matched nothing because `Booking.status` is a `BookingStatus` enum (strict string vs enum) → now compares against the enum cases (same bug class as the old `verifyBooking` fix).
+- My own test assertions: rich demo users = 100 (not 105), vehicles = 41 (40 rich + 1 legacy), probe points = 30 (not 40), and a bogus `distinct()->count('trip_id')` line removed.
+
+**Tests (1 new — 381 total, 1220 assertions):** `RichSeederTest` (seeds the full `DatabaseSeeder` on SQLite; asserts user/vehicle/trip/booking counts, zero duplicate booking pairs, non-negative wallet balances, ride credits/P2P/payouts, confirmed road events + segments, demand counts, chat + impact + GTFS meta exist, every demo user has a wallet).
+
+### 4.24 Trip Board Planning Pass + Animations Off + Site Search Fix (COMPLETE)
+
+Root-cause fixes from the post-fleet review. The board looked empty except at peak, the animated SVG brand cards weren't showing a real map (and threw a stale-view `Undefined array key "x"` once), and the header search button relied on Alpine magic that may not resolve outside an `x-data` scope.
+
+**Trip board planning (the "clicking a trip does nothing" fix):**
+- Root cause: `TripMatchingService::upcoming()` only returned trips departing within `departure_window_minutes` (30) — at runtime 0 trips left in the next 30 min while 13+ day-ahead scheduled trips existed. The board wasn't broken; it was just empty except at peak, so there was nothing to click.
+- Config: new `workride.board_window_minutes` (default **2880** = 48h) + `workride.board_window_presets` (`now` 30 / `later` 240 / `tomorrow` 1440 / `any` 2880). The live API `findMatches()` keeps its tight 30-minute window so near-term seats aren't pre-empted; only the web board widened.
+- `TripBoardController::index()` now accepts `?window=now|later|tomorrow|any` and `?women_only=` (defaulting from the rider's profile preference, still never a hard sort).
+- `trips/board.blade.php` rewritten: "How to book a seat" 3-step guide strip, corridor chips + Women-only filter, departure-window chips, trip cards with corridor/free/volunteer/women-only/**Live now**/**Book ahead** badges, departure time, seats, driver + rating, fixed fare, and a clear "View & book →" call-to-action; day-ahead empty state links back to "Anytime (48h)".
+
+**Animations silenced site-wide (per instruction — review later):**
+- New `workride.animations.enabled` config (default `false`, flip `WORKRIDE_ANIMATIONS=true` to re-enable). All four animated brand cards — `matching-anim`, `demand-map-anim`, `navigation-anim`, `trip-fill-anim` — early-return when disabled, so landing/dashboard/trips pages render clean content-first with no decorative SVG map.
+- `.env.example` documents the flag.
+
+**Site search (⌘K) button fix:**
+- The header "Search… ⌘K" button used `@click="$dispatch('open-command')"` — Alpine's `$dispatch` magic is only guaranteed inside an `x-data` component scope, and the header sits outside any. Replaced with a native `onclick="window.dispatchEvent(new CustomEvent('open-command', { bubbles: true }))"` so the command palette always opens regardless of Alpine scoping.
+
+**Homepage link on auth pages:** register page gains the same "← Back to homepage" link the login page already has.
+
+**Bug found & fixed during hardening:**
+- The "Book ahead" badge used `$trip->departure_time->diffInMinutes(now(), false) > 60` — Carbon's signed `diffInMinutes` returns a **negative** number when `$this` is in the future (verified: -926 for a day-ahead trip), so the badge never showed. Now `$trip->departure_time->gt(now()->addHour())` — unambiguous.
+
+**Tests (3 new — 384 total, 1230 assertions):** `TripTest::test_board_shows_day_ahead_trips_by_default` (48h board shows + books a next-day trip with "Book ahead" badge), `TripTest::test_board_now_window_hides_day_ahead_trips` (Leaving soon filters them out with a clear empty state), `RatingsSafetyTest::test_landing_does_not_render_brand_animations_by_default` (gate keeps the SVG + label off the landing page).
+
 ---
 
 ## 5. Issues Resolved
@@ -835,11 +896,13 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Sprint 10 | Tier-0 phone-verified onboarding + employer enrollment Forms 1 & 2 | ✅ Complete (v0.11.0) |
 | UI Compact & Mobile Pass | Compact layout + PWA install CTA + nav dedup + 3 page-specific animated cards | ✅ Complete (v0.12.0) |
 | Sprint 11 | Operations & Demand Research schema pass (fleet, stakeholder, forecasts, demand field kit) + Control Tower pages | ✅ Complete (v0.13.0) |
+| Rich Demo Seeder Suite | 13-seeder 100-account operations-ready demo world + seeder test | ✅ Complete (v0.14.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
 2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
-3. ✅ DONE — Fleet Driver App UI wired (see §4.22); next: rich demo seeder, rider-facing driver scorecards
+3. ✅ DONE — Fleet Driver App UI wired (see §4.22)
+4. ✅ DONE — Rich demo seeder suite (see §4.23); next: rider-facing driver scorecards
 
 ---
 
@@ -865,6 +928,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.11.0` | Sprint 10 — Tier-0 Phone Onboarding + Employer Enrollment | Tier-0 phone-verified booking gate (OTP, SHA-256-hashed, rate-limited, single-use) unlocking `canBook()` before KYC, with the benefits string (subsidy / ride-credit / free-volunteer / women-only / employer-coverage / publishing) gated behind Level 1+ · Employer enrollment Forms 1 & 2 (self-request → pending → approve grants Level 1 + phone-verified, rejected/review lifecycle, header-detecting CSV roster that auto-creates staff accounts with temp password + `EmployerWelcome`) · shared `VehicleService` self-service fleet page · Control Tower pending-approval queue | 336 (1057) | 2026-08-02 |
 | `v0.12.0` | UI Compact & Mobile Pass | Tightened layout (h-14 header, `max-w-5xl` main, reduced vertical rhythm) + PWA install CTA (profile menu + mobile More sheet via `installApp`/`mobileNav` Alpine, iOS metas, `x-cloak`) + nav dedup (Impact/Missions dropped from profile menu — already primary nav) + 3 new page-specific animated SVG cards (`trip-fill-anim` on trips board, `demand-map-anim` on dashboard corridor card, `navigation-anim` on trips/show for participants) with new keyframes (`wr-seat-fill`, `wr-car-drive`, `wr-map-pan`, `wr-ring`, `wr-route-draw`, `wr-car-bob`) | 336 (1057) | 2026-08-02 |
 | `v0.13.0` | Sprint 11 — Operations & Demand Research (v4.0) | Guide v4.0 ops + BRT pre-design field kit: 17 enums, 7 migrations (21 tables + `trips.asset_id`), 21 models (fleet assets/maintenance/inspections/faults/telemetry, unions + stakeholder remittances, forecast demand calendar, demand surveys/probe points/OD surveys/check-ins/OD matrix, duty rosters/car pool/driver scores/fuel advances/permits/GTFS validations) + FleetService publish gate (latest-inspection-wins) + StakeholderService idempotent remittances + ForecastService weekday-multiplier suggestion + DemandService junction counts/150 m probe merge/FCT-geofenced check-ins/OD matrix + CalculateDriverScoresJob + Control Tower demand calendar/fleet/stakeholder/driver-scoreboard pages + rider `/demand` check-in + API field kit + gated `DemoOpsSeeder` — demand on by default (`FEATURE_DEMAND`) | 368 (1151) | 2026-08-02 |
+| `v0.14.0` | Rich Demo Seeder Suite | 13 idempotent seeders + `InteractsWithDemoData` trait (activity-log completion marker) building a 100-account / 80-trip / 554-booking / 102-road-event / 92-survey operations-ready demo world + regenerated GTFS feed; `RichSeederTest` locks the whole chain on SQLite | 381 (1220) | 2026-08-02 |
 
 ---
 

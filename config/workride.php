@@ -30,8 +30,30 @@ return [
     // Trip matching: radius in metres around the passenger's location.
     'search_radius_m' => env('WORKRIDE_SEARCH_RADIUS_M', 2000),
 
-    // Trip matching: only trips departing within this many minutes are shown.
+    // Trip matching (API): only trips departing within this many minutes match
+    // a live pickup request. Kept tight so near-term seats are not pre-empted.
     'departure_window_minutes' => env('WORKRIDE_DEPARTURE_WINDOW_MINUTES', 30),
+
+    // Animated SVG brand cards (matching-anim, demand-map-anim, navigation-anim,
+    // trip-fill-anim). Off by default — they are decorative, not functional, and
+    // we want a calm, content-first UI until the site-wide animation language is
+    // reviewed. Flip WORKRIDE_ANIMATIONS=true to re-enable them everywhere.
+    'animations' => [
+        'enabled' => (bool) env('WORKRIDE_ANIMATIONS', false),
+    ],
+
+    // Trip board (web): how far ahead the board shows trips so riders can plan
+    // and book a seat a day ahead ("Kubwa → CBD, tomorrow 6:45am") and drivers
+    // can see demand before they publish. 2880 minutes = 48 hours.
+    'board_window_minutes' => env('WORKRIDE_BOARD_WINDOW_MINUTES', 2880),
+
+    // Quick departure filters on the trip board. Each is minutes-from-now.
+    'board_window_presets' => [
+        'now' => 30,
+        'later' => 240,
+        'tomorrow' => 1440,
+        'any' => 2880,
+    ],
 
     // No-show policy: share of the held fare captured when a passenger no-shows.
     'no_show_capture_percent' => env('WORKRIDE_NO_SHOW_CAPTURE_PERCENT', 50),

@@ -1,5 +1,9 @@
 @props(['label' => null, 'compact' => false, 'hotspot' => 'Berger', 'count' => '12 people'])
 
+@if (! config('workride.animations.enabled', false))
+    @php return; @endphp
+@endif
+
 @php
     // Fixed coordinate system (640×320). A light map pane pans gently behind a
     // fixed set of demand pins — the "where people wait" view. The hotspot pin

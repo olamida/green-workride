@@ -1,5 +1,9 @@
 @props(['label' => null, 'compact' => false, 'departing' => 'Kubwa → CBD', 'seats' => '3 cars boarding'])
 
+@if (! config('workride.animations.enabled', false))
+    @php return; @endphp
+@endif
+
 @php
     // Fixed coordinate system (640×320). A corridor stop on the left fills cars
     // seat-by-seat; the top car then drives off along the route — the trip board's

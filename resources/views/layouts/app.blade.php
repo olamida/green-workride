@@ -47,7 +47,7 @@
                         @endif
                     </a>
 
-                    <button type="button" @click="$dispatch('open-command')"
+                    <button type="button" onclick="window.dispatchEvent(new CustomEvent('open-command', { bubbles: true }))"
                             class="hidden items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-medium text-ink-500 transition hover:border-forest-300 hover:text-ink-700 sm:flex"
                             aria-label="Search (⌘K)">
                         <x-icon name="search" class="h-3.5 w-3.5" />
