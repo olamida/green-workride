@@ -95,11 +95,12 @@
                 </div>
             </div>
 
-            @if ($trip->waypoints->isNotEmpty())
+            @php $waypoints = $trip->waypoints()->get(); @endphp
+            @if ($waypoints->isNotEmpty())
                 <div class="rounded-2xl border border-ink-200 bg-white p-6">
                     <h2 class="font-heading font-semibold text-ink-900">Waypoints</h2>
                     <ol class="mt-4 space-y-3">
-                        @foreach ($trip->waypoints as $waypoint)
+                        @foreach ($waypoints as $waypoint)
                             <li class="flex items-center gap-3 text-sm text-ink-700">
                                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-forest-100 font-mono text-xs font-semibold text-forest-700">{{ $waypoint->sequence }}</span>
                                 {{ $waypoint->label }}
@@ -232,6 +233,43 @@
                             Book seat · ₦{{ number_format((float) $trip->fare_per_seat, 0) }}
                         </button>
                     </form>
+                </div>
+            @elseif (! $myBooking && $trip->driver_id !== $user->id && in_array($trip->status->value, ['scheduled', 'active']))
+                <div class="rounded-2xl border border-ink-200 bg-white p-6">
+                    <h2 class="font-heading font-semibold text-ink-900">
+                        @if ($trip->available_seats < 1)
+                            Trip is full
+                        @else
+                            I want this journey
+                        @endif
+                    </h2>
+                    <p class="mt-1 text-sm text-ink-500">
+                        @if ($trip->available_seats < 1)
+                            Every seat is taken, but demand talks — join the list so the driver (and Ops) knows this ride is wanted.
+                        @else
+                            @if ($interestCount > 0)
+                                <strong>{{ $interestCount }}</strong> {{ $interestCount === 1 ? 'person wants' : 'people want' }} this trip. Register interest and when a seat frees up, book instantly.
+                            @else
+                                Be the first to register interest — the driver (and Ops) sees this ride is wanted.
+                            @endif
+                        @endif
+                    </p>
+                    @if ($myInterest)
+                        <p class="mt-3 inline-flex items-center gap-2 rounded-xl bg-forest-50 px-4 py-2 text-sm font-semibold text-forest-700">
+                            <span class="h-1.5 w-1.5 rounded-full bg-forest-500"></span> You're on the list
+                        </p>
+                    @else
+                        <form method="POST" action="{{ route('trips.interest', $trip) }}" class="mt-4">
+                            @csrf
+                            <button type="submit" class="w-full rounded-xl border border-forest-600 px-4 py-3 text-sm font-semibold text-forest-700 transition hover:bg-forest-50">
+                                @if ($trip->available_seats < 1)
+                                    Notify me when a seat frees up
+                                @else
+                                    I want this journey
+                                @endif
+                            </button>
+                        </form>
+                    @endif
                 </div>
             @endif
 

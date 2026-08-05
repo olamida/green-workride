@@ -47,12 +47,18 @@ class TripMatchingService
      * Upcoming bookable trips in the departure window, optionally by corridor.
      * Used by the web board where a passenger pickup point may not be known.
      *
+     * Live (active) trips always sort first, then soonest departure — the
+     * "leaving soon" boost so nothing already on the road gets buried under
+     * tomorrow's schedule. Each trip carries a `leaving_soon` flag for the
+     * board badge (departing within 30 minutes).
+     *
      * @param  bool|null  $womenOnly  when true, only women-only trips are returned
      * @return Collection<int, Trip>
      */
     public function upcoming(?Corridor $corridor = null, ?int $withinMinutes = null, ?bool $womenOnly = null): Collection
     {
         $withinMinutes ??= (int) config('workride.departure_window_minutes', 30);
+        $leavingSoonMinutes = (int) config('workride.departure_window_minutes', 30);
 
         $trips = Trip::query()
             ->whereIn('status', [TripStatus::Scheduled, TripStatus::Active])
@@ -61,8 +67,16 @@ class TripMatchingService
             ->when($corridor, fn ($query) => $query->where('corridor', $corridor))
             ->when($womenOnly, fn ($query) => $query->where('women_only', true))
             ->with(['driver', 'vehicle'])
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
             ->orderBy('departure_time')
             ->get();
+
+        $leavingCutoff = now()->addMinutes($leavingSoonMinutes);
+
+        $trips->each(function (Trip $trip) use ($leavingCutoff) {
+            $trip->leaving_soon = $trip->status === TripStatus::Active
+                || ($trip->departure_time !== null && $trip->departure_time->lte($leavingCutoff));
+        });
 
         $this->ratings->attachDriverRatingToTrips($trips);
 

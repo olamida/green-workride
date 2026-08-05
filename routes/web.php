@@ -168,6 +168,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/trips/{trip}/complete', [TripBoardController::class, 'complete'])->name('trips.complete');
     Route::post('/trips/{trip}/cancel', [TripBoardController::class, 'cancel'])->name('trips.cancel');
     Route::post('/trips/{trip}/messages', [TripBoardController::class, 'storeMessage'])->name('trips.messages');
+    Route::post('/trips/{trip}/interest', [TripBoardController::class, 'registerInterest'])->name('trips.interest');
     Route::post('/trips/{trip}/sos', [SafetyController::class, 'sos'])->name('trips.sos');
 
     Route::prefix('bookings')->name('bookings.')->group(function () {

@@ -199,6 +199,28 @@ class DemandService
         return DemandRequest::where('status', DemandRequestStatus::Pending)->count();
     }
 
+    /**
+     * Board demand snapshot: how many people want a ride right now (last 24h
+     * pending check-ins) and where they want to go. Drives the demand-aware
+     * empty state + the "How to book" live strip on the trip board.
+     */
+    public function demandSnapshot(): array
+    {
+        $rows = DemandRequest::query()
+            ->where('status', DemandRequestStatus::Pending)
+            ->where('requested_at', '>=', now()->subDay())
+            ->selectRaw('COALESCE(NULLIF(TRIM(destination_text), ""), "the CBD") as destination, SUM(passengers_count) as total')
+            ->groupBy('destination')
+            ->orderByDesc('total')
+            ->limit(3)
+            ->get();
+
+        return [
+            'people' => (int) $rows->sum('total'),
+            'top_destinations' => $rows->pluck('destination')->all(),
+        ];
+    }
+
     private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
         return $this->geofence->haversine($lat1, $lng1, $lat2, $lng2);

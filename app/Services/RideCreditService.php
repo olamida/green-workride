@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\RideCreditStatus;
+use App\Enums\TrustLedgerType;
 use App\Enums\VerificationLevel;
 use App\Models\Booking;
 use App\Models\RideCredit;
@@ -20,7 +21,10 @@ use Illuminate\Validation\ValidationException;
  */
 class RideCreditService
 {
-    public function __construct(private PricingService $pricing) {}
+    public function __construct(
+        private PricingService $pricing,
+        private TrustService $trust,
+    ) {}
 
     public function enabled(): bool
     {
@@ -89,7 +93,7 @@ class RideCreditService
 
         $dueDays = (int) config('workride.time_bank.due_days', 7);
 
-        return RideCredit::create([
+        $credit = RideCredit::create([
             'user_id' => $user->id,
             'trip_id' => $trip->id,
             'booking_id' => $booking->id,
@@ -99,6 +103,17 @@ class RideCreditService
             'due_date' => now()->addDays($dueDays),
             'status' => RideCreditStatus::Owed,
         ]);
+
+        // The Trust funded this float — record it for the auditor. Idempotent
+        // on TB-FLOAT-{bookingId}; a cancelled booking never reaches here.
+        $this->trust->credit(
+            TrustLedgerType::TimeBankFloat,
+            (float) $trip->fare_per_seat,
+            "TB-FLOAT-{$booking->id}",
+            ['user_id' => $user->id, 'trip_id' => $trip->id, 'booking_id' => $booking->id, 'seats_owed' => $credit->seats_owed],
+        );
+
+        return $credit;
     }
 
     /**
@@ -123,6 +138,18 @@ class RideCreditService
 
         $credit->increment('seats_repaid');
         $credit->refresh();
+
+        // Each repaid seat releases a share of the Trust float it was funded
+        // from. Idempotent on the booking reference so double-settle never
+        // double-releases.
+        $seatShare = round((float) $credit->fare_value / max($credit->seats_owed, 1), 2);
+        $bookingKey = $credit->booking_id ?? $credit->id;
+        $this->trust->debit(
+            TrustLedgerType::TimeBankFloat,
+            $seatShare,
+            "TB-REPAY-{$bookingKey}-{$credit->seats_repaid}",
+            ['user_id' => $driver->id, 'ride_credit_id' => $credit->id, 'seat' => $credit->seats_repaid],
+        );
 
         if ($credit->seats_repaid >= $credit->seats_owed) {
             $credit->update(['status' => RideCreditStatus::Repaid->value]);

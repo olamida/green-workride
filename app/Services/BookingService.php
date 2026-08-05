@@ -4,11 +4,14 @@ namespace App\Services;
 
 use App\Enums\BookingStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\TripInterestStatus;
 use App\Enums\TripStatus;
 use App\Events\BookingCancelled;
 use App\Events\BookingConfirmed;
+use App\Events\TripSeatsUpdated;
 use App\Models\Booking;
 use App\Models\Trip;
+use App\Models\TripInterest;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -103,8 +106,15 @@ class BookingService
                 }
 
                 $trip->decrement('available_seats');
+                $trip->refresh();
+
+                // An "I want this journey" interest becomes a real match.
+                TripInterest::where('trip_id', $trip->id)
+                    ->where('user_id', $passenger->id)
+                    ->update(['status' => TripInterestStatus::Matched, 'matched_at' => now()]);
 
                 event(new BookingConfirmed($booking->load('passenger')));
+                event(TripSeatsUpdated::forTrip($trip));
 
                 return $booking;
             });
@@ -146,8 +156,14 @@ class BookingService
             $this->employerLedger->refund($booking);
 
             $booking->trip->increment('available_seats');
+            $booking->trip->refresh();
+
+            TripInterest::where('trip_id', $booking->trip_id)
+                ->where('user_id', $booking->passenger_id)
+                ->update(['status' => TripInterestStatus::Pending, 'matched_at' => null]);
 
             event(new BookingCancelled($booking->fresh()));
+            event(TripSeatsUpdated::forTrip($booking->trip));
 
             return $booking->fresh();
         });
@@ -194,6 +210,9 @@ class BookingService
             }
 
             $booking->trip->increment('available_seats');
+            $booking->trip->refresh();
+
+            event(TripSeatsUpdated::forTrip($booking->trip));
 
             return $booking->fresh();
         });

@@ -6,6 +6,7 @@ use App\Enums\Corridor;
 use App\Events\NewChatMessage;
 use App\Http\Controllers\Controller;
 use App\Models\Trip;
+use App\Services\DemandService;
 use App\Services\RatingService;
 use App\Services\TripMatchingService;
 use App\Services\TripService;
@@ -20,7 +21,7 @@ class TripBoardController extends Controller
         private RatingService $ratings,
     ) {}
 
-    public function index(Request $request, TripMatchingService $matcher)
+    public function index(Request $request, TripMatchingService $matcher, DemandService $demand)
     {
         $corridor = $request->has('corridor') && $request->input('corridor')
             ? Corridor::from($request->input('corridor'))
@@ -41,7 +42,12 @@ class TripBoardController extends Controller
 
         $trips = $matcher->upcoming($corridor, $withinMinutes, $womenOnly);
 
-        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets'));
+        // Demand-aware board (section 9B): pending check-ins become the empty
+        // state's "N people want this journey" signal + the guide's live strip.
+        $demandSnapshot = $demand->demandSnapshot();
+        $nextTrip = $trips->first();
+
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip'));
     }
 
     public function create()
@@ -107,6 +113,8 @@ class TripBoardController extends Controller
         $myBooking = $user->bookings()->where('trip_id', $trip->id)->whereIn('status', ['requested', 'confirmed', 'boarded'])->first();
         $isParticipant = $trip->isParticipant($user);
         $womenOnlyBlocked = $trip->women_only && $user->gender !== 'female';
+        $myInterest = $trip->interests()->where('user_id', $user->id)->first();
+        $interestCount = $trip->interests()->where('status', 'pending')->count();
 
         return view('trips.show', compact(
             'trip',
@@ -117,7 +125,25 @@ class TripBoardController extends Controller
             'myBooking',
             'isParticipant',
             'womenOnlyBlocked',
+            'myInterest',
+            'interestCount',
         ));
+    }
+
+    /**
+     * "I want this journey" — a soft supply signal that never touches seats or
+     * money (section 2.2). Idempotent per (trip, user); upgrades to a real
+     * booking (matched) when the passenger books.
+     */
+    public function registerInterest(Request $request, Trip $trip)
+    {
+        try {
+            $this->trips->registerInterest($trip, $request->user());
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return back()->with('status', 'You’re on the interest list. When the driver confirms, book from the trip page.');
     }
 
     public function start(Request $request, Trip $trip)

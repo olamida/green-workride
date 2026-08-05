@@ -75,6 +75,11 @@ class Trip extends Model
         return $this->hasMany(Booking::class);
     }
 
+    public function interests(): HasMany
+    {
+        return $this->hasMany(TripInterest::class);
+    }
+
     public function chatMessages(): HasMany
     {
         return $this->hasMany(ChatMessage::class);

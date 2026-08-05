@@ -49,7 +49,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Animations silenced site-wide (config `WORKRIDE_ANIMATIONS=false`) — the animated SVG brand cards are gated out until the site-wide animation language is reviewed |
 | Feature modules | ✅ Site search button fixed — header ⌘K button no longer depends on Alpine `$dispatch` outside an `x-data` scope (native event dispatch) |
 | Feature modules | ✅ Docs pass complete — `WORKRIDE-DESIGN-REVIEWS.md` (critiques of the seeding-data prompt + plan-ahead/live-loading + Time-Bank + EV lease-to-own, with ADOPT/ADAPT/DEFER verdicts) · `WORKRIDE-USER-GUIDE.md` (role-based rider/driver/volunteer/MDA/ops guide) · `WORKRIDE-DEV-GUIDE.md` (world-class engineering standards + known-traps table) · `WORKRIDE-ROADMAP.md` (honest gap list of unimplemented spec items, priority-ranked with "done when" criteria) |
-| Tests | ✅ 384 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate)
+| Feature modules | ✅ Realtime board + demand-aware planning pass complete — Trip interest (idempotent `trip_interests` per trip+user, Pending→Matched on booking, revert on cancel) + live seat-counter channel (`TripSeatsUpdated` on the public `trips` channel, `board-live.js` seat/Full/book-link updates) + active-first "Leaving soon" sort + demand-aware empty state (`demandSnapshot` → "N people want this journey" + top destinations) + "How to book / Next departure" guide + interest panel on `trips/show` + Community Trust float ledger (`community_trust` table + `TrustService` credit/debit/balance, idempotent `TB-FLOAT-{bookingId}` on Time-Bank float creation + `TB-REPAY-{bookingId}-{seats}` on repayment) |
+| Tests | ✅ 395 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger)
 
 ---
 
@@ -706,6 +707,41 @@ Four companion docs so the spec stops being the only artifact. No schema/code ch
 
 **Tests:** no code change — 384 total, 1230 assertions remain green; `pint` clean.
 
+### 4.26 Realtime Board + Demand-Aware Planning + Community Trust Float Ledger (COMPLETE)
+
+The board stops being static between requests, and the Time-Bank float becomes auditable. Closes roadmap P1.3, P1.4, P1.5 and the ledger half of P3.3.
+
+**Schema (2 migrations):**
+- `create_community_trust_table` — `reference` (unique), `direction` (credit/debit), `type`, `amount`, `meta` json, `created_at` — the Trust float ledger ("who owes the Trust a seat, what the Trust paid for").
+- `create_trip_interests_table` — `trip_id` FK, `user_id` FK, `status` (default pending), `registered_at`, `notified_at`, `matched_at`; unique `[trip_id, user_id]`, index `[status, registered_at]`.
+
+**Enums (3 new):** `TripInterestStatus` (Pending/Notified/Matched), `TrustLedgerDirection` (Credit/Debit), `TrustLedgerType` (FloatIssued/FloatRepaid/FloatRefunded/FloatWaived).
+
+**Models (2):** `TripInterest` (`trip()`/`user()` + casts, idempotent per trip+user), `CommunityTrust` (table `community_trust`, reference-unique).
+
+**Services:**
+- `TripService::registerInterest(Trip, User)` — validates not-own-trip / not-completed-cancelled / not-departed; `updateOrCreate` on `[trip_id, user_id]` resetting to Pending with `registered_at = now()`.
+- `BookingService` — after a successful booking, upgrade the rider's interest to **Matched** (`matched_at`); on cancel, revert to **Pending** (clears `matched_at`); both fire `TripSeatsUpdated` for the live board.
+- `TripMatchingService::upcoming()` — reworked ordering: `ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, departure_time ASC`; each trip gets a dynamic `leaving_soon` flag (active, or departing within `workride.departure_window_minutes`).
+- `DemandService::demandSnapshot()` — pending `demand_requests` in the last 24 h → `['people' => int, 'top_destinations' => array]` for the board's live signal.
+- `TrustService` — idempotent `credit()`/`debit()` keyed on reference (no-op returns the existing row) + `balance(?type)`, gated on `workride.time_bank.enabled`.
+
+**Event + realtime client:**
+- `TripSeatsUpdated` (`app/Events`) — broadcasts `{trip_id, available_seats, total_seats}` on the public `trips` channel; static `forTrip(Trip)` factory; fired from `BookingService` on book and cancel.
+- `board-live.js` — Alpine `boardLive` component: `.TripSeatsUpdated` listener updates `[data-seats]` text with a gold flash, toggles `[data-seats-full]` ("Full" pill), and disables `[data-book-link]` when seats hit 0; also hears `.TripPublished` and marks the new trip live. Registered in `app.js`.
+
+**Wiring:**
+- `TripBoardController::index()` passes `$demandSnapshot`, `$nextTrip` (first upcoming), plus `?window=`/`?women_only=` filters; `show()` passes `$myInterest` + `$interestCount`. New `POST /trips/{trip}/interest` (`trips.interest`).
+- `trips/board.blade.php` — "How to book a seat" guide with **Next departure** (or demand-aware strip when empty), departure-window chips, trip cards with **Live now / Leaving soon / Book ahead** badges, demand-aware empty state ("N people want this journey" + top destinations + "Check in" / "I need a ride" links).
+- `trips/show.blade.php` — interest panel (not full/not my trip): "Trip is full", "I want this journey" register button, or "You're on the list" pill with live interest count.
+- `RideCreditService` — Time-Bank float creation credits the Trust (`TB-FLOAT-{bookingId}`) and repayment debits it (`TB-REPAY-{bookingId}-{seats}`, booking key fallback to credit id).
+
+**Bugs fixed during hardening:**
+- `board.blade.php` threw a Blade compile error (`unexpected token endif`) at runtime: a text-glued `right now@if (...)` — Blade's `\B@` directive regex requires non-word whitespace before `@`, so the inline `@if` stayed literal and its `@endif` orphaned. Moved `@if` onto its own line.
+- The four board tests all failed on that compile error (no cards rendered); the interest `matched`-on-cancel assertion also needed interest registered *before* booking, and the seat-broadcast test needed a funded wallet before a wallet booking could dispatch the event.
+
+**Tests (11 new — 395 total, 1254 assertions):** `TripInterestTest` — register interest, idempotent per trip+user, driver-own trip rejected, completed/departed rejected, booking upgrades to matched, cancel reverts to pending, demand-aware empty state, next-departure guide, active-first sort, leaving-soon/book-ahead badges, `TripSeatsUpdated` dispatch on wallet booking.
+
 ---
 
 ## 5. Issues Resolved
@@ -838,6 +874,12 @@ Four companion docs so the spec stops being the only artifact. No schema/code ch
 - **Fix:** Asserted the un-encoded sentence `Your connection dropped` instead.
 - **Status:** ✅ Resolved.
 
+### Blade compile error — `unexpected token "endif"` from a text-glued `@if`
+- **Symptom:** every `/trips` render 500'd — `syntax error, unexpected token "endif", expecting end of file` at `trips/board.blade.php:35`. The failure page itself only rendered because the *compiled* PHP was broken, yet `Blade::compileString()` on the same source returned OK.
+- **Root cause:** the view had `…want a ride right now@if (count($demandSnapshot['top_destinations']))`. Blade's directive regex is `\B@(?:…)` — a `@` glued directly after a word character (`now@`) is NOT a directive (it's treated as literal email-like text), so the `@if` stayed as literal markup while its paired `@endif` compiled to a real `<?php endif; ?>` — one orphaned `endif`.
+- **Fix:** moved `@if` onto its own line (preceded by whitespace) so `\B@` matches and the pair compiles balanced.
+- **Status:** ✅ Resolved — caught by the four board-rendering tests in `TripInterestTest`.
+
 ---
 
 ## 6. How to Work On This Project
@@ -913,6 +955,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Rich Demo Seeder Suite | 13-seeder 100-account operations-ready demo world + seeder test | ✅ Complete (v0.14.0) |
 | Trip Board Planning + Animations Off + Search Fix | 48h board window, window/women-only filters, "How to book" guide, book-ahead/live badges, animation gate, ⌘K fix | ✅ Complete (v0.15.0) |
 | Docs Pass | `WORKRIDE-DESIGN-REVIEWS.md` + `WORKRIDE-USER-GUIDE.md` + `WORKRIDE-DEV-GUIDE.md` + `WORKRIDE-ROADMAP.md` | ✅ Complete (v0.16.0) |
+| Realtime Board + Demand-Aware Planning | Trip interest (pending→matched/revert) + live seat-counter channel + active-first leaving-soon sort + demand-aware empty state + next-departure guide + Community Trust float ledger (`community_trust`, `TrustService`) | ✅ Complete |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -921,6 +964,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 4. ✅ DONE — Rich demo seeder suite (see §4.23); next: rider-facing driver scorecards
 5. ✅ DONE — Trip board planning + animations gate + search fix (see §4.24); next: live seat-counter channel (see `WORKRIDE-ROADMAP.md` 1.3)
 6. ✅ DONE — Docs pass (see §4.25); backlog lives in `WORKRIDE-ROADMAP.md`
+7. ✅ DONE — Realtime board + demand-aware planning + trust float ledger (see §4.26); next: Trust reconciliation report + ledger tests
 
 ---
 

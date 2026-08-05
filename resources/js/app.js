@@ -4,6 +4,7 @@ import tripChat from './trip-chat';
 import tripLive from './trip-live';
 import useRoadSensor from './use-road-sensor';
 import commandPalette from './command-palette';
+import boardLive from './board-live';
 
 window.Alpine = Alpine;
 
@@ -11,6 +12,7 @@ Alpine.data('tripChat', tripChat);
 Alpine.data('tripLive', tripLive);
 Alpine.data('roadSensor', useRoadSensor);
 Alpine.data('commandPalette', commandPalette);
+Alpine.data('boardLive', boardLive);
 
 Alpine.start();
 

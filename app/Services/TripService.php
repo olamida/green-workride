@@ -6,6 +6,7 @@ use App\Enums\BookingStatus;
 use App\Enums\Corridor;
 use App\Enums\MissionActivityType;
 use App\Enums\RewardTrigger;
+use App\Enums\TripInterestStatus;
 use App\Enums\TripStatus;
 use App\Events\TripCancelled;
 use App\Events\TripCompleted;
@@ -15,6 +16,7 @@ use App\Events\TripStarted;
 use App\Jobs\CalculateImpactJob;
 use App\Jobs\GenerateGtfsFeedJob;
 use App\Models\Trip;
+use App\Models\TripInterest;
 use App\Models\User;
 use App\Models\Vehicle;
 use Illuminate\Validation\ValidationException;
@@ -87,6 +89,31 @@ class TripService
         $this->queueGtfsRegeneration();
 
         return $trip->load('driver', 'vehicle', 'waypoints');
+    }
+
+    /**
+     * Passenger interest registration ("I want this journey", section 2.2).
+     * A soft signal that never touches seats or money; upgrades to a real
+     * booking (matched) when the passenger books. Idempotent per (trip, user).
+     */
+    public function registerInterest(Trip $trip, User $passenger): TripInterest
+    {
+        if ($trip->driver_id === $passenger->id) {
+            throw ValidationException::withMessages(['trip' => 'You cannot register interest in your own trip.']);
+        }
+
+        if (in_array($trip->status, [TripStatus::Completed, TripStatus::Cancelled], true)) {
+            throw ValidationException::withMessages(['trip' => 'This trip is no longer accepting interest.']);
+        }
+
+        if ($trip->departure_time?->isPast()) {
+            throw ValidationException::withMessages(['trip' => 'This trip has already departed.']);
+        }
+
+        return TripInterest::updateOrCreate(
+            ['trip_id' => $trip->id, 'user_id' => $passenger->id],
+            ['status' => TripInterestStatus::Pending, 'registered_at' => now()],
+        );
     }
 
     public function start(Trip $trip, User $driver, ?float $lat = null, ?float $lng = null): Trip

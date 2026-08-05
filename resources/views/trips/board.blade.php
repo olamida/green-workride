@@ -20,6 +20,20 @@
     {{-- How to book — first-time riders shouldn't have to guess. --}}
     <div class="mb-6 rounded-2xl border border-forest-200 bg-forest-50/60 p-5">
         <p class="font-heading text-sm font-semibold text-forest-900">How to book a seat</p>
+        @if ($nextTrip)
+            <p class="mt-1 text-sm text-forest-800">
+                <strong>Next departure:</strong>
+                {{ $nextTrip->route_name }} at {{ $nextTrip->departure_time->format('g:i A') }}
+                — {{ $nextTrip->available_seats }}/{{ $nextTrip->total_seats }} seats left.
+            </p>
+        @elseif ($demandSnapshot['people'] > 0)
+            <p class="mt-1 text-sm text-forest-800">
+                <strong>{{ $demandSnapshot['people'] }} people</strong> want a ride right now
+                @if (count($demandSnapshot['top_destinations']))
+                    (towards {{ implode(', ', $demandSnapshot['top_destinations']) }})
+                @endif — we’re matching. <a href="{{ route('demand.index') }}" class="font-semibold text-forest-700 underline hover:text-forest-900">Check in</a> so Ops knows where to send a bus.
+            </p>
+        @endif
         <ol class="mt-3 grid gap-3 text-sm text-ink-700 sm:grid-cols-3">
             <li class="flex gap-3">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-forest-600 font-mono text-xs font-bold text-white">1</span>
@@ -87,9 +101,9 @@
         @endif
     </div>
 
-    <div class="space-y-4">
+    <div class="space-y-4" x-data="boardLive">
         @forelse ($trips as $trip)
-            <a href="{{ route('trips.show', $trip) }}" class="group block rounded-2xl border border-ink-200 bg-white p-5 transition hover:border-forest-300 hover:shadow-md">
+            <a href="{{ route('trips.show', $trip) }}" data-trip-card="{{ $trip->id }}" class="group block rounded-2xl border border-ink-200 bg-white p-5 transition hover:border-forest-300 hover:shadow-md">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
@@ -104,6 +118,8 @@
                                 <span class="inline-flex items-center gap-1 rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700">
                                     <span class="h-1.5 w-1.5 rounded-full bg-forest-500"></span> Live now
                                 </span>
+                            @elseif (($trip->leaving_soon ?? false) && ! $trip->departure_time->gt(now()->addHour()))
+                                <span class="rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-semibold text-gold-800">Leaving soon</span>
                             @elseif ($trip->departure_time->gt(now()->addHour()))
                                 <span class="rounded-full bg-ink-100 px-2.5 py-0.5 text-xs font-semibold text-ink-600">Book ahead</span>
                             @endif
@@ -122,29 +138,55 @@
 
                 <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-ink-100 pt-4 text-sm text-ink-600">
                     <span>⏰ {{ $trip->departure_time->format('D, M j · g:i A') }}</span>
-                    <span>🚌 {{ $trip->available_seats }}/{{ $trip->total_seats }} seats</span>
+                    <span>🚌 <span data-seats class="font-mono font-semibold text-ink-900">{{ $trip->available_seats }}/{{ $trip->total_seats }}</span> seats</span>
+                    <span data-seats-full class="{{ $trip->available_seats > 0 ? 'hidden' : '' }} rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">Full</span>
                     <span>👤 {{ $trip->driver?->name }}</span>
                     @if ($trip->driver_rating_count)
                         <span class="text-gold-600">★ {{ number_format((float) $trip->driver_rating_avg, 1) }} ({{ $trip->driver_rating_count }})</span>
                     @endif
-                    <span class="ml-auto font-semibold text-forest-700 group-hover:underline">View &amp; book →</span>
+                    <span data-book-link class="ml-auto font-semibold text-forest-700 group-hover:underline">View &amp; book →</span>
                 </div>
             </a>
         @empty
             <div class="rounded-2xl border border-ink-200 bg-white px-6 py-10 text-center">
-                <p class="font-heading text-lg font-semibold text-ink-900">No trips in this window yet</p>
-                <p class="mx-auto mt-1 max-w-md text-sm text-ink-500">
-                    @if ($window === 'now')
-                        Nothing is leaving in the next 30 minutes. Try <a href="{{ route('trips.index', array_filter(['corridor' => $corridor?->value, 'window' => 'any'])) }}" class="font-semibold text-forest-600 hover:underline">Anytime (48h)</a> to plan a seat a day ahead.
+                <p class="font-heading text-lg font-semibold text-ink-900">
+                    @if ($demandSnapshot['people'] > 0)
+                        {{ $demandSnapshot['people'] }} people want this journey
                     @else
-                        The matcher keeps scanning. Check another corridor, widen the time window above, or be the first to publish on this route.
+                        No trips in this window yet
                     @endif
                 </p>
-                @if (auth()->user()->canDriveVolunteer())
-                    <a href="{{ route('trips.create') }}" class="mt-4 inline-block rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
-                        Publish a trip
+                <p class="mx-auto mt-1 max-w-md text-sm text-ink-500">
+                    @if ($demandSnapshot['people'] > 0)
+                        @if (count($demandSnapshot['top_destinations']))
+                            Demand is live for <strong>{{ implode(', ', $demandSnapshot['top_destinations']) }}</strong> — a driver is being matched.
+                        @else
+                            Demand is live and a driver is being matched.
+                        @endif
+                        <a href="{{ route('demand.index') }}" class="font-semibold text-forest-600 hover:underline">Check in at your junction</a> to strengthen the signal, or
+                        @if ($window === 'now')
+                            <a href="{{ route('trips.index', array_filter(['corridor' => $corridor?->value, 'window' => 'any'])) }}" class="font-semibold text-forest-600 hover:underline">plan ahead in the next 48h</a>.
+                        @else
+                            try another corridor or widen the time window above.
+                        @endif
+                    @else
+                        @if ($window === 'now')
+                            Nothing is leaving in the next 30 minutes. Try <a href="{{ route('trips.index', array_filter(['corridor' => $corridor?->value, 'window' => 'any'])) }}" class="font-semibold text-forest-600 hover:underline">Anytime (48h)</a> to plan a seat a day ahead.
+                        @else
+                            The matcher keeps scanning. Check another corridor, widen the time window above, or be the first to publish on this route.
+                        @endif
+                    @endif
+                </p>
+                <div class="mt-4 flex flex-wrap items-center justify-center gap-3">
+                    @if (auth()->user()->canDriveVolunteer())
+                        <a href="{{ route('trips.create') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
+                            Publish a trip
+                        </a>
+                    @endif
+                    <a href="{{ route('demand.index') }}" class="rounded-xl border border-forest-600 px-4 py-2 text-sm font-semibold text-forest-700 transition hover:bg-forest-50">
+                        I need a ride
                     </a>
-                @endif
+                </div>
             </div>
         @endforelse
     </div>
