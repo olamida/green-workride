@@ -22,6 +22,23 @@ class DatabaseSeeder extends Seeder
             Sprint8DemoSeeder::class,
             DemoMissionSeeder::class,
             DemoOpsSeeder::class,
+
+            // Rich demo data suite (guide WORKRIDE-PROMPT-SEEDING-DATA.md).
+            // Each Rich* seeder is idempotent (guarded by the demo001 marker),
+            // so re-running db:seed is always safe.
+            JunctionSeeder::class,
+            RichUserSeeder::class,
+            RichVerificationSeeder::class,
+            RichVehicleSeeder::class,
+            RichWalletSeeder::class,
+            RichTripSeeder::class,
+            RichBookingSeeder::class,
+            RichRideCreditSeeder::class,
+            RichTransferSeeder::class,
+            RichRoadSeeder::class,
+            RichDemandSeeder::class,
+            RichGtfsSeeder::class,
+            RichChatImpactSeeder::class,
         ]);
     }
 }
