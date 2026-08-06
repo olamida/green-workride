@@ -18,18 +18,23 @@
             </p>
         </div>
 
-        <div class="mt-5 grid gap-5 lg:grid-cols-3">
+        <div x-data="connectGuideUI()" class="mt-5 grid gap-5 lg:grid-cols-3">
             <div class="lg:col-span-2">
-                <div id="connect-guide-map" class="h-[460px] w-full overflow-hidden rounded-2xl border border-ink-200"
-                     style="z-index: 1;"></div>
+                <div id="connect-guide-map" x-ref="map"
+                     data-config="@json($config)" data-target="@json($target)"
+                     class="h-[460px] w-full overflow-hidden rounded-2xl border border-ink-200"
+                     style="z-index: 1;" role="region" aria-label="Map of your boarding point"></div>
 
-                <div data-guide-banner class="mt-4 rounded-2xl border border-forest-200 bg-white p-5">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
+                {{-- Overview — pin the vehicle, then hand over to the guide. --}}
+                <div x-show="mode === 'overview'" x-cloak
+                     class="wr-glass wr-scale-in mt-4 rounded-2xl p-5">
+                    <div class="flex flex-wrap items-end justify-between gap-3">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">
                                 Walking distance
                             </p>
-                            <p data-guide-distance class="mt-1 font-mono text-2xl font-semibold text-ink-900">
+                            <p data-guide-distance x-text="distance"
+                               class="mt-1 font-mono text-2xl font-semibold text-ink-900">
                                 {{ $target['lat'] !== null ? '—' : 'n/a' }}
                             </p>
                         </div>
@@ -37,15 +42,75 @@
                             <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">
                                 ETA to boarding
                             </p>
-                            <p data-guide-eta class="mt-1 font-mono text-2xl font-semibold text-ink-900">
+                            <p data-guide-eta x-text="eta"
+                               class="mt-1 font-mono text-2xl font-semibold text-ink-900">
                                 {{ $target['lat'] !== null ? '—' : 'n/a' }}
                             </p>
                         </div>
-                        <div class="w-full">
-                            <p data-guide-status class="text-sm font-medium text-ink-700">
-                                {{ $target['type'] === 'none' ? 'Waiting for the driver to share a location…' : 'Pin the vehicle on the map, then walk to the green dot.' }}
+                    </div>
+                    <p data-guide-status x-text="status" aria-live="polite"
+                       class="mt-3 text-sm font-medium text-ink-700"></p>
+                    @if ($target['lat'] !== null)
+                        <button type="button" x-on:click="start()" aria-expanded="false"
+                                class="mt-4 min-h-[44px] w-full rounded-xl bg-forest-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-forest-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-600">
+                            Start guide
+                        </button>
+                    @endif
+                </div>
+
+                {{-- Active — compact HUD while walking to the green dot. --}}
+                <div x-show="mode === 'active'" x-cloak class="wr-glass mt-4 rounded-2xl p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="h-2.5 w-2.5 rounded-full bg-forest-500 wr-pulse" aria-hidden="true"></span>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-ink-500">
+                                Approaching vehicle
                             </p>
                         </div>
+                        <p x-ref="hudDistance" x-text="distance" class="font-mono text-2xl font-semibold text-ink-900"></p>
+                        <p x-ref="hudEta" x-text="eta" class="font-mono text-2xl font-semibold text-ink-900"></p>
+                    </div>
+                    <p data-guide-status x-text="status" aria-live="polite"
+                       class="mt-2 text-sm font-medium text-ink-700"></p>
+                </div>
+
+                {{-- Arrived — you are here. --}}
+                <div x-show="mode === 'arrived'" x-cloak
+                     class="wr-glass wr-scale-in mt-4 rounded-2xl border-2 border-forest-500 p-5">
+                    <p class="font-heading text-lg font-semibold text-forest-700">
+                        You are here — wave to the driver.
+                    </p>
+                    <p class="mt-1 text-sm text-ink-600">
+                        The vehicle is within the pick-up radius. Head to the green dot and let the driver know you have arrived.
+                    </p>
+                    <a href="{{ route('trips.show', $trip) }}" x-on:click=""
+                       class="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-forest-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-forest-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-600">
+                        Open trip page
+                    </a>
+                </div>
+
+                {{-- Missed — the ride is gone; recover gracefully. --}}
+                <div x-show="mode === 'missed'" x-cloak class="wr-glass mt-4 rounded-2xl p-5">
+                    <p class="font-heading text-lg font-semibold text-ink-700">
+                        The ride is gone.
+                    </p>
+                    <p data-guide-status x-text="missedReason" aria-live="polite"
+                       class="mt-1 text-sm text-ink-600"></p>
+                    <div class="mt-4 flex flex-wrap gap-3">
+                        <a href="{{ route('trips.index') }}"
+                           class="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-forest-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-forest-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-600">
+                            Find another ride
+                        </a>
+                        <a href="{{ route('trips.show', $trip) }}"
+                           class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm font-semibold text-ink-800 transition-colors hover:bg-ink-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-600">
+                            Open trip page
+                        </a>
+                        @if ($trip->driver->phone)
+                            <a href="tel:{{ $trip->driver->phone }}"
+                               class="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm font-semibold text-ink-800 transition-colors hover:bg-ink-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-forest-600">
+                                Call driver
+                            </a>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -91,13 +156,4 @@
     </div>
 
     @vite(['resources/js/connect-guide.js'])
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            window.initConnectGuide(
-                document.getElementById('connect-guide-map'),
-                @json($config),
-                @json($target)
-            );
-        });
-    </script>
 @endsection

@@ -5,6 +5,7 @@ import tripLive from './trip-live';
 import useRoadSensor from './use-road-sensor';
 import commandPalette from './command-palette';
 import boardLive from './board-live';
+import connectGuideUI from './connect-guide-ui';
 
 window.Alpine = Alpine;
 
@@ -13,6 +14,7 @@ Alpine.data('tripLive', tripLive);
 Alpine.data('roadSensor', useRoadSensor);
 Alpine.data('commandPalette', commandPalette);
 Alpine.data('boardLive', boardLive);
+Alpine.data('connectGuideUI', connectGuideUI);
 
 Alpine.start();
 

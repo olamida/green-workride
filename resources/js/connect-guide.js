@@ -17,18 +17,57 @@ function prefersReducedMotion() {
 }
 
 /**
+ * Branded map pin — circular head (forest for the vehicle, blue for "you"),
+ * white ring and a small gold badge. The head carries a one-shot soft pulse
+ * when it appears or moves so motion stays purposeful (feedback, not a beat).
+ */
+function createPin(color, badge) {
+    const dot = badge
+        ? `<span class="wr-pin-badge">${badge}</span>`
+        : '<span class="wr-pin-dot"></span>';
+
+    return L.divIcon({
+        className: 'wr-pin-icon',
+        html: `<div class="wr-pin" style="--pin: ${color}"><div class="wr-pin-body">${dot}</div></div>`,
+        iconSize: [34, 40],
+        iconAnchor: [17, 40],
+        popupAnchor: [0, -36],
+    });
+}
+
+const quietPan = () => ({ animate: !prefersReducedMotion() });
+
+/**
  * Passenger-to-vehicle connect guide.
  *
  * Privacy rule: the map only ever shows THIS passenger's position and the
  * shared trip target (vehicle or boarding waypoint) — nothing else. Live
  * coordinates arrive only over the private `trip.{id}` channel, which Laravel
  * authorizes per-participant in routes/channels.php.
+ *
+ * UI contract: the function is stateless about presentation — it reports
+ * distance/ETA, status copy and terminal states through the `callbacks` the
+ * Alpine shell passes in. The shell owns the glass HUD, the number ticks and
+ * the arrived/missed panels.
  */
-export function initConnectGuide(element, config, target) {
+export function initConnectGuide(element, config, target, callbacks = {}) {
     if (!element) {
         return null;
     }
 
+    const onStatus = callbacks.onStatus || (() => {});
+    const onDistance = callbacks.onDistance || (() => {});
+    const onArrived = callbacks.onArrived || (() => {});
+    const onMissed = callbacks.onMissed || (() => {});
+
+    if (target.lat === null || target.lng === null) {
+        element.innerHTML =
+            '<div class="flex h-full items-center justify-center rounded-2xl border border-dashed border-ink-300 bg-paper/60 p-6 text-center text-sm text-ink-600">' +
+            'No boarding point shared yet — the driver has not pinned a location for this ride.</div>';
+        return null;
+    }
+
+    const reduce = prefersReducedMotion();
     const map = L.map(element, {
         scrollWheelZoom: false,
     });
@@ -38,43 +77,43 @@ export function initConnectGuide(element, config, target) {
         maxZoom: 19,
     }).addTo(map);
 
-    const targetMarker = L.marker([target.lat, target.lng]).addTo(map);
+    const targetMarker = L.marker([target.lat, target.lng], {
+        icon: createPin('#2e7d32', 'B'),
+        title: target.label,
+    }).addTo(map);
     targetMarker.bindPopup(`<strong>${target.label}</strong>`);
     map.setView([target.lat, target.lng], config.zoom_overview);
 
+    let state = 'overview'; // overview → active → arrived | missed
     let passengerMarker = null;
     let routeLayer = null;
     let lastPassenger = null;
-    let distanceM = null;
-    let durationS = null;
 
-    const banner = document.querySelector('[data-guide-banner]');
-    const distanceEl = document.querySelector('[data-guide-distance]');
-    const etaEl = document.querySelector('[data-guide-eta]');
-    const statusEl = document.querySelector('[data-guide-status]');
+    const format = (distanceM, durationS) => ({
+        distance: `${Math.round(distanceM)} m`,
+        eta: `~${Math.ceil(durationS / 60)} min walk`,
+    });
 
-    const setStatus = (status) => {
-        if (statusEl) {
-            statusEl.textContent = status;
-            statusEl.setAttribute('aria-live', 'polite');
+    const ensureRouteVisible = () => {
+        if (!routeLayer || !routeLayer.getBounds || !routeLayer.getBounds().isValid()) {
+            return;
+        }
+        const bounds = routeLayer.getBounds();
+        if (!bounds.contains(passengerMarker.getLatLng())) {
+            map.fitBounds(bounds, { padding: [48, 48], ...quietPan() });
         }
     };
 
     const updateBanner = (route) => {
-        distanceM = route.distance_m;
-        durationS = route.duration_s;
-
-        const mins = Math.ceil(durationS / 60);
-        if (distanceEl) {
-            distanceEl.textContent = `${Math.round(distanceM)} m`;
+        if (state !== 'active') {
+            return;
         }
-        if (etaEl) {
-            etaEl.textContent = `~${mins} min walk`;
-        }
+        onDistance(format(route.distance_m, route.duration_s));
 
-        if (distanceM <= config.arrived_radius_m) {
-            setStatus('You have arrived — the vehicle is within the pick-up radius.');
-            map.panTo([target.lat, target.lng], { animate: !prefersReducedMotion() });
+        if (route.distance_m <= config.arrived_radius_m) {
+            state = 'arrived';
+            onArrived();
+            map.panTo([target.lat, target.lng], quietPan());
         }
     };
 
@@ -85,13 +124,12 @@ export function initConnectGuide(element, config, target) {
         routeLayer = L.polyline(points, {
             color: '#2E7D32',
             weight: 4,
-            dashArray: '6 8',
             lineCap: 'round',
+            opacity: 0.95,
+            className: 'wr-route-line',
         }).addTo(map);
-        if (routeLayer.getBounds && routeLayer.getBounds().isValid()) {
-            map.fitBounds(routeLayer.getBounds(), { padding: [48, 48], animate: !prefersReducedMotion() });
-        }
-        setStatus(`Walking route ready${provider && provider !== 'osrm' ? ` · ${provider}` : ''}.`);
+        ensureRouteVisible();
+        onStatus(`Walking route ready${provider && provider !== 'osrm' ? ` · ${provider}` : ''}.`);
     };
 
     const fetchRoute = async (pos) => {
@@ -103,20 +141,38 @@ export function initConnectGuide(element, config, target) {
         return res.json();
     };
 
+    const pulsePin = (marker) => {
+        const body = marker.getElement()?.querySelector('.wr-pin-body');
+        if (!body) {
+            return;
+        }
+        body.classList.remove('wr-pin-soft', 'wr-pin-move');
+        void body.offsetWidth;
+        body.classList.add('wr-pin-soft');
+    };
+
     const updatePassenger = async (pos) => {
         if (!passengerMarker) {
             passengerMarker = L.marker([pos.lat, pos.lng], {
+                icon: createPin('#2563eb'),
                 title: 'You',
             }).addTo(map);
             passengerMarker.bindPopup('<strong>You</strong>');
+            pulsePin(passengerMarker);
         } else {
             passengerMarker.setLatLng([pos.lat, pos.lng]);
         }
 
-        if (
-            lastPassenger &&
-            haversine(lastPassenger, pos) < config.re_route_threshold_m
-        ) {
+        if (state === 'overview') {
+            // Quiet estimate while the guide is still in overview — no fetch,
+            // no camera movement, no polylines. The number ticks when it updates.
+            const distanceM = haversine(pos, target);
+            const durationS = Math.round(distanceM / ((config.walking_speed_kmh / 3.6) || 1.39));
+            onDistance(format(distanceM, durationS));
+            return;
+        }
+
+        if (lastPassenger && haversine(lastPassenger, pos) < config.re_route_threshold_m) {
             return;
         }
         lastPassenger = pos;
@@ -127,9 +183,10 @@ export function initConnectGuide(element, config, target) {
             drawRoute(route.points, route.provider);
         } catch {
             // Routing provider unreachable — show the straight-line estimate.
+            const distanceM = haversine(pos, target);
             const straight = {
-                distance_m: haversine(pos, target),
-                duration_s: Math.round(haversine(pos, target) / ((config.walking_speed_kmh / 3.6) || 1.39)),
+                distance_m: distanceM,
+                duration_s: Math.round(distanceM / ((config.walking_speed_kmh / 3.6) || 1.39)),
                 points: [
                     [pos.lat, pos.lng],
                     [target.lat, target.lng],
@@ -141,6 +198,27 @@ export function initConnectGuide(element, config, target) {
         }
     };
 
+    const startFollow = () => {
+        if (state !== 'overview') {
+            return;
+        }
+        state = 'active';
+
+        if (passengerMarker) {
+            map.fitBounds(
+                L.latLngBounds([passengerMarker.getLatLng(), targetMarker.getLatLng()]),
+                { padding: [48, 48], maxZoom: config.zoom_follow, ...quietPan() }
+            );
+        } else {
+            map.setView([target.lat, target.lng], config.zoom_follow);
+        }
+
+        if (lastPassenger) {
+            updatePassenger(lastPassenger);
+        }
+        onStatus('Walking to the green dot — follow the route.');
+    };
+
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition(
             (pos) => {
@@ -150,7 +228,7 @@ export function initConnectGuide(element, config, target) {
                 });
             },
             () => {
-                setStatus('Location unavailable — showing the boarding point. Check the map or the driver chat.');
+                onStatus('Location unavailable — showing the boarding point. Check the map or the driver chat.');
             },
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
         );
@@ -158,29 +236,45 @@ export function initConnectGuide(element, config, target) {
 
     const followTarget = (lat, lng) => {
         targetMarker.setLatLng([lat, lng]);
-        map.panTo([lat, lng], { animate: !prefersReducedMotion() });
+        pulsePin(targetMarker);
+
+        if (state !== 'active') {
+            return;
+        }
+        if (lastPassenger) {
+            updatePassenger(lastPassenger);
+        }
+        ensureRouteVisible();
+        onStatus('Vehicle position updated.');
+    };
+
+    const miss = (reason) => {
+        if (state === 'arrived' || state === 'missed') {
+            return;
+        }
+        state = 'missed';
+        onMissed(reason);
     };
 
     if (window.Echo) {
         window.Echo.private(`trip.${config.trip_id}`)
             .listen('.TripLocationUpdated', (e) => {
                 followTarget(e.current_lat, e.current_lng);
-                setStatus('Vehicle position updated.');
             })
             .listen('.TripCancelled', () => {
-                setStatus('This ride has been cancelled by the driver.');
+                miss('The driver cancelled this ride.');
             })
             .listen('.TripCompleted', () => {
-                setStatus('This ride has been completed — well done.');
+                miss('The ride departed — it is already on the road.');
             })
             .listen('.BookingCancelled', (e) => {
                 if (e.booking_id && Number(e.booking_id) === Number(config.my_booking_id)) {
-                    setStatus('Your booking was cancelled — this guide is no longer active.');
+                    miss('Your booking was cancelled — this guide is no longer active.');
                 }
             });
     }
 
-    return map;
+    return { startFollow };
 }
 
 if (typeof window !== 'undefined') {

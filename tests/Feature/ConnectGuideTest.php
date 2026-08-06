@@ -143,6 +143,42 @@ class ConnectGuideTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_guide_renders_overview_state_with_glass_hud_and_start_button(): void
+    {
+        $trip = $this->tripFor($this->driver(), [
+            'current_lat' => 9.05,
+            'current_lng' => 7.45,
+        ]);
+
+        $this->actingAs($trip->driver)
+            ->get("/trips/{$trip->id}/guide")
+            ->assertOk()
+            ->assertSee('connectGuideUI')
+            ->assertSee('Start guide')
+            ->assertSee('data-guide-distance')
+            ->assertSee('data-config')
+            ->assertSee('data-target')
+            ->assertSee('route_url')
+            ->assertSee('Approaching vehicle')
+            ->assertSee('hudDistance')
+            ->assertSee('You are here — wave to the driver.')
+            ->assertSee('The ride is gone.');
+    }
+
+    public function test_guide_without_shared_target_hides_start_button_and_shows_na(): void
+    {
+        $trip = $this->tripFor($this->driver(), [
+            'current_lat' => null,
+            'current_lng' => null,
+        ]);
+
+        $this->actingAs($trip->driver)
+            ->get("/trips/{$trip->id}/guide")
+            ->assertOk()
+            ->assertSee('n/a')
+            ->assertDontSee('Start guide');
+    }
+
     public function test_route_endpoint_returns_walking_route_for_participant(): void
     {
         $trip = $this->tripFor($this->driver(), [
