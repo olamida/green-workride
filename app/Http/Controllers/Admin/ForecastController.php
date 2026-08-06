@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\Corridor;
 use App\Enums\ForecastEventType;
 use App\Http\Controllers\Controller;
+use App\Jobs\CalculateDemandForecastJob;
 use App\Models\Forecast;
 use App\Services\ForecastService;
 use Illuminate\Http\Request;
@@ -14,15 +15,24 @@ use Illuminate\Validation\Rule;
 /**
  * Demand calendar (guide §9): the ops planner logs known events (FAAC, Juma'a,
  * rain) and the forecast service suggests how many extra vehicles each
- * corridor needs so we never deploy empty buses.
+ * corridor needs so we never deploy empty buses. Phase-2 learned predictions
+ * (CalculateDemandForecastJob) layer on top of the manual event calendar.
  */
 class ForecastController extends Controller
 {
     public function index(ForecastService $forecasts)
     {
         $events = $forecasts->upcoming(30);
+        $learned = $forecasts->learned(14);
 
-        return view('admin.forecasts.index', compact('events'));
+        return view('admin.forecasts.index', compact('events', 'learned'));
+    }
+
+    public function train(ForecastService $forecasts)
+    {
+        $written = (new CalculateDemandForecastJob)->handle();
+
+        return back()->with('status', 'Forecast job trained on bookings history — '.$written.' prediction cell(s) written/refreshed.');
     }
 
     public function store(Request $request, ForecastService $forecasts)

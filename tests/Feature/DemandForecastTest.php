@@ -6,9 +6,11 @@ use App\Enums\BookingStatus;
 use App\Enums\Corridor;
 use App\Enums\ForecastEventType;
 use App\Enums\UserRole;
+use App\Jobs\CalculateDemandForecastJob;
 use App\Jobs\CalculateDriverScoresJob;
 use App\Models\Booking;
 use App\Models\DemandRequest;
+use App\Models\Forecast;
 use App\Models\Junction;
 use App\Models\OdSurvey;
 use App\Models\ProbeDemandPoint;
@@ -18,6 +20,7 @@ use App\Models\Workplace;
 use App\Services\DemandService;
 use App\Services\ForecastService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class DemandForecastTest extends TestCase
@@ -271,5 +274,109 @@ class DemandForecastTest extends TestCase
             'rides_completed' => 1,
             'green_points_earned' => 50,
         ]);
+    }
+
+    // --- Phase 2: learned demand forecast job (guide §9) ---
+
+    private function bookingInLast4Weeks(string $corridor, Carbon $date, int $hour): void
+    {
+        $trip = Trip::factory()->create(['corridor' => $corridor]);
+
+        Booking::factory()->create([
+            'trip_id' => $trip->id,
+            'created_at' => $date->copy()->setTime($hour, 0),
+            'status' => BookingStatus::Completed,
+            'fare_paid' => 600,
+        ]);
+    }
+
+    public function test_demand_forecast_job_trains_on_same_weekday_hour_history(): void
+    {
+        $corridor = Corridor::KubwaCbd->value;
+        $target = today();
+
+        foreach (range(1, 4) as $weeksAgo) {
+            $this->bookingInLast4Weeks($corridor, $target->copy()->subWeeks($weeksAgo), 8);
+        }
+
+        $written = (new CalculateDemandForecastJob(forDate: $target->toDateString(), days: 1))->handle();
+
+        $this->assertGreaterThan(0, $written);
+        $this->assertDatabaseHas('demand_forecasts', [
+            'date' => $target->startOfDay()->toDateTimeString(),
+            'hour' => 8,
+            'corridor' => $corridor,
+            'baseline' => 1.0, // 4 same-weekday-8am bookings / 4 weeks
+            'multiplier' => 1.0,
+            'predicted' => 1.0,
+            'data_points' => 4,
+        ]);
+    }
+
+    public function test_demand_forecast_job_applies_event_multiplier(): void
+    {
+        $corridor = Corridor::KubwaCbd->value;
+        $target = today()->addDays(1);
+
+        foreach (range(1, 4) as $weeksAgo) {
+            $this->bookingInLast4Weeks($corridor, $target->copy()->subWeeks($weeksAgo), 7);
+        }
+
+        Forecast::create([
+            'date' => $target->toDateString(),
+            'event_type' => ForecastEventType::Govt,
+            'event_name' => 'FAAC week',
+            'corridor' => $corridor,
+            'expected_demand_multiplier' => 1.6,
+            'recommended_extra_vehicles' => 1,
+        ]);
+
+        (new CalculateDemandForecastJob(forDate: $target->toDateString(), days: 1))->handle();
+
+        $this->assertDatabaseHas('demand_forecasts', [
+            'date' => $target->startOfDay()->toDateTimeString(),
+            'hour' => 7,
+            'corridor' => $corridor,
+            'baseline' => 1.0,
+            'multiplier' => 1.6,
+            'predicted' => 1.6,
+        ]);
+    }
+
+    public function test_learned_forecasts_roll_up_per_corridor_per_day(): void
+    {
+        $corridor = Corridor::KubwaCbd->value;
+        $target = today()->addDays(2);
+
+        foreach (range(1, 4) as $weeksAgo) {
+            $this->bookingInLast4Weeks($corridor, $target->copy()->subWeeks($weeksAgo), 8);
+            $this->bookingInLast4Weeks($corridor, $target->copy()->subWeeks($weeksAgo), 9);
+        }
+
+        (new CalculateDemandForecastJob(forDate: $target->toDateString(), days: 1))->handle();
+
+        $learned = app(ForecastService::class)->learned(14);
+
+        $this->assertNotEmpty($learned);
+
+        $row = collect($learned)->first(fn ($r) => $r['date'] === $target->toDateString() && $r['corridor'] === $corridor);
+
+        $this->assertNotNull($row);
+        $this->assertSame(2.0, $row['predicted']); // 1.0 (8am) + 1.0 (9am)
+    }
+
+    public function test_admin_can_trigger_the_forecast_job_from_the_calendar(): void
+    {
+        $this->actingAs($this->admin())
+            ->post('/admin/forecasts/train')
+            ->assertRedirect()
+            ->assertSessionHas('status', fn ($v) => str_contains($v, 'trained on bookings history'));
+    }
+
+    public function test_non_admin_cannot_trigger_the_forecast_job(): void
+    {
+        $this->actingAs($this->user())
+            ->post('/admin/forecasts/train')
+            ->assertForbidden();
     }
 }

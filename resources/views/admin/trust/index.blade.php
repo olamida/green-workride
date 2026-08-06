@@ -11,7 +11,10 @@
             share (guide §2.1). Every movement carries an idempotent reference and a running
             balance; this report rebuilds each balance from the entries and flags any drift.
         </p>
-        <a href="{{ route('admin.trust.export') }}" class="rounded-xl bg-forest-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-700">Export CSV →</a>
+        <div class="flex items-center gap-3">
+            <a href="{{ route('admin.trust.pay-it-forward') }}" class="rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-paper">Pay-it-forward →</a>
+            <a href="{{ route('admin.trust.export') }}" class="rounded-xl bg-forest-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-700">Export CSV →</a>
+        </div>
     </div>
 
     <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

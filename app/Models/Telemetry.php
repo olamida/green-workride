@@ -24,6 +24,8 @@ class Telemetry extends Model
         'fuel_level',
         'engine_fault_code',
         'harsh_braking',
+        'battery_soc',
+        'range_km',
         'recorded_at',
     ];
 
@@ -35,6 +37,8 @@ class Telemetry extends Model
             'speed' => 'decimal:2',
             'fuel_level' => 'decimal:2',
             'harsh_braking' => 'boolean',
+            'battery_soc' => 'decimal:2',
+            'range_km' => 'decimal:2',
             'recorded_at' => 'datetime',
         ];
     }

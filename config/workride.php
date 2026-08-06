@@ -195,6 +195,8 @@ return [
         'due_days' => env('WORKRIDE_RIDE_CREDIT_DUE_DAYS', 7),
         // Max seats a user may owe at once (blocks piling up debt).
         'max_owed_seats' => env('WORKRIDE_MAX_OWED_SEATS', 3),
+        // Days before due_date the overnight job nudges the debtor once.
+        'remind_within_days' => env('WORKRIDE_RIDE_CREDIT_REMIND_DAYS', 3),
     ],
 
     // P2P wallet transfer between verified colleagues (like PalmPay).
@@ -285,6 +287,13 @@ return [
     // telemetry. Asset-light: leases first, buy later.
     'fleet' => [
         'enabled' => (bool) env('FEATURE_FLEET', false),
+    ],
+
+    // EV lease-to-own schema seams (WORKRIDE-DESIGN-REVIEWS §4) — propulsion,
+    // battery telemetry, lease agreements, charging stations. DEFER the
+    // hardware; the finance layer is a fuel-price hedge, not a one-way bet.
+    'ev_lease' => [
+        'enabled' => (bool) env('FEATURE_EV_LEASE', false),
     ],
 
     // Stakeholder remittances (guide §10) — per-trip union shares. Make the

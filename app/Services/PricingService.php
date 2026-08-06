@@ -6,9 +6,14 @@ use App\Enums\Corridor;
 
 class PricingService
 {
+    public function __construct(
+        private SettingsService $settings,
+    ) {}
+
     /**
      * Fixed per-corridor fare — anti-surge.
-     * Volunteer rides are always free.
+     * Volunteer rides are always free. Runtime overrides from the Ops Control
+     * Tower (`/admin/settings`) win over the committed config default.
      */
     public function fareFor(Corridor $corridor, bool $isFreeVolunteer = false): float
     {
@@ -16,7 +21,8 @@ class PricingService
             return 0.0;
         }
 
-        return (float) (config("workride.max_fare_per_corridor.{$corridor->value}") ?? 800);
+        return $this->settings->fareFor($corridor->value)
+            ?? (float) (config("workride.max_fare_per_corridor.{$corridor->value}") ?? 800);
     }
 
     public function commission(float $fare): float

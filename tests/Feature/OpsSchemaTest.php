@@ -52,4 +52,28 @@ class OpsSchemaTest extends TestCase
         $this->assertSame(0.7, $service->defaultMultiplier(ForecastEventType::Mosque));
         $this->assertSame(1.4, $service->defaultMultiplier(ForecastEventType::Weather));
     }
+
+    public function test_ev_lease_schema_seams_exist(): void
+    {
+        $this->assertTrue(Schema::hasTable('lease_agreements'));
+        $this->assertTrue(Schema::hasTable('charging_stations'));
+        $this->assertTrue(Schema::hasColumn('assets', 'propulsion'));
+        $this->assertTrue(Schema::hasColumn('telemetry', 'battery_soc'));
+        $this->assertTrue(Schema::hasColumn('telemetry', 'range_km'));
+
+        $leaseColumns = collect(Schema::getColumns('lease_agreements'))->pluck('name')->all();
+        foreach (['asset_id', 'driver_id', 'total_ngn', 'paid_ngn', 'per_km_ngn', 'fuel_baseline_ngn_per_litre', 'status', 'next_due_at'] as $column) {
+            $this->assertContains($column, $leaseColumns, "Missing lease_agreements column: {$column}");
+        }
+
+        $stationColumns = collect(Schema::getColumns('charging_stations'))->pluck('name')->all();
+        foreach (['name', 'lat', 'lng', 'kw', 'slots', 'is_available', 'corridor'] as $column) {
+            $this->assertContains($column, $stationColumns, "Missing charging_stations column: {$column}");
+        }
+    }
+
+    public function test_ev_lease_is_feature_gated(): void
+    {
+        $this->assertFalse(config('workride.ev_lease.enabled'));
+    }
 }

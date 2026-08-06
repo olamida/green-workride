@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RideCreditStatus;
 use App\Enums\TrustLedgerType;
 use App\Enums\UserRole;
 use App\Enums\VerificationLevel;
 use App\Models\CommunityTrust;
+use App\Models\RideCredit;
 use App\Models\User;
 use App\Services\TrustService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,6 +22,14 @@ class TrustLedgerTest extends TestCase
         return User::factory()->create([
             'role' => UserRole::Admin,
             'verification_level' => VerificationLevel::DriverVerified,
+        ]);
+    }
+
+    private function passenger(): User
+    {
+        return User::factory()->create([
+            'role' => UserRole::Passenger,
+            'verification_level' => VerificationLevel::WorkplaceVerified,
         ]);
     }
 
@@ -189,5 +199,80 @@ class TrustLedgerTest extends TestCase
         $this->assertSame('credit', $row[2]);
         $this->assertSame('600.00', $row[3]);
         $this->assertSame(['booking_id' => 42, 'seats' => 1], json_decode($row[6], true));
+    }
+
+    public function test_pay_it_forward_statement_renders_aggregates(): void
+    {
+        $user = User::factory()->create(['name' => 'Ada Nwosu']);
+
+        RideCredit::create([
+            'user_id' => $user->id,
+            'seats_owed' => 2,
+            'seats_repaid' => 1,
+            'fare_value' => 1200,
+            'due_date' => now()->addDays(7),
+            'status' => RideCreditStatus::Repaid,
+            'created_at' => now()->startOfMonth()->addDays(2),
+        ]);
+
+        RideCredit::create([
+            'user_id' => $user->id,
+            'seats_owed' => 1,
+            'seats_repaid' => 0,
+            'fare_value' => 600,
+            'due_date' => now()->subDay(),
+            'status' => RideCreditStatus::Overdue,
+            'created_at' => now()->startOfMonth()->addDays(3),
+        ]);
+
+        $response = $this->actingAs($this->admin())
+            ->get('/admin/trust/pay-it-forward');
+
+        $response->assertOk();
+        $response->assertSee('Pay-it-forward statement');
+        $response->assertSee('Ada Nwosu');
+        $response->assertSee('2');
+        $response->assertSee('1,800.00');
+        $response->assertSee('1');
+    }
+
+    public function test_pay_it_forward_rejects_bad_month(): void
+    {
+        $this->actingAs($this->admin())
+            ->get('/admin/trust/pay-it-forward?month=banana')
+            ->assertStatus(422);
+    }
+
+    public function test_pay_it_forward_is_admin_only(): void
+    {
+        $this->actingAs($this->passenger())
+            ->get('/admin/trust/pay-it-forward')
+            ->assertForbidden();
+
+        $this->actingAs($this->passenger())
+            ->get('/admin/trust/pay-it-forward/export')
+            ->assertForbidden();
+    }
+
+    public function test_pay_it_forward_csv_exports_credits(): void
+    {
+        $user = User::factory()->create(['name' => 'Chidi Eze']);
+
+        RideCredit::create([
+            'user_id' => $user->id,
+            'seats_owed' => 1,
+            'seats_repaid' => 0,
+            'fare_value' => 600,
+            'due_date' => now()->addDays(7),
+            'status' => RideCreditStatus::Owed,
+        ]);
+
+        $response = $this->actingAs($this->admin())
+            ->get('/admin/trust/pay-it-forward/export');
+
+        $response->assertOk();
+        $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('pay-it-forward-', $response->headers->get('Content-Disposition'));
+        $this->assertStringContainsString('Chidi Eze', $response->getContent());
     }
 }

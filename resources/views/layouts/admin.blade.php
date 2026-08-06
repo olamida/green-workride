@@ -38,6 +38,7 @@
                     <x-admin-nav-link :active="request()->routeIs('admin.stakeholders.*')" href="{{ route('admin.stakeholders.index') }}">Stakeholders</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.scoreboard.*')" href="{{ route('admin.scoreboard.index') }}">Driver Scores</x-admin-nav-link>
                     <x-admin-nav-link :active="request()->routeIs('admin.trust.*')" href="{{ route('admin.trust.index') }}">Community Trust</x-admin-nav-link>
+                    <x-admin-nav-link :active="request()->routeIs('admin.settings.*')" href="{{ route('admin.settings.index') }}">Settings</x-admin-nav-link>
                 </nav>
 
                 <div class="border-t border-ink-800 p-4 text-sm">

@@ -308,6 +308,50 @@ class EmployerTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_can_print_employer_report(): void
+    {
+        $employer = $this->employer();
+        $passenger = $this->passenger();
+        $this->enroll($employer, $passenger);
+        $this->book($this->bookableTrip(600), $passenger);
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+
+        $this->actingAs($admin)
+            ->get("/admin/employers/{$employer->id}/report")
+            ->assertOk()
+            ->assertSee('CO₂ & Subsidy Report')
+            ->assertSee($employer->name)
+            ->assertSee('₦600.00')
+            ->assertSee('CO₂ saved');
+    }
+
+    public function test_non_admin_cannot_view_employer_report(): void
+    {
+        $employer = $this->employer();
+        $passenger = $this->passenger();
+
+        $this->actingAs($passenger)
+            ->get("/admin/employers/{$employer->id}/report")
+            ->assertForbidden();
+    }
+
+    public function test_employer_report_aggregates_staff_and_rides(): void
+    {
+        $employer = $this->employer();
+        $passenger = $this->passenger();
+        $this->enroll($employer, $passenger);
+        $this->book($this->bookableTrip(600), $passenger);
+
+        $admin = User::factory()->create(['role' => UserRole::Admin]);
+
+        $this->actingAs($admin)
+            ->get("/admin/employers/{$employer->id}/report")
+            ->assertOk()
+            ->assertSee('Rides covered')
+            ->assertSee('Staff covered');
+    }
+
     private function enroll(Employer $employer, User $user): void
     {
         EmployerMember::create([

@@ -9,8 +9,10 @@ use App\Models\EmployerMember;
 use App\Models\Vehicle;
 use App\Models\Workplace;
 use App\Services\EmployerLedgerService;
+use App\Services\EmployerReportService;
 use App\Services\EmployerService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -68,6 +70,21 @@ class EmployerController extends Controller
         ];
 
         return view('admin.employers.show', compact('employer', 'wallet', 'stats'));
+    }
+
+    /**
+     * One-click printable CSR / subsidy report (roadmap 3.14, guide §11 #7) —
+     * the aggregate CO₂ + coverage statement an MDA takes into its renewal.
+     */
+    public function report(Request $request, Employer $employer, EmployerReportService $service)
+    {
+        $month = Carbon::parse($request->string('month', now()->format('Y-m')));
+
+        abort_unless(preg_match('/^\d{4}-\d{2}$/', $month->format('Y-m')), 422);
+
+        $data = $service->report($employer, $month);
+
+        return view('admin.employers.report', $data);
     }
 
     public function fund(Request $request, Employer $employer, EmployerLedgerService $ledger)

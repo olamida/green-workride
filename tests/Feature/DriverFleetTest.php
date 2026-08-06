@@ -8,6 +8,8 @@ use App\Enums\AssetType;
 use App\Enums\UserRole;
 use App\Enums\VerificationLevel;
 use App\Models\Asset;
+use App\Models\ChargingStation;
+use App\Models\LeaseAgreement;
 use App\Models\User;
 use App\Services\FleetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -226,5 +228,63 @@ class DriverFleetTest extends TestCase
             ->get('/trips/create')
             ->assertOk()
             ->assertSee('cleared to publish');
+    }
+
+    public function test_api_telemetry_accepts_ev_battery_fields(): void
+    {
+        $driver = $this->driver();
+        $asset = $this->asset($driver, AssetStatus::Active);
+
+        $this->actingAs($driver, 'sanctum')
+            ->postJson("/api/v1/fleet/{$asset->id}/telemetry", [
+                'speed' => 30,
+                'battery_soc' => 84.5,
+                'range_km' => 187.2,
+                'mileage' => 12600,
+            ])
+            ->assertCreated();
+
+        $sample = $asset->telemetry()->first();
+        $this->assertSame('84.50', $sample->battery_soc);
+        $this->assertSame('187.20', $sample->range_km);
+    }
+
+    public function test_ev_lease_agreement_and_charging_station_roundtrip(): void
+    {
+        $driver = $this->driver();
+        $asset = $this->asset($driver);
+        $asset->update(['propulsion' => 'ev']);
+
+        $lease = LeaseAgreement::create([
+            'asset_id' => $asset->id,
+            'driver_id' => $driver->id,
+            'total_ngn' => 8500000,
+            'paid_ngn' => 1200000,
+            'per_km_ngn' => 45,
+            'fuel_baseline_ngn_per_litre' => 1200,
+            'status' => 'active',
+            'next_due_at' => today()->addMonth(),
+        ]);
+
+        $this->assertSame('ev', $asset->fresh()->propulsion->value);
+        $this->assertSame(7300000.0, $lease->outstanding());
+        $this->assertSame(14, $lease->progressPercent());
+        $this->assertFalse($lease->status->isSettled());
+        $this->assertSame($asset->id, $lease->asset->id);
+        $this->assertSame($driver->id, $lease->driver->id);
+
+        $station = ChargingStation::create([
+            'name' => 'Kubwa Fast Charge',
+            'lat' => 9.08,
+            'lng' => 7.35,
+            'kw' => 120,
+            'slots' => 4,
+            'is_available' => true,
+            'corridor' => 'kubwa_cbd',
+        ]);
+
+        $this->assertDatabaseHas('charging_stations', ['name' => 'Kubwa Fast Charge', 'is_available' => 1]);
+        $this->assertSame(4, $station->slots);
+        $this->assertTrue($station->is_available);
     }
 }

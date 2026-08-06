@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips + PHPStan Gate + STEP 3 UI/UX Pass — Corridor Stats Hero + Payment Picker + My Rides Segments + Guide From-To & Voice + Roadmap P1 Closed — Seeder README + Google OAuth Tests + Rider-Facing Driver Scorecards)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips + PHPStan Gate + STEP 3 UI/UX Pass — Corridor Stats Hero + Payment Picker + My Rides Segments + Guide From-To & Voice + Roadmap P1 Closed — Seeder README + Google OAuth Tests + Rider-Facing Driver Scorecards + Roadmap P3 Closed — Employer CSR Report + Pay-it-Forward Statement + Forecast ML Job + EV Lease Seams + Ride-Credit Reminders + Corridor Fare Config UI)
 
 | Area | Status |
 |------|--------|
@@ -57,6 +57,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Tooling | ✅ PHPStan gate complete — Larastan level 8 over `app/` + generated `phpstan-baseline.neon` (971 snapshot entries); gate green, blocks new regressions, wired into the DoD ritual (`WORKRIDE-DEV-GUIDE.md` §5) |
 | Tests | ✅ 428 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger + connect guide / board map / foot-profile routing + guide states / branded pins / live corridor chips / seat-count ticks) |
 | Feature modules | ✅ STEP 3 UI/UX pass complete — corridor chip hero stats (`TripMatchingService::corridorStats` → per-corridor `· N trips · ₦min` on the board chips, live pulse preserved) + calm payment picker on `trips/show` (`x-payment-picker`: 56px tappable rows, checkmark, single Confirm-seat button, submit spinner, press feedback, free-ride label; posts a real `payment_method` for free rides since the controller validates `wallet|cash|subsidy_credit|ride_credit`) + My Rides segmented Active/Upcoming/Past control (`BookingController::index` grouping, `bookings/_booking-card` with Open Guide CTA + Cancel + Receipt + rating form) + connect guide from-to journey framing (`origin_text → boarding point` strip + Walk chip) + opt-in voice announcements (`x-guide-voice-toggle`, Web Speech, off by default, ~100 m distance nudges + arrived/missed messages, reduced-motion safe) + `OPENCODE_PROMPT_REBRAND.md` merged with `suggestion.txt` learnings (from-to/voice, open-source package shortlist, restrained motion principles, step status table) |
+| Feature modules | ✅ Roadmap P3 closed — Employer CSR report (3.14): `EmployerReportService` + `/admin/employers/{id}/report` printable monthly CO₂/fuel/trips/subsidy aggregate · Pay-it-forward statement (3.11): `/admin/trust/pay-it-forward` monthly rode/repaid/overdue/waived report + CSV export · Forecast ML job (3.9): `CalculateDemandForecastJob` trains 4-week same-weekday+hour baselines × event multipliers into `demand_forecasts` (14-day horizon, nightly + manual train) · EV lease-to-own schema seams (3.8, gated `FEATURE_EV_LEASE`): `assets.propulsion`, `telemetry.battery_soc`/`range_km`, `lease_agreements`, `charging_stations` · Ride-credit reminders (3.4): `SendRideCreditRemindersJob` + `RideCreditDueSoon` (database + log) with idempotent `reminder_sent_at` · Corridor fare config UI (3.6): `settings` table + `SettingsService` + `/admin/settings` (override-first fares, blank restores default, `corridor_fare_updated` change-control trail) |
+| Tests | ✅ 428+ feature tests passing (… + employer CSR report + pay-it-forward statement + demand-forecast ML job + EV lease seams + ride-credit reminders + corridor fare config UI) |
 
 ## 3. Environment
 
@@ -835,6 +837,40 @@ Static-analysis quality gate wired into the DoD ritual. Tooling change only — 
 
 ---
 
+## 4.31 Roadmap P3 Closed — Employer CSR Report + Pay-it-Forward Statement + Forecast ML Job + EV Lease Seams + Ride-Credit Reminders + Corridor Fare Config UI (COMPLETE)
+
+The last six Priority-3 gap rows from `WORKRIDE-ROADMAP.md` (3.14, 3.11, 3.9, 3.8, 3.4, 3.6) are closed, so the P3 backlog is empty. All rows marked ✅ in the roadmap; each follows the "extend existing systems, never parallel ones" rule.
+
+**3.14 Employer CSR report (`EmployerReportService` + `EmployerController::report()`):**
+- `app/Services/EmployerReportService.php` — `monthly(Employer, Carbon $month)`: members count, trips, CO₂ saved, fuel saved, subsidy spent, per-workplace aggregate (companion of the individual CO₂/Fuel certificates).
+- `Admin\EmployerController::report(Request, Employer)` — month `Y-m` via `abort_unless` + `preg_match`; renders printable `admin/employers/report.blade.php` (branded sheet, monthly CO₂/fuel/trips/subsidy KPIs + member rides table, `@media print` friendly).
+- Routes `admin.employers.report` + "View monthly report →" button on `admin/employers/show.blade.php`. Tests: 14 / 57 assertions (non-admin 403, month validation, printable content).
+
+**3.11 Pay-it-forward Trust statement (`TrustController::payItForward()` + `exportPayItForward()`):**
+- `admin/trust/pay-it-forward.blade.php` — month picker + per-month totals: riders rode, seats repaid, overdue, waived (cash + seat volumes) with per-rider breakdown from `ride_credits`; the ledger KPI cards (float issued/released/outstanding) already existed from v0.18.0.
+- CSV export route + link on the report page. Routes `admin.trust.pay-it-forward` / `.export`. Tests: 16 / 57 assertions.
+
+**3.9 Forecast Phase-2 ML job (`CalculateDemandForecastJob`):**
+- Migration `create_demand_forecasts_table` (unique `[date, hour, corridor]`); `DemandForecast` model; `CalculateDemandForecastJob` trains the 4-week same-weekday+hour baseline of boarded/completed bookings, applies the corridor's `expected_demand_multiplier` from `forecasts`, upserts a 14-day horizon (hours 5–21) and deletes zero-baseline cells.
+- `ForecastService::learned(14)` reads predictions back; `ForecastController::train()` manual-train button + nightly 04:00 schedule in `routes/console.php`; "Learned predictions" table on the Demand Calendar. Tests: 18 / 49 assertions.
+
+**3.8 EV lease-to-own schema seams (feature-gated `FEATURE_EV_LEASE`):**
+- Migration `create_ev_lease_seams_table` — `assets.propulsion` (default `ice`), `telemetry.battery_soc`/`range_km`, `lease_agreements` (fuel baseline for the ROI story), `charging_stations`. Enums `AssetPropulsion`, `LeaseStatus`; models `LeaseAgreement` (`outstanding()`, `progressPercent()`), `ChargingStation`; `Asset`/`Telemetry` cast + fillable the new fields; `FleetController::telemetry()` + `FleetService::recordTelemetry()` persist battery + range.
+- Hardware / lease-owning stays DEFERred per `WORKRIDE-DESIGN-REVIEWS.md` Review 4 — only the schema seams land. Tests: schema assertions + gating + battery intake + lease/station roundtrip.
+
+**3.4 Ride-credit pre-due reminders:**
+- Migration `add_reminder_sent_at_to_ride_credits_table` (idempotency stamp); `RideCredit` fillable + cast; `RideCreditDueSoon` notification (database + log channels, mirroring `SendPhoneOtp`); `SendRideCreditRemindersJob` (status `owed`, `reminder_sent_at` null, due within `time_bank.remind_within_days` incl. due-today; overdue/repaid/waived never reminded); nightly 08:00 schedule passes the config value. Tests: 4 / 13 assertions via `assertSentToTimes`.
+
+**3.6 Corridor fare config UI (`/admin/settings`):**
+- Migration `create_settings_table` (unique `key`, `value`, `updated_by`); `Setting` model; `SettingsService` — `get/has/set/forget/fareFor(corridor)` override-first with config fallback, key prefix `max_fare_per_corridor.`.
+- `PricingService::fareFor()` now consults `SettingsService::fareFor()` first, so a DB override applies to every new trip with no deploy — the anti-surge cap stays enforceable in one place.
+- `Admin\SettingsController` — `index()` (per-corridor effective fare + override badge) + `store()` (validates `fares.*` numeric 100–5000, blank restores default, writes `corridor_fare_updated` change-control trail via `ActivityLog::log` with from/to).
+- View `admin/settings.blade.php`, routes `admin.settings.index|store`, "Settings" sidebar link. Tests: 6 / 27 assertions.
+
+**Tests:** 22 new across the six rows. Full suite re-run after `pint` + `npm run build` (see the commit gate).
+
+---
+
 ## 5. Issues Resolved
 
 ### Feature tests returning 404 on `/`
@@ -1050,6 +1086,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Community Trust Reconciliation Report | Control Tower `/admin/trust` (per-fund + net balance, float KPIs, from-scratch running-balance rebuild flagging drifted `balance_after`) + full-ledger CSV export + `TrustLedgerTest` | ✅ Complete (v0.18.0) |
 | Connect Guide + Map-First Board + Accessibility | Participant-only live connect guide (`/trips/{trip}/guide`, private channel, walking ETA) + Leaflet map-first trip board (corridor anchors, live seats into map) + a11y hardening (focus-visible, reduced-motion, 44px map controls, aria-live) | ✅ Complete (v0.19.0) |
 | Guide Motion & Branding + Live Corridor Chips | Connect guide three-state flow (overview → active HUD → arrived/missed) + branded pins + glass HUD + number ticks + motion tokens (reduced-motion-safe) + live corridor chip pulse + seat-count tick | ✅ Complete (v0.20.0) |
+| Roadmap P3 closed | Employer CSR report (3.14) + pay-it-forward statement (3.11) + forecast ML job (3.9) + EV lease schema seams (3.8) + ride-credit reminders (3.4) + corridor fare config UI (3.6) — P3 backlog now empty | ✅ Complete (v0.21.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -1062,6 +1099,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 8. ✅ DONE — Trust reconciliation report + ledger tests (see §4.27); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 9. ✅ DONE — Connect guide + map-first board + accessibility pass (see §4.28); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 10. ✅ DONE — Guide motion & branding + live corridor chips + seat-count tick (see §4.29); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+11. ✅ DONE — Roadmap P3 closed (see §4.31); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -1094,6 +1132,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.18.0` | Community Trust Reconciliation Report | Control Tower `/admin/trust` — net + per-fund credit/debit/balance, float issued/released/outstanding KPIs, from-scratch running-balance rebuild flagging drifted `balance_after` (0.005 tolerance) + recent-movements ledger + full-ledger CSV export (meta JSON round-trip) + sidebar link + `TrustLedgerTest` (12) | 407 (1298) | 2026-08-05 |
 | `v0.19.0` | Connect Guide + Map-First Board + Accessibility Pass | Participant-only live connect guide (`/trips/{trip}/guide` — Leaflet + private `trip.{id}` live driver/waypoint target, walking ETA via `RoutingService` foot profile + haversine × `route_factor` fallback, 50 m arrived, `guide_opened` audit log) · map-first trip board (live trips at coords, scheduled at corridor anchors, color legend, live seat-counter pushes into the map) · accessibility pass (`:focus-visible`, reduced-motion, 44×44 map controls, aria-live guide regions) — gated on `FEATURE_GUIDE` | 424 (1337) | 2026-08-06 |
 | `v0.20.0` | Guide Motion & Branding + Live Corridor Chips + Seat-Count Tick | Connect guide three-state flow (overview quiet straight-line estimate + Start guide → active glass HUD with 150 ms gold number ticks → arrived / missed terminal panels) · branded map pins (forest vehicle + gold "B", blue "You" dot; one/two-shot pulses while moving, never a constant beat) · solid 4 px forest polyline glow · motion tokens + `wr-pulse`/`wr-fade-in`/`wr-scale-in` + `.wr-glass` (all collapse under `prefers-reduced-motion`) · `connectGuideUI` Alpine shell owns the state machine + HUD via callbacks · live corridor chip `wr-pulse` dot (`TripMatchingService::liveCorridors()`) · seat counters carry corridor data + one-shot `wr-seat-tick` on `TripSeatsUpdated` | 428 (1361) | 2026-08-06 |
+| `v0.21.0` | Roadmap P3 closed | Employer CSR report (3.14) — `EmployerReportService` + `/admin/employers/{id}/report` printable · Pay-it-forward statement (3.11) — `/admin/trust/pay-it-forward` + CSV · Forecast ML job (3.9) — `CalculateDemandForecastJob` + `demand_forecasts` (14-day, nightly + manual) · EV lease schema seams (3.8, gated `FEATURE_EV_LEASE`) — `assets.propulsion`, `telemetry.battery_soc`, `lease_agreements`, `charging_stations` · Ride-credit reminders (3.4) — `SendRideCreditRemindersJob` + `RideCreditDueSoon` · Corridor fare config UI (3.6) — `settings` + `SettingsService` + `/admin/settings` (override-first fares, `PricingService::fareFor()` reads them, `corridor_fare_updated` trail) — P3 backlog empty | TBD (full suite) | 2026-08-06 |
 
 ---
 

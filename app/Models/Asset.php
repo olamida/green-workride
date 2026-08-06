@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AssetAcquisitionType;
+use App\Enums\AssetPropulsion;
 use App\Enums\AssetStatus;
 use App\Enums\AssetType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -33,6 +34,7 @@ class Asset extends Model
         'status',
         'assigned_driver_id',
         'corridor',
+        'propulsion',
         'notes',
     ];
 
@@ -42,6 +44,7 @@ class Asset extends Model
             'asset_type' => AssetType::class,
             'acquisition_type' => AssetAcquisitionType::class,
             'status' => AssetStatus::class,
+            'propulsion' => AssetPropulsion::class,
             'year' => 'integer',
             'purchase_cost' => 'decimal:2',
             'lease_monthly' => 'decimal:2',

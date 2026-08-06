@@ -29,6 +29,8 @@ class FleetController extends Controller
             'engine_fault_code' => ['nullable', 'string', 'max:20'],
             'harsh_braking' => ['nullable', 'boolean'],
             'mileage' => ['nullable', 'integer', 'min:0'],
+            'battery_soc' => ['nullable', 'numeric', 'between:0,100'],
+            'range_km' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $telemetry = $fleet->recordTelemetry($asset, $data);

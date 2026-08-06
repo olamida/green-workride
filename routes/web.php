@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\RatingController as AdminRatingController;
 use App\Http\Controllers\Admin\RewardController as AdminRewardController;
 use App\Http\Controllers\Admin\RoadController as AdminRoadController;
 use App\Http\Controllers\Admin\ScoreboardController;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StakeholderController;
 use App\Http\Controllers\Admin\SubsidyController;
 use App\Http\Controllers\Admin\TrustController;
@@ -223,6 +224,7 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/forecasts', [ForecastController::class, 'index'])->name('forecasts.index');
         Route::post('/forecasts', [ForecastController::class, 'store'])->name('forecasts.store');
+        Route::post('/forecasts/train', [ForecastController::class, 'train'])->name('forecasts.train');
 
         Route::get('/stakeholders', [StakeholderController::class, 'index'])->name('stakeholders.index');
         Route::post('/stakeholders/settle', [StakeholderController::class, 'settle'])->name('stakeholders.settle');
@@ -232,14 +234,20 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/trust', [TrustController::class, 'index'])->name('trust.index');
         Route::get('/trust/export', [TrustController::class, 'export'])->name('trust.export');
+        Route::get('/trust/pay-it-forward', [TrustController::class, 'payItForward'])->name('trust.pay-it-forward');
+        Route::get('/trust/pay-it-forward/export', [TrustController::class, 'exportPayItForward'])->name('trust.pay-it-forward.export');
 
         Route::get('/ratings', [AdminRatingController::class, 'index'])->name('ratings.index');
+
+        Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
+        Route::post('/settings', [SettingsController::class, 'store'])->name('settings.store');
 
         Route::get('/employers', [EmployerController::class, 'index'])->name('employers.index');
         Route::get('/employers/create', [EmployerController::class, 'create'])->name('employers.create');
         Route::post('/employers', [EmployerController::class, 'store'])->name('employers.store');
         Route::get('/employers/members/pending', [EmployerController::class, 'pendingMembers'])->name('employers.members.pending');
         Route::get('/employers/{employer}', [EmployerController::class, 'show'])->name('employers.show');
+        Route::get('/employers/{employer}/report', [EmployerController::class, 'report'])->name('employers.report');
         Route::get('/employers/{employer}/members', [EmployerController::class, 'members'])->name('employers.members');
         Route::get('/employers/{employer}/vehicles', [EmployerController::class, 'vehicles'])->name('employers.vehicles');
         Route::post('/employers/{employer}/fund', [EmployerController::class, 'fund'])->name('employers.fund');

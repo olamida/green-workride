@@ -20,6 +20,7 @@ class RideCredit extends Model
         'fare_value',
         'due_date',
         'status',
+        'reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -29,6 +30,7 @@ class RideCredit extends Model
             'seats_repaid' => 'integer',
             'fare_value' => 'decimal:2',
             'due_date' => 'datetime',
+            'reminder_sent_at' => 'datetime',
             'status' => RideCreditStatus::class,
         ];
     }

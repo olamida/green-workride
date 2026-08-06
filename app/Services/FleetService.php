@@ -145,6 +145,8 @@ class FleetService
             'fuel_level' => $data['fuel_level'] ?? null,
             'engine_fault_code' => $data['engine_fault_code'] ?? null,
             'harsh_braking' => (bool) ($data['harsh_braking'] ?? false),
+            'battery_soc' => $data['battery_soc'] ?? null,
+            'range_km' => $data['range_km'] ?? null,
             'recorded_at' => now(),
         ]);
 

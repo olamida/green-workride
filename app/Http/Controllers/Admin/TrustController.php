@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\RideCreditStatus;
 use App\Enums\TrustLedgerDirection;
 use App\Enums\TrustLedgerType;
 use App\Http\Controllers\Controller;
 use App\Models\CommunityTrust;
+use App\Models\RideCredit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 /**
  * Community Trust reconciliation (guide §2.1 + §19 traceability): the auditable
@@ -103,6 +107,121 @@ class TrustController extends Controller
         return response(stream_get_contents($csv), 200, [
             'Content-Type' => 'text/csv',
             'Content-Disposition' => 'attachment; filename="community-trust-ledger.csv"',
+        ]);
+    }
+
+    /**
+     * Pay-it-forward statement (roadmap 3.11): who rode on Time-Bank this
+     * month, who repaid, who is overdue, who was waived — the board-governance
+     * view of the Trust float. One snapshot per month from the ride_credits
+     * rows plus the Trust ledger's float movements for the same window.
+     */
+    public function payItForward(Request $request)
+    {
+        $rawMonth = $request->string('month', now()->format('Y-m'));
+        abort_unless(preg_match('/^\d{4}-\d{2}$/', $rawMonth), 422);
+        $month = Carbon::parse($rawMonth);
+
+        $start = $month->copy()->startOfMonth();
+        $end = $month->copy()->endOfMonth();
+
+        $credits = RideCredit::with(['user', 'trip'])
+            ->whereBetween('created_at', [$start, $end])
+            ->orderBy('created_at')
+            ->get();
+
+        $floatIssued = (float) CommunityTrust::where('type', TrustLedgerType::TimeBankFloat)
+            ->where('direction', TrustLedgerDirection::Credit)
+            ->whereBetween('recorded_at', [$start, $end])
+            ->sum('amount');
+
+        $floatReleased = (float) CommunityTrust::where('type', TrustLedgerType::TimeBankFloat)
+            ->where('direction', TrustLedgerDirection::Debit)
+            ->whereBetween('recorded_at', [$start, $end])
+            ->sum('amount');
+
+        $rode = $credits->count();
+        $seatsOwed = $credits->sum('seats_owed');
+        $seatsRepaid = $credits->sum('seats_repaid');
+        $fareValue = round((float) $credits->sum('fare_value'), 2);
+
+        $byStatus = [
+            'repaid' => $credits->where('status', RideCreditStatus::Repaid)->count(),
+            'owed' => $credits->where('status', RideCreditStatus::Owed)->count(),
+            'overdue' => $credits->where('status', RideCreditStatus::Overdue)->count(),
+            'waived' => $credits->where('status', RideCreditStatus::Waived)->count(),
+        ];
+
+        $perUser = $credits
+            ->groupBy('user_id')
+            ->map(function ($rows) {
+                $first = $rows->first();
+
+                return [
+                    'name' => $first?->user?->name ?? 'Unknown',
+                    'email' => $first?->user?->email ?? '—',
+                    'credits' => $rows->count(),
+                    'seats_owed' => $rows->sum('seats_owed'),
+                    'seats_repaid' => $rows->sum('seats_repaid'),
+                    'fare_value' => round((float) $rows->sum('fare_value'), 2),
+                    'repaid' => $rows->where('status', RideCreditStatus::Repaid)->count(),
+                    'overdue' => $rows->where('status', RideCreditStatus::Overdue)->count(),
+                    'waived' => $rows->where('status', RideCreditStatus::Waived)->count(),
+                ];
+            })
+            ->values()
+            ->sortByDesc('fare_value')
+            ->values();
+
+        return view('admin.trust.pay-it-forward', compact(
+            'month',
+            'credits',
+            'floatIssued',
+            'floatReleased',
+            'rode',
+            'seatsOwed',
+            'seatsRepaid',
+            'fareValue',
+            'byStatus',
+            'perUser',
+        ));
+    }
+
+    public function exportPayItForward(Request $request)
+    {
+        $rawMonth = $request->string('month', now()->format('Y-m'));
+        abort_unless(preg_match('/^\d{4}-\d{2}$/', $rawMonth), 422);
+        $month = Carbon::parse($rawMonth);
+
+        $start = $month->copy()->startOfMonth();
+        $end = $month->copy()->endOfMonth();
+
+        $credits = RideCredit::with('user')
+            ->whereBetween('created_at', [$start, $end])
+            ->orderBy('created_at')
+            ->get();
+
+        $csv = fopen('php://temp', 'w');
+        fputcsv($csv, ['created_at', 'name', 'email', 'seats_owed', 'seats_repaid', 'fare_value', 'status', 'due_date']);
+
+        foreach ($credits as $credit) {
+            fputcsv($csv, [
+                $credit->created_at->toDateTimeString(),
+                $credit->user?->name ?? 'Unknown',
+                $credit->user?->email ?? '—',
+                $credit->seats_owed,
+                $credit->seats_repaid,
+                number_format((float) $credit->fare_value, 2, '.', ''),
+                $credit->status->value,
+                $credit->due_date?->toDateString() ?? '—',
+            ]);
+        }
+
+        rewind($csv);
+
+        return response(stream_get_contents($csv), 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="pay-it-forward-'.$month->format('Y-m').'.csv"',
         ]);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\ForecastEventType;
 use App\Models\Booking;
+use App\Models\DemandForecast;
 use App\Models\Forecast;
 use Illuminate\Support\Carbon;
 
@@ -90,5 +91,35 @@ class ForecastService
             ForecastEventType::Weather => 1.4,
             ForecastEventType::Mosque => 0.7,
         };
+    }
+
+    /**
+     * The learned Phase-2 predictions (written by CalculateDemandForecastJob),
+     * rolled up to per-corridor, per-day totals for the demand calendar.
+     */
+    public function learned(int $days = 14): array
+    {
+        return DemandForecast::query()
+            ->whereDate('date', '>=', today())
+            ->whereDate('date', '<=', today()->addDays($days))
+            ->orderBy('date')
+            ->orderBy('corridor')
+            ->get()
+            ->groupBy(fn (DemandForecast $f) => $f->date->toDateString().'|'.$f->corridor->value)
+            ->map(function ($rows) {
+                $first = $rows->first();
+
+                return [
+                    'date' => $first->date->toDateString(),
+                    'day_name' => $first->date->format('D'),
+                    'corridor' => $first->corridor->value,
+                    'corridor_label' => $first->corridor->label(),
+                    'predicted' => round((float) $rows->sum('predicted'), 1),
+                    'baseline' => round((float) $rows->sum('baseline'), 1),
+                    'peak_hour' => $rows->sortByDesc('predicted')->first()->hour,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

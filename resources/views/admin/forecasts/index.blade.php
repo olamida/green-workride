@@ -5,15 +5,56 @@
 @section('page', 'Demand Forecasting')
 
 @section('content')
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-start justify-between gap-4">
         <p class="max-w-xl text-sm text-ink-500">
             Guide §9 — Abuja demand follows religion, government cycles (FAAC/FEC/salary week),
             festivals, weather and fuel scarcity. Log events; the app suggests extra vehicles so
             we never deploy empty buses.
         </p>
+        <form method="POST" action="{{ route('admin.forecasts.train') }}">
+            @csrf
+            <button class="rounded-xl border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 hover:bg-paper">Train on history (14 days) →</button>
+        </form>
     </div>
 
     <div class="mt-6 overflow-hidden rounded-2xl border border-ink-200 bg-white">
+        <div class="flex items-center justify-between border-b border-ink-100 px-6 py-4">
+            <h2 class="font-heading font-semibold text-ink-900">Learned predictions <span class="text-xs font-normal text-ink-400">(Phase 2 — trained on boarded/completed booking history, nightly)</span></h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-ink-100">
+                <thead>
+                    <tr class="bg-paper text-left text-xs font-medium uppercase tracking-wider text-ink-400">
+                        <th class="px-5 py-3">Date</th>
+                        <th class="px-5 py-3">Corridor</th>
+                        <th class="px-5 py-3 text-right">Predicted rides</th>
+                        <th class="px-5 py-3 text-right">Baseline</th>
+                        <th class="px-5 py-3 text-right">Peak hour</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-ink-100">
+                    @forelse ($learned as $row)
+                        <tr>
+                            <td class="px-5 py-4 text-sm font-medium text-ink-900">{{ $row['date'] }} <span class="text-xs text-ink-400">{{ $row['day_name'] }}</span></td>
+                            <td class="px-5 py-4 text-xs capitalize text-ink-700">{{ str_replace('_', ' ', $row['corridor_label']) }}</td>
+                            <td class="px-5 py-4 text-right font-mono text-sm font-semibold text-forest-700">{{ number_format($row['predicted'], 1) }}</td>
+                            <td class="px-5 py-4 text-right font-mono text-sm text-ink-700">{{ number_format($row['baseline'], 1) }}</td>
+                            <td class="px-5 py-4 text-right font-mono text-sm text-ink-700">{{ $row['peak_hour'] }}:00</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="px-5 py-12 text-center text-sm text-ink-500">
+                                No learned predictions yet. Run "Train on history" (or wait for the nightly job) and the table will
+                                project demand from your booking history.
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mt-8 overflow-hidden rounded-2xl border border-ink-200 bg-white">
         <div class="border-b border-ink-100 px-6 py-4">
             <h2 class="font-heading font-semibold text-ink-900">Log a demand event</h2>
         </div>

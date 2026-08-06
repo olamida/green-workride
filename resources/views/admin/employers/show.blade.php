@@ -22,6 +22,12 @@
         </span>
     </div>
 
+    <div class="mt-4 flex items-center gap-3">
+        <a href="{{ route('admin.employers.report', $employer) }}" class="inline-flex items-center gap-1.5 rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
+            Print CO₂ &amp; subsidy report
+        </a>
+    </div>
+
     <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-2xl border border-ink-200 bg-white p-5">
             <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Wallet balance</p>
