@@ -40,6 +40,30 @@ parameters:
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
+			path: app/Events/BookingDeclined.php
+
+		-
+			message: '#^Method App\\Events\\BookingDeclined\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/BookingDeclined.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Events/BookingRequested.php
+
+		-
+			message: '#^Method App\\Events\\BookingRequested\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/BookingRequested.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
 			path: app/Events/NewChatMessage.php
 
 		-
@@ -91,6 +115,12 @@ parameters:
 			path: app/Events/TripLocationUpdated.php
 
 		-
+			message: '#^Method App\\Events\\TripLocationUpdated\:\:__construct\(\) has parameter \$progress with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/TripLocationUpdated.php
+
+		-
 			message: '#^Method App\\Events\\TripLocationUpdated\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -131,6 +161,18 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Events/TripStarted.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Events/WaypointReached.php
+
+		-
+			message: '#^Method App\\Events\\WaypointReached\:\:broadcastWith\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Events/WaypointReached.php
 
 		-
 			message: '#^Method App\\Http\\Controllers\\Admin\\AdminController\:\:index\(\) has no return type specified\.$#'
@@ -1713,7 +1755,7 @@ parameters:
 		-
 			message: '#^Cannot call method canBook\(\) on App\\Models\\User\|null\.$#'
 			identifier: method.nonObject
-			count: 1
+			count: 2
 			path: app/Http/Controllers/Web/BookingController.php
 
 		-
@@ -1725,6 +1767,12 @@ parameters:
 		-
 			message: '#^Cannot call method load\(\) on App\\Models\\User\|null\.$#'
 			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Web\\BookingController\:\:approve\(\) has no return type specified\.$#'
+			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Web/BookingController.php
 
@@ -1747,6 +1795,12 @@ parameters:
 			path: app/Http/Controllers/Web/BookingController.php
 
 		-
+			message: '#^Method App\\Http\\Controllers\\Web\\BookingController\:\:decline\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
 			message: '#^Method App\\Http\\Controllers\\Web\\BookingController\:\:index\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -1754,6 +1808,12 @@ parameters:
 
 		-
 			message: '#^Method App\\Http\\Controllers\\Web\\BookingController\:\:noShow\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Web\\BookingController\:\:request\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Web/BookingController.php
@@ -1771,7 +1831,19 @@ parameters:
 			path: app/Http/Controllers/Web/BookingController.php
 
 		-
+			message: '#^Parameter \#2 \$driver of method App\\Services\\BookingService\:\:approveRequest\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
 			message: '#^Parameter \#2 \$driver of method App\\Services\\BookingService\:\:board\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
+			message: '#^Parameter \#2 \$driver of method App\\Services\\BookingService\:\:declineRequest\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Web/BookingController.php
@@ -1784,6 +1856,12 @@ parameters:
 
 		-
 			message: '#^Parameter \#2 \$passenger of method App\\Services\\BookingService\:\:book\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
+			message: '#^Parameter \#2 \$passenger of method App\\Services\\BookingService\:\:requestToJoin\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Web/BookingController.php
@@ -2601,7 +2679,7 @@ parameters:
 		-
 			message: '#^Cannot access property \$id on App\\Models\\User\|null\.$#'
 			identifier: property.nonObject
-			count: 5
+			count: 6
 			path: app/Http/Controllers/Web/TripBoardController.php
 
 		-
@@ -4327,10 +4405,52 @@ parameters:
 			path: app/Models/Workplace.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Notifications/BookingRequested.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$route_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Notifications/BookingRequested.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/BookingRequested.php
+
+		-
 			message: '#^Access to an undefined property object\:\:\$email\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Notifications/EmployerWelcome.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$route_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Notifications/RequestApproved.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>route_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/RequestApproved.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$route_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Notifications/RequestDeclined.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>route_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/RequestDeclined.php
 
 		-
 			message: '#^Cannot call method format\(\) on string\.$#'
@@ -4351,6 +4471,12 @@ parameters:
 			path: app/Services/BookingService.php
 
 		-
+			message: '#^Call to function in_array\(\) with arguments string, array\{App\\Enums\\BookingStatus\:\:Requested\} and true will always evaluate to false\.$#'
+			identifier: function.impossibleType
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
 			message: '#^Call to function in_array\(\) with arguments string, array\{App\\Enums\\PaymentMethod\:\:Wallet, App\\Enums\\PaymentMethod\:\:SubsidyCredit\} and true will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
@@ -4359,7 +4485,7 @@ parameters:
 		-
 			message: '#^Call to function in_array\(\) with arguments string, array\{App\\Enums\\TripStatus\:\:Scheduled, App\\Enums\\TripStatus\:\:Active\} and true will always evaluate to false\.$#'
 			identifier: function.impossibleType
-			count: 1
+			count: 2
 			path: app/Services/BookingService.php
 
 		-
@@ -4387,6 +4513,12 @@ parameters:
 			path: app/Services/BookingService.php
 
 		-
+			message: '#^If condition is always true\.$#'
+			identifier: if.alwaysTrue
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
 			message: '#^Method App\\Services\\BookingService\:\:book\(\) has parameter \$data with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -4400,6 +4532,18 @@ parameters:
 
 		-
 			message: '#^Method App\\Services\\BookingService\:\:cancelBooking\(\) should return App\\Models\\Booking but returns App\\Models\\Booking\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Method App\\Services\\BookingService\:\:requestToJoin\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Method App\\Services\\BookingService\:\:requestToJoin\(\) should return App\\Models\\Booking but returns null\.$#'
 			identifier: return.type
 			count: 1
 			path: app/Services/BookingService.php
@@ -4449,11 +4593,17 @@ parameters:
 		-
 			message: '#^Result of static method Illuminate\\Database\\Connection\:\:transaction\(\) \(void\) is used\.$#'
 			identifier: staticMethod.void
-			count: 1
+			count: 2
 			path: app/Services/BookingService.php
 
 		-
 			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\BookingStatus\:\:Confirmed will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\BookingStatus\:\:Requested will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 2
 			path: app/Services/BookingService.php
@@ -4473,7 +4623,7 @@ parameters:
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
-			count: 3
+			count: 6
 			path: app/Services/BookingService.php
 
 		-
@@ -5947,9 +6097,69 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$distance_from_origin_km\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$is_major_hub\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$label\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lat\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lng\.$#'
+			identifier: property.notFound
+			count: 5
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$passenger\.$#'
 			identifier: property.notFound
 			count: 5
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pickup_lat\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$pickup_lng\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$reached_at\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sequence\.$#'
+			identifier: property.notFound
+			count: 1
 			path: app/Services/TripService.php
 
 		-
@@ -6001,6 +6211,12 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Method App\\Services\\TripService\:\:etaMinutes\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Method App\\Services\\TripService\:\:publish\(\) has parameter \$data with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -6043,6 +6259,12 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Method App\\Services\\TripService\:\:walkMinutes\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Parameter \#1 \$booking of method App\\Services\\BookingService\:\:cancelBooking\(\) expects App\\Models\\Booking, Illuminate\\Database\\Eloquent\\Model given\.$#'
 			identifier: argument.type
 			count: 1
@@ -6067,6 +6289,18 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Parameter \#1 \$trip of method App\\Services\\TripService\:\:calculateProgress\(\) expects App\\Models\\Trip, App\\Models\\Trip\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Parameter \#1 \$trip of method App\\Services\\TripService\:\:markReachedWaypoints\(\) expects App\\Models\\Trip, App\\Models\\Trip\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Parameter \#1 \$user of method App\\Services\\MissionService\:\:record\(\) expects App\\Models\\User, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
 			identifier: argument.type
 			count: 3
@@ -6085,6 +6319,18 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Parameter \#1 \$waypoint of method App\\Services\\TripService\:\:etaMinutesFromOrigin\(\) expects App\\Models\\TripWaypoint, Illuminate\\Database\\Eloquent\\Model given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Parameter \#2 \$to of method App\\Services\\TripService\:\:walkMinutes\(\) expects array\{lat\: float, lng\: float\}, array\{lat\: float, lng\: float\}\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Property App\\Services\\TripService\:\:\$rideCredits is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -6097,9 +6343,15 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\TripStatus\:\:Active will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
-			count: 1
+			count: 2
 			path: app/Services/TripService.php
 
 		-
@@ -6109,15 +6361,27 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\TripStatus\:\:Active will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
-			count: 2
+			count: 3
 			path: app/Services/TripService.php
 
 		-
 			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type Illuminate\\Database\\Eloquent\\Model\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
 			path: app/Services/TripService.php
 
 		-

@@ -87,6 +87,56 @@ class BookingController extends Controller
     }
 
     /**
+     * Share-request (Sprint 3 §3.4): rider asks to join a shared trip before
+     * committing money. The driver approves/declines from the ride or My Rides.
+     */
+    public function request(Request $request, Trip $trip)
+    {
+        abort_unless($request->user()->canBook(), 403, 'Verify your phone or workplace to request a seat.');
+
+        $data = $request->validate([
+            'share_code' => ['nullable', 'string', 'max:32'],
+        ]);
+
+        // Prefer the explicit form value, else the share page's session entry
+        // (set by SafetyController::share) which survives guest → login.
+        $data['share_code'] ??= $request->session()->pull("trip_share.{$trip->id}");
+
+        try {
+            $booking = $this->bookings->requestToJoin($trip, $request->user(), $data);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
+        }
+
+        $this->applyReferral($request, $trip, $booking);
+
+        return redirect()->route('bookings.index')
+            ->with('status', 'Request sent to the driver — your seat is held once they approve.');
+    }
+
+    public function approve(Request $request, Booking $booking)
+    {
+        try {
+            $this->bookings->approveRequest($booking, $request->user());
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return back()->with('status', 'Request approved — seat held.');
+    }
+
+    public function decline(Request $request, Booking $booking)
+    {
+        try {
+            $this->bookings->declineRequest($booking, $request->user());
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return back()->with('status', 'Request declined — the rider has been notified.');
+    }
+
+    /**
      * Attribute a booking made via a shared ride link to the sharer. The
      * referral is held in the session (set by the public share page) so it
      * survives a guest → login round-trip, and is consumed once here.

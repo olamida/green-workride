@@ -49,6 +49,41 @@
                     </div>
                 </div>
 
+                @php
+                    $minutesToDeparture = (int) ($timing['minutes_to_departure'] ?? 0);
+                    $etaNext = (int) ($timing['eta_to_next_waypoint_minutes'] ?? 0);
+                    $delay = (int) ($timing['delay_minutes'] ?? 0);
+                @endphp
+                <div class="mt-5 flex flex-wrap gap-2 border-t border-ink-100 pt-5 text-sm" aria-live="polite">
+                    @if ($trip->status->value === 'scheduled' && $minutesToDeparture >= 0)
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-forest-50 px-3 py-1.5 text-xs font-semibold text-forest-700">
+                            <x-icon name="clock" class="h-3.5 w-3.5" />
+                            Leaves in {{ $minutesToDeparture }} min
+                        </span>
+                    @endif
+                    @if ($trip->status->value === 'active')
+                        @if ($etaNext > 0)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-3 py-1.5 text-xs font-semibold text-gold-800">
+                                <x-icon name="map-pin" class="h-3.5 w-3.5" />
+                                Next: {{ $timing['next_waypoint_label'] ?? 'next stop' }} in {{ $etaNext }} min
+                            </span>
+                        @endif
+                        @if ($timing['eta_to_destination_minutes'] !== null)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-forest-100 px-3 py-1.5 text-xs font-semibold text-forest-800">
+                                <x-icon name="target" class="h-3.5 w-3.5" />
+                                ETA {{ $trip->destination_text }} ~{{ (int) $timing['eta_to_destination_minutes'] }} min
+                            </span>
+                        @endif
+                        @if ($delay > 5)
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700">
+                                <x-icon name="alert" class="h-3.5 w-3.5" />
+                                Delayed {{ $delay }} min
+                            </span>
+                        @endif
+                    @endif
+                </div>
+            </div>
+
                 <div class="mt-6 flex flex-wrap gap-2">
                     <div class="flex items-center gap-2 rounded-xl border border-ink-200 px-3 py-2">
                         <span class="flex h-8 w-8 items-center justify-center rounded-full bg-forest-100 font-heading text-sm font-bold text-forest-700">
@@ -101,15 +136,28 @@
             @php $waypoints = $trip->waypoints()->get(); @endphp
             @if ($waypoints->isNotEmpty())
                 <div class="rounded-2xl border border-ink-200 bg-white p-6">
-                    <h2 class="font-heading font-semibold text-ink-900">Waypoints</h2>
-                    <ol class="mt-4 space-y-3">
-                        @foreach ($waypoints as $waypoint)
-                            <li class="flex items-center gap-3 text-sm text-ink-700">
-                                <span class="flex h-6 w-6 items-center justify-center rounded-full bg-forest-100 font-mono text-xs font-semibold text-forest-700">{{ $waypoint->sequence }}</span>
-                                {{ $waypoint->label }}
-                            </li>
-                        @endforeach
-                    </ol>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <h2 class="font-heading font-semibold text-ink-900">Ride progress</h2>
+                        @if ($trip->status->value === 'active')
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-forest-50 px-3 py-1 text-xs font-semibold text-forest-700">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-forest-400 opacity-75"></span>
+                                    <span class="relative inline-flex h-2 w-2 rounded-full bg-forest-500"></span>
+                                </span>
+                                Live
+                            </span>
+                        @endif
+                    </div>
+                    <p class="mt-1 text-sm text-ink-500">
+                        {{ $trip->origin_text }} → {{ $trip->destination_text }}
+                    </p>
+
+                    <div class="mt-5">
+                        <x-trip.progress-tracker
+                            :progress="$progress"
+                            :live="$trip->status->value === 'active' ? ['available_seats' => $trip->available_seats] : false"
+                            :id="$trip->id" />
+                    </div>
                 </div>
             @endif
 
@@ -122,11 +170,31 @@
                                 <div>
                                     <p class="text-sm font-medium text-ink-800">{{ $booking->passenger?->name }}</p>
                                     <p class="text-xs text-ink-500">
-                                        {{ $booking->payment_method->label() }} · ₦{{ number_format((float) $booking->fare_paid, 2) }}
+                                        @if ($booking->status->value === 'requested')
+                                            <span class="inline-flex items-center gap-1">
+                                                <x-icon name="ticket" class="h-3.5 w-3.5" />
+                                                Requested to join
+                                                @if ($booking->share_code)
+                                                    · ride code {{ $booking->share_code }}
+                                                @endif
+                                            </span>
+                                        @else
+                                            {{ $booking->payment_method->label() }} · ₦{{ number_format((float) $booking->fare_paid, 2) }}
+                                        @endif
                                     </p>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <x-badge :status="$booking->status->value" />
+                                    @if ($booking->status->value === 'requested')
+                                        <form method="POST" action="{{ route('bookings.approve', $booking) }}">
+                                            @csrf
+                                            <button class="rounded-lg bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">Approve</button>
+                                        </form>
+                                        <form method="POST" action="{{ route('bookings.decline', $booking) }}">
+                                            @csrf
+                                            <button class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 transition hover:bg-red-50">Decline</button>
+                                        </form>
+                                    @endif
                                     @if ($booking->status->value === 'confirmed')
                                         <form method="POST" action="{{ route('bookings.board', $booking) }}">
                                             @csrf
@@ -223,6 +291,14 @@
                             Book a seat
                         @endif
                     </h2>
+                    <div class="mt-4">
+                        <x-ui.progress-wizard :steps="[
+                            ['label' => 'Destination', 'eta' => $trip->origin_text],
+                            ['label' => 'Options'],
+                            ['label' => 'Payment', 'eta' => 'seat held on confirm'],
+                            ['label' => 'Confirmed'],
+                        ]" :current="2" :show-time="true" />
+                    </div>
                     @if (! $trip->is_free_volunteer)
                         <p class="mt-1 text-sm text-ink-500">
                             Pay wallet, subsidy, cash or ride-credit. Fixed price {{ $trip->corridor->short() }} — no surge.
@@ -290,12 +366,19 @@
                     <h2 class="font-heading font-semibold text-ink-900">Your booking</h2>
                     <div class="mt-3 space-y-2 text-sm text-ink-700">
                         <p>Status: <x-badge :status="$myBooking->status->value" /></p>
-                        <p>Paid: ₦{{ number_format((float) $myBooking->fare_paid, 2) }} · {{ $myBooking->payment_method->label() }}</p>
+                        @if ($myBooking->status->value === 'requested')
+                            <p class="inline-flex items-center gap-1.5 rounded-xl bg-gold-50 px-3 py-2 text-gold-800">
+                                <x-icon name="ticket" class="h-4 w-4" />
+                                Request sent — the driver will approve or decline it. Your seat is held the moment they approve.
+                            </p>
+                        @else
+                            <p>Paid: ₦{{ number_format((float) $myBooking->fare_paid, 2) }} · {{ $myBooking->payment_method->label() }}</p>
+                        @endif
                     </div>
                     <form method="POST" action="{{ route('bookings.cancel', $myBooking) }}" class="mt-4">
                         @csrf
                         <button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
-                            Cancel booking
+                            {{ $myBooking->status->value === 'requested' ? 'Withdraw request' : 'Cancel booking' }}
                         </button>
                     </form>
                 </div>

@@ -80,6 +80,16 @@ return [
         'zoom_follow' => env('WORKRIDE_GUIDE_ZOOM_FOLLOW', 16),
     ],
 
+    // Live junction progress (Sprint 3). Waypoint rows may override the
+    // arrival radius per stop; ETA estimates degrade to straight-line at the
+    // configured cruising speed when the routing provider is unreachable.
+    'waypoint' => [
+        // Default geofence radius (m) for waypoint arrival detection.
+        'geofence_radius_m' => env('WORKRIDE_WAYPOINT_GEOFENCE_RADIUS_M', 100),
+        // Assumed cruising speed (km/h) for straight-line ETA fallbacks.
+        'avg_speed_kmh' => env('WORKRIDE_WAYPOINT_AVG_SPEED_KMH', 30),
+    ],
+
     // Fixed per-corridor fares (anti-surge). Naira per seat.
     'max_fare_per_corridor' => [
         'kubwa_cbd' => 800,

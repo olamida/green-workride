@@ -13,13 +13,19 @@ use App\Events\TripCompleted;
 use App\Events\TripLocationUpdated;
 use App\Events\TripPublished;
 use App\Events\TripStarted;
+use App\Events\WaypointReached;
 use App\Jobs\CalculateImpactJob;
 use App\Jobs\GenerateGtfsFeedJob;
+use App\Models\ActivityLog;
 use App\Models\Trip;
 use App\Models\TripInterest;
+use App\Models\TripWaypoint;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Notifications\WaypointReachedNotification;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class TripService
 {
@@ -32,6 +38,7 @@ class TripService
         private MissionService $missions,
         private FleetService $fleet,
         private StakeholderService $stakeholders,
+        private RoutingService $routing,
     ) {}
 
     public function publish(User $driver, array $data): Trip
@@ -145,9 +152,259 @@ class TripService
 
         $trip->update(['current_lat' => $lat, 'current_lng' => $lng]);
 
-        broadcast(new TripLocationUpdated($trip->fresh()));
+        $trip = $trip->fresh();
 
-        return $trip->fresh();
+        $this->markReachedWaypoints($trip);
+
+        broadcast(new TripLocationUpdated($trip, $this->calculateProgress($trip)));
+
+        return $trip;
+    }
+
+    /**
+     * Live junction progress for the shared tracker (spec §3.1). Pure read —
+     * never mutates. Reach detection/persistence lives in updateLocation().
+     *
+     * Each waypoint is resolved to passed / current / upcoming:
+     *   - passed: reached_at stamped (already crossed).
+     *   - current: the first waypoint not yet reached (the next stop).
+     *   - upcoming: everything after the current one.
+     *
+     * Distance from origin uses the stored backfill when present, else a
+     * Haversine from the first waypoint. ETA mirrors the stored eta_minutes,
+     * else distance ÷ configured cruising speed.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function calculateProgress(Trip $trip): array
+    {
+        $waypoints = $trip->waypoints()->orderBy('sequence')->get();
+
+        if ($waypoints->isEmpty()) {
+            return [];
+        }
+
+        $currentLat = $trip->current_lat !== null ? (float) $trip->current_lat : null;
+        $currentLng = $trip->current_lng !== null ? (float) $trip->current_lng : null;
+
+        $origin = $waypoints->first();
+        $originLat = (float) $origin->lat;
+        $originLng = (float) $origin->lng;
+
+        $currentAssigned = false;
+        $progress = [];
+
+        foreach ($waypoints as $waypoint) {
+            $reached = $waypoint->reached_at;
+
+            $within = false;
+            if ($currentLat !== null && $currentLng !== null) {
+                $distanceM = $this->geofence->haversine(
+                    $currentLat,
+                    $currentLng,
+                    (float) $waypoint->lat,
+                    (float) $waypoint->lng,
+                );
+                $within = $distanceM <= (float) ($waypoint->geofence_radius_m ?? config('workride.waypoint.geofence_radius_m', 100));
+            }
+
+            if ($reached || $within) {
+                $status = 'passed';
+            } elseif (! $currentAssigned) {
+                $status = 'current';
+                $currentAssigned = true;
+            } else {
+                $status = 'upcoming';
+            }
+
+            $distanceFromOrigin = $waypoint->distance_from_origin_km !== null
+                ? (float) $waypoint->distance_from_origin_km
+                : round($this->geofence->haversine($originLat, $originLng, (float) $waypoint->lat, (float) $waypoint->lng) / 1000, 2);
+
+            $progress[] = [
+                'id' => $waypoint->id,
+                'label' => $waypoint->label,
+                'lat' => (float) $waypoint->lat,
+                'lng' => (float) $waypoint->lng,
+                'sequence' => $waypoint->sequence,
+                'is_major_hub' => (bool) $waypoint->is_major_hub,
+                'eta' => $this->etaMinutesFromOrigin($waypoint, $distanceFromOrigin),
+                'eta_minutes' => $this->etaMinutesFromOrigin($waypoint, $distanceFromOrigin),
+                'distance' => $distanceFromOrigin,
+                'distance_from_origin_km' => $distanceFromOrigin,
+                'status' => $status,
+                'reached_at' => $reached?->toIso8601String(),
+                'within_geofence' => $within,
+            ];
+        }
+
+        return $progress;
+    }
+
+    /**
+     * Crossed-waypoint detection (spec §3.1 acceptance: fires when the vehicle
+     * passes within the arrival geofence while the trip is active). Persists
+     * reached_at, writes the change-control trail, broadcasts WaypointReached
+     * to the private channel and notifies participants. Idempotent per
+     * waypoint — already-reached stops are skipped.
+     */
+    public function markReachedWaypoints(Trip $trip): void
+    {
+        if ($trip->status !== TripStatus::Active) {
+            return;
+        }
+
+        $lat = $trip->current_lat !== null ? (float) $trip->current_lat : null;
+        $lng = $trip->current_lng !== null ? (float) $trip->current_lng : null;
+
+        if ($lat === null || $lng === null) {
+            return;
+        }
+
+        $waypoints = $trip->waypoints()->whereNull('reached_at')->orderBy('sequence')->get();
+
+        foreach ($waypoints as $waypoint) {
+            $distanceM = $this->geofence->haversine(
+                $lat,
+                $lng,
+                (float) $waypoint->lat,
+                (float) $waypoint->lng,
+            );
+
+            $radius = (float) ($waypoint->geofence_radius_m ?? config('workride.waypoint.geofence_radius_m', 100));
+
+            if ($distanceM > $radius) {
+                continue;
+            }
+
+            $waypoint->update(['reached_at' => now()]);
+
+            ActivityLog::log($trip->driver, 'waypoint_reached', Trip::class, $trip->id, [
+                'waypoint_id' => $waypoint->id,
+                'label' => $waypoint->label,
+                'sequence' => $waypoint->sequence,
+            ]);
+
+            broadcast(new WaypointReached($trip->fresh(), $waypoint->fresh()));
+
+            $participants = $trip->bookings()
+                ->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Boarded, BookingStatus::Completed])
+                ->get()
+                ->pluck('passenger')
+                ->push($trip->driver)
+                ->unique('id');
+
+            Notification::send($participants, new WaypointReachedNotification($trip->fresh(), $waypoint->fresh()));
+        }
+    }
+
+    /**
+     * Timing indicators (spec §3.2): countdown to departure, ETA to the
+     * passenger's pickup, destination, next waypoint, delay vs schedule and
+     * the walking time to the pickup. Every routing estimate degrades to a
+     * free straight-line fallback so the UI never 500s on provider outages.
+     *
+     * @return array<string, mixed>
+     */
+    public function getTimingAttributes(Trip $trip, ?User $userForPickup = null): array
+    {
+        $current = $trip->current_lat !== null && $trip->current_lng !== null
+            ? ['lat' => (float) $trip->current_lat, 'lng' => (float) $trip->current_lng]
+            : null;
+
+        $pickup = null;
+        if ($userForPickup) {
+            $booking = $trip->bookings()->where('passenger_id', $userForPickup->id)->first();
+            if ($booking?->pickup_lat !== null && $booking?->pickup_lng !== null) {
+                $pickup = ['lat' => (float) $booking->pickup_lat, 'lng' => (float) $booking->pickup_lng];
+            }
+        }
+
+        $progress = $this->calculateProgress($trip);
+        $currentWaypoint = collect($progress)->firstWhere('status', 'current');
+        $nextWaypoint = $currentWaypoint ? ['lat' => (float) $currentWaypoint['lat'], 'lng' => (float) $currentWaypoint['lng']] : null;
+
+        $destination = null;
+        $last = $trip->waypoints()->orderByDesc('sequence')->first();
+        if ($last?->lat !== null && $last?->lng !== null) {
+            $destination = ['lat' => (float) $last->lat, 'lng' => (float) $last->lng];
+        }
+
+        $departure = $trip->departure_time;
+
+        return [
+            'minutes_to_departure' => $departure ? now()->diffInMinutes($departure, false) : null,
+            'eta_to_pickup_minutes' => $current && $pickup ? $this->etaMinutes($current, $pickup) : null,
+            'eta_to_destination_minutes' => $current && $destination ? $this->etaMinutes($current, $destination) : null,
+            'eta_to_next_waypoint_minutes' => $current && $nextWaypoint ? $this->etaMinutes($current, $nextWaypoint) : null,
+            'delay_minutes' => $trip->status === TripStatus::Active && $departure
+                ? max(0, now()->diffInMinutes($departure, false))
+                : 0,
+            'time_to_pickup_walk_minutes' => $pickup && ($current ?? $nextWaypoint)
+                ? $this->walkMinutes($pickup, $current ?? $nextWaypoint)
+                : null,
+            'next_waypoint_label' => $currentWaypoint['label'] ?? null,
+            'progress' => $progress,
+        ];
+    }
+
+    /**
+     * ETA from origin (minutes) for a waypoint — stored stamp first, else
+     * distance ÷ configured cruising speed.
+     */
+    private function etaMinutesFromOrigin(TripWaypoint $waypoint, float $distanceKm): ?int
+    {
+        if ($waypoint->eta_minutes !== null) {
+            return $waypoint->eta_minutes;
+        }
+
+        $speed = (float) config('workride.waypoint.avg_speed_kmh', 30);
+
+        return $speed > 0 ? (int) round($distanceKm / $speed * 60) : null;
+    }
+
+    /**
+     * Driving ETA (minutes) between two points, with a free straight-line
+     * fallback when the routing provider is unreachable.
+     *
+     * @param  array{lat:float,lng:float}  $from
+     * @param  array{lat:float,lng:float}  $to
+     */
+    private function etaMinutes(array $from, array $to): ?int
+    {
+        try {
+            $route = $this->routing->route($from, $to, 'driving');
+
+            return (int) round($route['duration_s'] / 60);
+        } catch (Throwable) {
+            $distanceM = $this->geofence->haversine(
+                (float) $from['lat'],
+                (float) $from['lng'],
+                (float) $to['lat'],
+                (float) $to['lng'],
+            );
+
+            return (int) round($distanceM / ((float) config('workride.waypoint.avg_speed_kmh', 30) / 3.6) / 60);
+        }
+    }
+
+    /**
+     * Walking ETA (minutes) between two points using the guide's route factor
+     * and walking speed — same fallback math as the connect guide.
+     *
+     * @param  array{lat:float,lng:float}  $from
+     * @param  array{lat:float,lng:float}  $to
+     */
+    private function walkMinutes(array $from, array $to): ?int
+    {
+        $distanceM = $this->geofence->haversine(
+            (float) $from['lat'],
+            (float) $from['lng'],
+            (float) $to['lat'],
+            (float) $to['lng'],
+        ) * (float) config('workride.guide.route_factor', 1.25);
+
+        return (int) round($distanceM / ((float) config('workride.guide.walking_speed_kmh', 5) / 3.6) / 60);
     }
 
     public function completeTrip(Trip $trip, User $driver): Trip

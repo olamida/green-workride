@@ -7,6 +7,7 @@ import commandPalette from './command-palette';
 import boardLive from './board-live';
 import connectGuideUI from './connect-guide-ui';
 import paymentPicker from './payment-picker';
+import progressWizard from './progress-wizard';
 
 window.Alpine = Alpine;
 
@@ -17,6 +18,7 @@ Alpine.data('commandPalette', commandPalette);
 Alpine.data('boardLive', boardLive);
 Alpine.data('connectGuideUI', connectGuideUI);
 Alpine.data('paymentPicker', paymentPicker);
+Alpine.data('progressWizard', progressWizard);
 
 Alpine.start();
 

@@ -188,8 +188,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/{booking}/cancel', [BookingController::class, 'cancel'])->name('cancel');
         Route::post('/{booking}/board', [BookingController::class, 'board'])->name('board');
         Route::post('/{booking}/no-show', [BookingController::class, 'noShow'])->name('no-show');
+        Route::post('/{booking}/approve', [BookingController::class, 'approve'])->name('approve');
+        Route::post('/{booking}/decline', [BookingController::class, 'decline'])->name('decline');
     });
     Route::post('/trips/{trip}/book', [BookingController::class, 'book'])->name('bookings.store');
+    Route::post('/trips/{trip}/request', [BookingController::class, 'request'])->name('bookings.request');
 
     Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::get('/', [AdminController::class, 'index'])->name('dashboard');

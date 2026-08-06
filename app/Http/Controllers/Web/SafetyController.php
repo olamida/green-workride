@@ -36,6 +36,11 @@ class SafetyController extends Controller
             $request->session()->put("trip_referral.{$trip->id}", $ref);
         }
 
+        // Persist the ride's public share_code so a request-to-join survives
+        // the guest → login round-trip and lands on the booking as an audit
+        // link back to the shared link that produced it.
+        $request->session()->put("trip_share.{$trip->id}", $trip->share_code);
+
         return view('trips.share', compact('trip'));
     }
 

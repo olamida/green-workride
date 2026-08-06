@@ -16,6 +16,11 @@ class TripWaypoint extends Model
         'lat',
         'lng',
         'sequence',
+        'eta_minutes',
+        'is_major_hub',
+        'distance_from_origin_km',
+        'geofence_radius_m',
+        'reached_at',
     ];
 
     protected function casts(): array
@@ -24,6 +29,11 @@ class TripWaypoint extends Model
             'lat' => 'decimal:7',
             'lng' => 'decimal:7',
             'sequence' => 'integer',
+            'eta_minutes' => 'integer',
+            'is_major_hub' => 'boolean',
+            'distance_from_origin_km' => 'decimal:2',
+            'geofence_radius_m' => 'integer',
+            'reached_at' => 'datetime',
         ];
     }
 

@@ -95,7 +95,7 @@ Icons: ✅ shipped → extend · 🔧 merge doc intent with existing code · ➕
 - ✅ Share: `share_code` + QR + Web Share + `?ref=` session referral → `bookings.referred_by_user_id` + audit log.
 - ✅ Tests `NavigationTest` (8) — gate: `pint` + PHPStan L8 (baseline regenerated) + 474 tests green + build.
 
-### Sprint 3 — Live Progress + Timing + Wizards + Share Request
+### Sprint 3 — Live Progress + Timing + Wizards + Share Request ✅
 - ➕ Waypoint migration (`eta_minutes`, `is_major_hub`, `distance_from_origin_km`, `geofence_radius_m`, `reached_at`).
 - ➕ `TripService::calculateProgress()` + `getTimingAttributes()`; 🔧 extend `TripLocationUpdated` payload;
   ➕ `WaypointReached` event → `reached_at`, activity_log, DB/log notify.

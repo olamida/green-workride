@@ -18,6 +18,7 @@ class Booking extends Model
         'trip_id',
         'passenger_id',
         'referred_by_user_id',
+        'share_code',
         'pickup_lat',
         'pickup_lng',
         'status',

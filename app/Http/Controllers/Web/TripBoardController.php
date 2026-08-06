@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\Enums\BookingStatus;
 use App\Enums\Corridor;
 use App\Events\NewChatMessage;
 use App\Http\Controllers\Controller;
@@ -125,6 +126,21 @@ class TripBoardController extends Controller
         $myInterest = $trip->interests()->where('user_id', $user->id)->first();
         $interestCount = $trip->interests()->where('status', 'pending')->count();
 
+        // Live junction progress + timing indicators (spec §3.1/§3.2) — shared
+        // tracker + "Leaves in X mins / ETA … / Next: … in Y mins" everywhere.
+        $timing = $this->trips->getTimingAttributes($trip, $user);
+        $progress = $timing['progress'];
+
+        // Pending share-request approvals (spec §3.4): only the trip driver
+        // acts on them; riders see their own request status via $myBooking.
+        $pendingRequests = $trip->driver_id === $user->id
+            ? $trip->bookings()
+                ->where('status', BookingStatus::Requested)
+                ->with('passenger')
+                ->orderBy('created_at')
+                ->get()
+            : collect();
+
         // The booking form is shown to anyone who can book — except free
         // volunteer rides, which are a verified-worker benefit (phone-only
         // riders would otherwise see a form the service rejects).
@@ -143,6 +159,9 @@ class TripBoardController extends Controller
             'myInterest',
             'interestCount',
             'canBookForm',
+            'timing',
+            'progress',
+            'pendingRequests',
         ));
     }
 

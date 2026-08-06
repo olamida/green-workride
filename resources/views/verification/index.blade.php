@@ -10,6 +10,28 @@
         </p>
     </div>
 
+    @php
+        $verificationStep = $user->hasVerifiedPhone() ? 1 : 0;
+        if ((int) ($user->verification_level?->value ?? 0) >= 1) {
+            $verificationStep = 2;
+        }
+        if ((int) ($user->verification_level?->value ?? 0) >= 2) {
+            $verificationStep = 3;
+        }
+    @endphp
+    <div class="mb-6 rounded-2xl border border-ink-200 bg-white p-6">
+        <x-ui.progress-wizard :steps="[
+            ['label' => 'Phone', 'eta' => $user->hasVerifiedPhone() ? 'done' : '60 seconds'],
+            ['label' => 'Workplace', 'eta' => 'Level 1'],
+            ['label' => 'NIN', 'eta' => 'Level 2'],
+            ['label' => 'Driver docs', 'eta' => 'Level 3'],
+        ]" :current="$verificationStep" :show-time="true" />
+        <p class="mt-4 text-sm text-ink-500">
+            Each level unlocks more: phone books instantly · Level 1 unlocks subsidies, volunteer rides &amp; employer coverage ·
+            Level 2 unlocks ride-credit &amp; transfers · Level 3 lets you publish paid rides.
+        </p>
+    </div>
+
     @if (! $user->hasVerifiedPhone())
         <div class="mb-6 flex flex-col gap-4 rounded-2xl border border-forest-200 bg-forest-50 p-6 sm:flex-row sm:items-center sm:justify-between">
             <div>

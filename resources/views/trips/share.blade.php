@@ -80,9 +80,39 @@
                 </button>
             </div>
 
-            <a href="{{ route('login') }}" class="mt-4 block w-full rounded-xl bg-ink-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-ink-950" style="min-height:44px">
-                Sign in to book this seat
-            </a>
+            @php
+                $viewer = auth()->user();
+                $canRequest = $viewer
+                    && $viewer->canBook()
+                    && $viewer->id !== $trip->driver_id
+                    && in_array($trip->status->value, ['scheduled', 'active'], true)
+                    && $trip->available_seats > 0;
+            @endphp
+
+            @if ($canRequest)
+                <form method="POST" action="{{ route('bookings.request', $trip) }}" class="mt-6">
+                    @csrf
+                    <input type="hidden" name="share_code" value="{{ $trip->share_code }}">
+                    <button type="submit"
+                            class="block w-full rounded-xl bg-forest-600 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-forest-700"
+                            style="min-height:44px">
+                        Request to join this ride
+                    </button>
+                    <p class="mt-2 text-center text-xs text-ink-500">
+                        The driver approves or declines your request — you'll be notified either way. No payment taken now.
+                    </p>
+                </form>
+            @else
+                <a href="{{ route('login') }}" class="mt-4 block w-full rounded-xl bg-ink-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-ink-950" style="min-height:44px">
+                    @if ($viewer?->id === $trip->driver_id)
+                        You're driving this ride
+                    @elseif ($trip->available_seats < 1)
+                        This ride is full
+                    @else
+                        Sign in to book this seat
+                    @endif
+                </a>
+            @endif
 
             <p class="mt-3 text-center text-xs text-ink-400">
                 Scan the QR or open the link — anyone on this ride code can find it again from their trip board.
