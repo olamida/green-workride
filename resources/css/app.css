@@ -205,3 +205,43 @@
 [x-cloak] {
     display: none;
 }
+
+/*
+ * Accessibility hardening — see WORKRIDE-DEV-GUIDE.md §a11y.
+ * - Keyboard: every interactive element shows a visible, offset focus ring
+ *   (WCAG 2.4.7 / 1.4.11), independent of :focus-within styling.
+ * - Motion: `prefers-reduced-motion` collapses animation/transition/smooth
+ *   scroll to near-instant for vestibular-safety (WCAG 2.3.3). The connect
+ *   guide + trips map check the same flag in JS before pan/zoom animation.
+ * - Leaflet maps: pointer-events only on the zoom controls so the map never
+ *   traps a scrolling page; keyboard users get the list below the map.
+ */
+:focus-visible {
+    outline: 3px solid #2e7d32;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+.leaflet-control-attribution {
+    font-size: 10px;
+}
+
+.leaflet-container a {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+

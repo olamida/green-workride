@@ -22,13 +22,18 @@ class RoutingService
     public function __construct(private CostLogger $costs) {}
 
     /**
-     * Route from A to B. Returns [distance_m, duration_s, points].
+     * Route from A to B. Returns [distance_m, duration_s, points, provider].
+     *
+     * The connect guide (last-mile walking) calls this with `foot` so the
+     * OSRM host serves its walking profile; Google/Mapbox map it to their
+     * walking modes. Default `driving` keeps existing callers unchanged.
      *
      * @param  array{lat:float,lng:float}  $from
      * @param  array{lat:float,lng:float}  $to
-     * @return array{distance_m:float,duration_s:float,points:array}
+     * @param  string  $profile  driving|foot
+     * @return array{distance_m:float,duration_s:float,points:array,provider:string}
      */
-    public function route(array $from, array $to): array
+    public function route(array $from, array $to, string $profile = 'driving'): array
     {
         $primary = config('workride.routing.primary', 'osrm');
 
@@ -42,7 +47,7 @@ class RoutingService
 
         foreach ($strategies as $strategy) {
             try {
-                return $strategy($from, $to);
+                return $strategy($from, $to, $profile);
             } catch (Throwable $e) {
                 $lastError = $e;
             }
@@ -57,10 +62,10 @@ class RoutingService
     /**
      * Self-hosted OSRM — free, preferred. Logged with cost 0 for the audit trail.
      */
-    private function viaOsrm(array $from, array $to): array
+    private function viaOsrm(array $from, array $to, string $profile = 'driving'): array
     {
         $host = rtrim((string) config('workride.routing.osrm_host'), '/');
-        $url = $host.'/route/v1/driving/'.$from['lng'].','.$from['lat'].';'.$to['lng'].','.$to['lat'];
+        $url = $host.'/route/v1/'.$profile.'/'.$from['lng'].','.$from['lat'].';'.$to['lng'].','.$to['lat'];
 
         $response = Http::timeout((int) config('workride.routing.osrm_timeout', 5))
             ->get($url, ['overview' => 'full', 'geometries' => 'geojson']);
@@ -84,19 +89,21 @@ class RoutingService
             'to' => $to,
             'distance_m' => $route['distance'],
             'duration_s' => $route['duration'],
+            'profile' => $profile,
         ]);
 
         return [
             'distance_m' => (float) $route['distance'],
             'duration_s' => (float) $route['duration'],
             'points' => $points,
+            'provider' => 'osrm',
         ];
     }
 
     /**
      * Google Directions — paid fallback. Refused without budget headroom.
      */
-    private function viaGoogle(array $from, array $to): array
+    private function viaGoogle(array $from, array $to, string $profile = 'driving'): array
     {
         $this->assertFallbackAvailable('use_google_fallback', 'google_api_key', 'Google Directions');
 
@@ -110,7 +117,7 @@ class RoutingService
             'origin' => $from['lat'].','.$from['lng'],
             'destination' => $to['lat'].','.$to['lng'],
             'key' => config('workride.routing.google_api_key'),
-            'mode' => 'driving',
+            'mode' => $profile === 'foot' ? 'walking' : 'driving',
         ]);
 
         $response->throw();
@@ -127,19 +134,21 @@ class RoutingService
             'to' => $to,
             'distance_m' => $leg['distance']['value'],
             'duration_s' => $leg['duration']['value'],
+            'profile' => $profile,
         ]);
 
         return [
             'distance_m' => (float) $leg['distance']['value'],
             'duration_s' => (float) $leg['duration']['value'],
             'points' => $this->decodePolyline($body['routes'][0]['overview_polyline']['points'] ?? ''),
+            'provider' => 'google_directions',
         ];
     }
 
     /**
      * Mapbox Directions — optional premium fallback, capped+logged.
      */
-    private function viaMapbox(array $from, array $to): array
+    private function viaMapbox(array $from, array $to, string $profile = 'driving'): array
     {
         $this->assertFallbackAvailable('use_mapbox_premium', 'mapbox_access_token', 'Mapbox');
 
@@ -149,8 +158,10 @@ class RoutingService
             throw new RoutingUnavailableException('Monthly API budget reached — Mapbox fallback refused.');
         }
 
+        $mapboxProfile = $profile === 'foot' ? 'walking' : 'driving';
+
         $response = Http::get(
-            'https://api.mapbox.com/directions/v5/mapbox/driving/'.$from['lng'].','.$from['lat'].';'.$to['lng'].','.$to['lat'],
+            'https://api.mapbox.com/directions/v5/mapbox/'.$mapboxProfile.'/'.$from['lng'].','.$from['lat'].';'.$to['lng'].','.$to['lat'],
             [
                 'access_token' => config('workride.routing.mapbox_access_token'),
                 'geometries' => 'geojson',
@@ -177,12 +188,14 @@ class RoutingService
             'to' => $to,
             'distance_m' => $route['distance'],
             'duration_s' => $route['duration'],
+            'profile' => $profile,
         ]);
 
         return [
             'distance_m' => (float) $route['distance'],
             'duration_s' => (float) $route['duration'],
             'points' => $points,
+            'provider' => 'mapbox',
         ];
     }
 

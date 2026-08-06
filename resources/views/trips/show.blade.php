@@ -289,6 +289,22 @@
                 </div>
             @endif
 
+            @if ($isParticipant && in_array($trip->status->value, ['scheduled', 'active'], true))
+                <div class="rounded-2xl border border-forest-200 bg-forest-50/60 p-6">
+                    <h2 class="font-heading font-semibold text-ink-900">Connect guide</h2>
+                    <p class="mt-2 text-sm text-ink-700">
+                        Find where to meet the vehicle — live position or next boarding point, with walking distance and ETA.
+                    </p>
+                    <a href="{{ route('trips.guide.show', $trip) }}"
+                       class="mt-4 inline-flex items-center gap-2 rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
+                        Open connect guide
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                        </svg>
+                    </a>
+                </div>
+            @endif
+
             @if ($isParticipant)
                 <div class="rounded-2xl border border-ink-200 bg-white p-6"
                      x-data="tripChat({

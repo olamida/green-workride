@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-05
+> Last updated: 2026-08-06
 
 ---
 
@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass)
 
 | Area | Status |
 |------|--------|
@@ -51,7 +51,10 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Docs pass complete — `WORKRIDE-DESIGN-REVIEWS.md` (critiques of the seeding-data prompt + plan-ahead/live-loading + Time-Bank + EV lease-to-own, with ADOPT/ADAPT/DEFER verdicts) · `WORKRIDE-USER-GUIDE.md` (role-based rider/driver/volunteer/MDA/ops guide) · `WORKRIDE-DEV-GUIDE.md` (world-class engineering standards + known-traps table) · `WORKRIDE-ROADMAP.md` (honest gap list of unimplemented spec items, priority-ranked with "done when" criteria) |
 | Feature modules | ✅ Realtime board + demand-aware planning pass complete — Trip interest (idempotent `trip_interests` per trip+user, Pending→Matched on booking, revert on cancel) + live seat-counter channel (`TripSeatsUpdated` on the public `trips` channel, `board-live.js` seat/Full/book-link updates) + active-first "Leaving soon" sort + demand-aware empty state (`demandSnapshot` → "N people want this journey" + top destinations) + "How to book / Next departure" guide + interest panel on `trips/show` + Community Trust float ledger (`community_trust` table + `TrustService` credit/debit/balance, idempotent `TB-FLOAT-{bookingId}` on Time-Bank float creation + `TB-REPAY-{bookingId}-{seats}` on repayment) |
 | Feature modules | ✅ Community Trust reconciliation report complete — Control Tower `/admin/trust` (net balance + per-fund credit/debit/balance breakdown, float issued/released/outstanding KPIs, from-scratch running-balance rebuild flagging any drifted `balance_after`, recent movements) + full-ledger CSV export — closes the P3.3 ledger reconciliation backlog |
-| Tests | ✅ 407 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger)
+| Feature modules | ✅ Connect guide pass complete — participant-only live connection guide (`/trips/{trip}/guide`): Leaflet map + live driver position on the private `trip.{id}` channel (live target → next boarding waypoint → `none`), privacy = no coords ever broadcast to non-participants, walking ETA/distance via `RoutingService` foot profile (OSRM `foot`/Google `walking`/Mapbox `walking`) with haversine × `route_factor` straight-line fallback, 50 m arrived radius, `guide_opened` activity-log entry, a11y live regions + `prefers-reduced-motion` |
+| Feature modules | ✅ Map-first trip board complete — Leaflet/OSM map canvas above the trip list (live trips pinned at `current_lat/lng`, scheduled pinned at corridor anchors Kubwa/Nyanya/Lugbe/CBD), color legend (green live / gold free volunteer / slate scheduled), tooltips with route · departure · seats · fare, click-to-view cards, live seat-counter updates push into the map via `window.__tripsMap.updateTripSeats()` |
+| Feature modules | ✅ Accessibility pass complete — visible `:focus-visible` outlines (forest, 2px offset), `prefers-reduced-motion` collapse, Leaflet attribution sizing + 44×44 min hit-area for map controls, aria-live distance/ETA/status regions on the connect guide, aria-labeled board map region |
+| Tests | ✅ 423 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger + connect guide / board map / foot-profile routing)
 
 ---
 
@@ -757,6 +760,31 @@ Closes roadmap P3.3 — the ledger half shipped in §4.26, and now it can *prove
 
 **Tests (12 new — 407 total, 1298 assertions):** `TrustLedgerTest` — credit idempotent on reference (no duplicate row), debit idempotent, net + per-type `balance()`, running `balance_after` per write, admin report render with KPIs + balanced banner, per-fund breakdown numbers, drifted `balance_after` flagged for review, CSV download (headers + rows + meta JSON round-trip parsed via `str_getcsv`), guest/admin gate (403 non-admin on both routes), empty-ledger state.
 
+### 4.28 Connect Guide + Map-First Trip Board + Accessibility Pass (COMPLETE)
+
+Three slices from the post-trust-report audit: a participant-only **connect guide** (passenger walks/ETA to their ride, live via the private channel), a **map-first trip board**, and an **accessibility hardening pass**. No schema changes; pure services/controllers/views/JS/CSS. Feature-gated where useful (`FEATURE_GUIDE`, default true).
+
+**Config (`config/workride.php`):** `guide` block — `enabled` = `FEATURE_GUIDE` (default true), `walking_speed_kmh` 5, `route_factor` 1.25 (straight-line × factor walking fallback), `arrived_radius_m` 50, `re_route_threshold_m` 150, `zoom_overview` 14, `zoom_follow` 16; `corridor_anchors` (Kubwa/Nyanya/Lugbe/CBD) so scheduled board trips pin at a real anchor point instead of `0,0`.
+
+**`RoutingService` (`app/Services/RoutingService.php`)** — `route(from, to, profile = 'driving')` gains a walking profile threaded through all three providers (OSRM `/route/v1/foot/`, Google `mode=walking`, Mapbox `mapbox/walking/`); return arrays now include `provider`; cost-log payloads carry `profile`.
+
+**`ConnectGuideService` (`app/Services/ConnectGuideService.php`)** — `targetFor(Trip)` (active + non-zero coords → `type:live` driver position; else next scheduled/active `TripWaypoint` by sequence → `type:waypoint`; else `type:none`), `walkingDistanceM()` (haversine × `route_factor`, `null` when no target), `walkingDurationS()`, `isArrived()` (≤ 50 m), `walkingRoute()` (OSRM foot via `RoutingService`; catches `Throwable` → `provider: straight_line` zero-cost fallback), `vehicleLabel()`.
+
+**`GuideController` (`app/Http/Controllers/Web/GuideController.php`)** — `show()` participant-gated (`Trip::isParticipant`), status gate scheduled/active, writes a `guide_opened` change-control log (`ActivityLog::log`, `Trip::class`), passes config + `my_booking_id` for client-side cancellation filtering; `route()` validates the target exists (422 when `type:none`) and the point is inside the FCT geofence (422 otherwise). Routes `trips.guide.show` / `trips.guide.route` in the auth group. `trips/show` gains a "Connect guide" card (participants only) linking to the guide.
+
+**Guide view (`resources/views/trips/guide.blade.php`)** — Leaflet map (`#connect-guide-map`), a11y live regions (`data-guide-distance` / `data-guide-eta` / `data-guide-status`, `aria-live="polite"`), "Meet the ride" + "How the guide works" side cards, privacy note ("your live position is never broadcast to other riders"), `@vite(['resources/js/connect-guide.js'])`.
+
+**`connect-guide.js`** (new Vite entry) — initializes the map, pins the live/waypoint target, watches the passenger's `navigator.geolocation`, throttles route fetches (client straight-line catch fallback matching the service), listens on the private `trip.{id}` channel for `TripLocationUpdated` (re-route when moved > `re_route_threshold_m`), `TripCancelled` / `TripCompleted` (guide-over notice), and `BookingCancelled` (no-op unless it's *my* booking via `config.my_booking_id`); arrived → pan + status "You've arrived"; `prefersReducedMotion()` gates animated transitions. `window.initConnectGuide` exposed.
+
+**Map-first trip board** — `trips-map.js` (new Vite entry): `window.initTripsMap(el, trips, { cbd })` pins live trips at `current_lat/lng` and scheduled trips at their corridor anchor, color = green live / gold free volunteer / slate scheduled, tooltips `route_name · departure · seats · fare`, click → trip page, returns `updateTripSeats(tripId, seats)` which the existing `board-live.js` `.TripSeatsUpdated` handler also calls (re-colors slate→gold and refreshes the tooltip when a free ride fills). `trips/board.blade.php` renders the map block above the list **only when trips exist**, with the `@vite` + init script moved inside the `@if` (so the string `trips-map` never renders on an empty board), an aria-labeled `role="region"`, and a legend line.
+
+**Accessibility pass (`resources/css/app.css`)** — visible `:focus-visible` outline (forest `#2e7d32`, 2px offset) site-wide; `prefers-reduced-motion` collapses decorative animation to 0.01 ms; Leaflet attribution font-size 10px and 44×44 min hit-area for map controls (`.leaflet-bar a`).
+
+**Bugs fixed during hardening:**
+- `test_board_map_is_hidden_when_no_trips` failed `assertDontSee('trips-map')` because the map's `@vite(['resources/js/trips-map.js'])` + init `<script>` were rendered unconditionally at the bottom of `board.blade.php`, even though the `#trips-map` div was correctly gated — the string leaked into the empty-state DOM. Fixed by moving the `@vite` + `DOMContentLoaded` init inside the `@if ($mapTrips->isNotEmpty())` block (and deleting the orphaned bottom block).
+
+**Tests (17 new — 424 total, 1337 assertions):** `ConnectGuideTest` (13) — guest redirect, non-participant 403, driver sees live target, passenger view + `guide_opened` activity-log row, next-waypoint fallback, completed/cancelled 404, `trips.guide.route` 200 for participants + walking payload, 403 non-participant, 422 outside FCT, 422 no-target, service walking math (factor + speed), straight-line fallback on provider failure, zero-coords never `type:live`. `RoutingServiceTest` — foot profile hits the `/route/v1/foot/` endpoint and reports `provider`. `TripTest` (3) — map present when trips exist, `Map view` + `initTripsMap` + legend render, map hidden (no `trips-map` string) when the board is empty.
+
 ---
 
 ## 5. Issues Resolved
@@ -972,6 +1000,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Docs Pass | `WORKRIDE-DESIGN-REVIEWS.md` + `WORKRIDE-USER-GUIDE.md` + `WORKRIDE-DEV-GUIDE.md` + `WORKRIDE-ROADMAP.md` | ✅ Complete (v0.16.0) |
 | Realtime Board + Demand-Aware Planning | Trip interest (pending→matched/revert) + live seat-counter channel + active-first leaving-soon sort + demand-aware empty state + next-departure guide + Community Trust float ledger (`community_trust`, `TrustService`) | ✅ Complete (v0.17.0) |
 | Community Trust Reconciliation Report | Control Tower `/admin/trust` (per-fund + net balance, float KPIs, from-scratch running-balance rebuild flagging drifted `balance_after`) + full-ledger CSV export + `TrustLedgerTest` | ✅ Complete (v0.18.0) |
+| Connect Guide + Map-First Board + Accessibility | Participant-only live connect guide (`/trips/{trip}/guide`, private channel, walking ETA) + Leaflet map-first trip board (corridor anchors, live seats into map) + a11y hardening (focus-visible, reduced-motion, 44px map controls, aria-live) | ✅ Complete (v0.19.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -982,6 +1011,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 6. ✅ DONE — Docs pass (see §4.25); backlog lives in `WORKRIDE-ROADMAP.md`
 7. ✅ DONE — Realtime board + demand-aware planning + trust float ledger (see §4.26); next: Trust reconciliation report + ledger tests
 8. ✅ DONE — Trust reconciliation report + ledger tests (see §4.27); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+9. ✅ DONE — Connect guide + map-first board + accessibility pass (see §4.28); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -1012,6 +1042,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.16.0` | Docs Pass | `WORKRIDE-DESIGN-REVIEWS.md` (ADOPT/ADAPT/DEFER reviews: seeding-data prompt, plan-ahead/live-loading, Time-Bank trust float, EV lease-to-own) · `WORKRIDE-USER-GUIDE.md` (role-based usage) · `WORKRIDE-DEV-GUIDE.md` (engineering standards + known-traps table) · `WORKRIDE-ROADMAP.md` (priority-ranked gap list with "done when") | 384 (1230) | 2026-08-02 |
 | `v0.17.0` | Realtime Board + Demand-Aware Planning | Trip interest (idempotent `trip_interests`, Pending→Matched on book / revert on cancel) + live seat-counter `TripSeatsUpdated` channel (`board-live.js`) + active-first "Leaving soon" sort + demand-aware empty state + "How to book / Next departure" guide + interest panel + Community Trust float ledger (`community_trust` + `TrustService`, idempotent `TB-FLOAT-{bookingId}` / `TB-REPAY-{bookingId}-{seats}`) | 395 (1254) | 2026-08-05 |
 | `v0.18.0` | Community Trust Reconciliation Report | Control Tower `/admin/trust` — net + per-fund credit/debit/balance, float issued/released/outstanding KPIs, from-scratch running-balance rebuild flagging drifted `balance_after` (0.005 tolerance) + recent-movements ledger + full-ledger CSV export (meta JSON round-trip) + sidebar link + `TrustLedgerTest` (12) | 407 (1298) | 2026-08-05 |
+| `v0.19.0` | Connect Guide + Map-First Board + Accessibility Pass | Participant-only live connect guide (`/trips/{trip}/guide` — Leaflet + private `trip.{id}` live driver/waypoint target, walking ETA via `RoutingService` foot profile + haversine × `route_factor` fallback, 50 m arrived, `guide_opened` audit log) · map-first trip board (live trips at coords, scheduled at corridor anchors, color legend, live seat-counter pushes into the map) · accessibility pass (`:focus-visible`, reduced-motion, 44×44 map controls, aria-live guide regions) — gated on `FEATURE_GUIDE` | 424 (1337) | 2026-08-06 |
 
 ---
 

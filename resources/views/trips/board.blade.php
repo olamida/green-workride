@@ -102,6 +102,50 @@
     </div>
 
     <div class="space-y-4" x-data="boardLive">
+        @php
+            $anchors = config('workride.corridor_anchors');
+            $cbd = $anchors['cbd'];
+            $mapTrips = $trips->map(fn ($trip) => [
+                'id' => $trip->id,
+                'lat' => $trip->current_lat && (float) $trip->current_lat !== 0.0
+                    ? (float) $trip->current_lat
+                    : ($anchors[$trip->corridor->value]['lat'] ?? $cbd['lat']),
+                'lng' => $trip->current_lng && (float) $trip->current_lng !== 0.0
+                    ? (float) $trip->current_lng
+                    : ($anchors[$trip->corridor->value]['lng'] ?? $cbd['lng']),
+                'route_name' => $trip->route_name,
+                'status' => $trip->status->value,
+                'is_free_volunteer' => $trip->is_free_volunteer,
+                'leaving_soon' => (bool) ($trip->leaving_soon ?? false),
+                'departure_time' => $trip->departure_time->format('D M j · g:i A'),
+                'available_seats' => $trip->available_seats,
+                'total_seats' => $trip->total_seats,
+                'fare' => number_format((float) $trip->fare_per_seat, 0),
+                'url' => route('trips.show', $trip),
+            ])->values();
+        @endphp
+
+        @if ($mapTrips->isNotEmpty())
+            <div class="overflow-hidden rounded-2xl border border-ink-200 bg-white">
+                <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+                    <h2 class="font-heading text-sm font-semibold text-ink-900">Map view</h2>
+                    <p class="text-xs text-ink-500">Green = live · Gold = free volunteer · Slate = scheduled</p>
+                </div>
+                <div id="trips-map" class="h-[380px] w-full" role="region"
+                     aria-label="Map of available trips. Use the trip list below to view details and book a seat."></div>
+            </div>
+            @vite(['resources/js/trips-map.js'])
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    window.__tripsMap = window.initTripsMap(
+                        document.getElementById('trips-map'),
+                        @json($mapTrips),
+                        { cbd: @json($cbd) }
+                    );
+                });
+            </script>
+        @endif
+
         @forelse ($trips as $trip)
             <a href="{{ route('trips.show', $trip) }}" data-trip-card="{{ $trip->id }}" class="group block rounded-2xl border border-ink-200 bg-white p-5 transition hover:border-forest-300 hover:shadow-md">
                 <div class="flex flex-wrap items-start justify-between gap-4">

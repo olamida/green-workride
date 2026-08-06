@@ -26,6 +26,7 @@ use App\Http\Controllers\Web\DemandController;
 use App\Http\Controllers\Web\DriverFleetController;
 use App\Http\Controllers\Web\EmployerRequestController;
 use App\Http\Controllers\Web\GtfsController;
+use App\Http\Controllers\Web\GuideController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\ImpactCertificateController;
 use App\Http\Controllers\Web\ImpactController;
@@ -171,6 +172,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/trips/{trip}/messages', [TripBoardController::class, 'storeMessage'])->name('trips.messages');
     Route::post('/trips/{trip}/interest', [TripBoardController::class, 'registerInterest'])->name('trips.interest');
     Route::post('/trips/{trip}/sos', [SafetyController::class, 'sos'])->name('trips.sos');
+
+    Route::prefix('trips/{trip}/guide')->name('trips.guide.')->group(function () {
+        Route::get('/', [GuideController::class, 'show'])->name('show');
+        Route::get('/route', [GuideController::class, 'route'])->name('route');
+    });
 
     Route::prefix('bookings')->name('bookings.')->group(function () {
         Route::get('/', [BookingController::class, 'index'])->name('index');

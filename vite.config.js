@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
     plugins: [
         laravel({
-            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/road-map.js'],
+            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/road-map.js', 'resources/js/connect-guide.js', 'resources/js/trips-map.js'],
             refresh: true,
             fonts: [
                 bunny('Sora', { weights: [400, 600, 700] }),

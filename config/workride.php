@@ -58,6 +58,28 @@ return [
     // No-show policy: share of the held fare captured when a passenger no-shows.
     'no_show_capture_percent' => env('WORKRIDE_NO_SHOW_CAPTURE_PERCENT', 50),
 
+    // Passenger-to-vehicle connect guide (last-mile). Walking is the core job
+    // at informal junctions (Berger, Nyanya, Lugbe), so the guide is a calm 2D
+    // follow view — not a city-wide turn-by-turn clone. `route_factor` inflates
+    // straight-line distance toward a realistic walking path; the guide falls
+    // back to that estimate when OSRM is unreachable (zero API cost).
+    'guide' => [
+        'enabled' => (bool) env('FEATURE_GUIDE', true),
+        // Assumed walking speed for the "240 m · 3 min walk" ETA.
+        'walking_speed_kmh' => env('WORKRIDE_GUIDE_WALKING_KMH', 5),
+        // Walking distance = haversine × route_factor (road vs straight-line).
+        'route_factor' => env('WORKRIDE_GUIDE_ROUTE_FACTOR', 1.25),
+        // Below this distance the guide shows the "Wave — you are here" state.
+        'arrived_radius_m' => env('WORKRIDE_GUIDE_ARRIVED_RADIUS_M', 50),
+        // Client re-requests a walking route when either party moves this far.
+        're_route_threshold_m' => env('WORKRIDE_GUIDE_REROUTE_THRESHOLD_M', 150),
+        // Below this distance the follow view zooms in on the passenger.
+        'zoom_close_m' => env('WORKRIDE_GUIDE_ZOOM_CLOSE_M', 150),
+        // Map zoom presets (overview vs follow).
+        'zoom_overview' => env('WORKRIDE_GUIDE_ZOOM_OVERVIEW', 14),
+        'zoom_follow' => env('WORKRIDE_GUIDE_ZOOM_FOLLOW', 16),
+    ],
+
     // Fixed per-corridor fares (anti-surge). Naira per seat.
     'max_fare_per_corridor' => [
         'kubwa_cbd' => 800,
@@ -71,6 +93,15 @@ return [
         'kubwa_cbd' => 22,
         'nyanya_idu' => 14,
         'lugbe_cbd' => 12,
+    ],
+
+    // Approximate corridor origin anchors for the map-first trip board.
+    // Active trips pin at their live position; scheduled trips pin at these.
+    'corridor_anchors' => [
+        'kubwa_cbd' => ['lat' => 9.0093, 'lng' => 7.4619],
+        'nyanya_idu' => ['lat' => 8.9435, 'lng' => 7.5190],
+        'lugbe_cbd' => ['lat' => 9.0319, 'lng' => 7.4062],
+        'cbd' => ['lat' => 9.0589, 'lng' => 7.4891],
     ],
 
     // CO2 saved per passenger-km (kg).

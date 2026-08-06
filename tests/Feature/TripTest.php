@@ -70,7 +70,33 @@ class TripTest extends TestCase
         $this->actingAs($this->verifiedWorker())
             ->get('/trips')
             ->assertOk()
-            ->assertSee('Kubwa → CBD');
+            ->assertSee('Kubwa → CBD')
+            ->assertSee('trips-map');
+    }
+
+    public function test_board_map_renders_when_trips_exist(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Kubwa → CBD',
+            'corridor' => 'kubwa_cbd',
+            'departure_time' => now()->addMinutes(20),
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertSee('Map view')
+            ->assertSee('trips-map')
+            ->assertSee('initTripsMap');
+    }
+
+    public function test_board_map_is_hidden_when_no_trips(): void
+    {
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertDontSee('trips-map');
     }
 
     public function test_board_shows_day_ahead_trips_by_default(): void

@@ -56,6 +56,32 @@ class RoutingServiceTest extends TestCase
         ]);
     }
 
+    public function test_foot_profile_hits_walking_endpoint_and_reports_provider(): void
+    {
+        config(['workride.routing.primary' => 'osrm']);
+        Http::fake([
+            '*/route/v1/foot/*' => Http::response([
+                'code' => 'Ok',
+                'routes' => [[
+                    'distance' => 420,
+                    'duration' => 340,
+                    'geometry' => ['coordinates' => [[7.3304, 9.1117], [7.4900, 9.0500]]],
+                ]],
+            ]),
+        ]);
+
+        $result = $this->app->make(RoutingService::class)->route($this->origin(), $this->to(), 'foot');
+
+        $this->assertSame(420.0, $result['distance_m']);
+        $this->assertSame(340.0, $result['duration_s']);
+        $this->assertSame('osrm', $result['provider']);
+        $this->assertDatabaseHas('api_cost_logs', [
+            'provider' => 'osrm',
+            'service' => 'routing',
+            'cost_naira' => '0.00',
+        ]);
+    }
+
     public function test_google_fallback_is_capped_and_logged(): void
     {
         config([
