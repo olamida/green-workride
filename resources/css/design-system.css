@@ -72,3 +72,104 @@
         @apply font-heading;
     }
 }
+
+/*
+ * Motion tokens — purposeful feedback and orientation, never decoration.
+ * Every duration is a token so reduced-motion collapses the whole system to
+ * 0 ms in one place (WCAG 2.3.3). The pulse scale/opacity tokens drive the
+ * live corridor chips and the guide's softly breathing pins.
+ */
+:root {
+    --wr-motion-fast: 150ms;
+    --wr-motion-normal: 200ms;
+    --wr-motion-slow: 320ms;
+    --wr-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --wr-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --wr-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --wr-pulse-duration: 2000ms;
+    --wr-pulse-scale: 1.04;
+    --wr-pulse-opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --wr-motion-fast: 0ms;
+        --wr-motion-normal: 0ms;
+        --wr-motion-slow: 0ms;
+    }
+}
+
+/*
+ * Reusable motion utilities — transform + opacity only, never layout. Tailwind
+ * `transition` covers the property list; these vary the duration/easing so a
+ * component can say `wr-transition-slow` and stay on-token.
+ */
+.wr-transition-fast {
+    transition-property: transform, opacity, background-color, color, border-color;
+    transition-duration: var(--wr-motion-fast);
+    transition-timing-function: var(--wr-ease-out);
+}
+
+.wr-transition-normal {
+    transition-property: transform, opacity, background-color, color, border-color;
+    transition-duration: var(--wr-motion-normal);
+    transition-timing-function: var(--wr-ease-out);
+}
+
+.wr-transition-slow {
+    transition-property: transform, opacity, background-color, color, border-color;
+    transition-duration: var(--wr-motion-slow);
+    transition-timing-function: var(--wr-ease-out);
+}
+
+/*
+ * Soft "something is live here" pulse — gentle scale + opacity loop. Applied
+ * to live corridor chips and the guide's vehicle/you pins. `transform-box:
+ * fill-box` lets the same class pulse SVG circles around their own centre.
+ * Reduced-motion: the app.css global media query forces the duration to 0.
+ */
+.wr-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: wr-pulse var(--wr-pulse-duration) var(--wr-ease-in-out) infinite;
+}
+
+.wr-fade-in {
+    animation: wr-fade-in var(--wr-motion-slow) var(--wr-ease-out) both;
+}
+
+.wr-scale-in {
+    animation: wr-scale-in var(--wr-motion-slow) var(--wr-ease-spring) both;
+}
+
+@keyframes wr-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(var(--wr-pulse-scale));
+        opacity: var(--wr-pulse-opacity);
+    }
+}
+
+@keyframes wr-fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes wr-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

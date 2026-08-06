@@ -36,16 +36,6 @@
     }
 }
 
-@keyframes wr-pulse {
-    0%,
-    100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.3;
-    }
-}
-
 @keyframes wr-float {
     0%,
     100% {
@@ -71,10 +61,6 @@
 .wr-dash-reveal {
     stroke-dasharray: 360;
     animation: wr-dash-reveal 3s ease-out forwards;
-}
-
-.wr-pulse {
-    animation: wr-pulse 2.2s ease-in-out infinite;
 }
 
 .wr-float {
@@ -243,5 +229,146 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+}
+
+/*
+ * Board + connect-guide motion (see WORKRIDE-GUIDE-MOTION checklist §2-7).
+ * All of these are one-shot feedback ticks or soft breathing pulses —
+ * transform + opacity only — so nothing shifts layout while a rider walks.
+ */
+
+/* A seat was just taken — brief forest highlight + subtle scale on the count. */
+@keyframes wr-seat-tick {
+    0% {
+        background-color: #dcefdf;
+        transform: scale(1);
+    }
+    45% {
+        transform: scale(1.12);
+    }
+    100% {
+        background-color: transparent;
+        transform: scale(1);
+    }
+}
+
+.wr-seat-tick {
+    border-radius: 8px;
+    padding: 1px 6px;
+    animation: wr-seat-tick 300ms var(--wr-ease-out) 1;
+}
+
+/* A live distance/ETA number changed — 150 ms gold tick, no layout shift. */
+@keyframes wr-number-tick {
+    from {
+        color: #fbc02d;
+    }
+    to {
+        color: #0f172a;
+    }
+}
+
+.wr-number-tick {
+    animation: wr-number-tick var(--wr-motion-fast) var(--wr-ease-out) 1;
+}
+
+/*
+ * Guide glass cards — the app's frosted elevation language (blur ~20px over
+ * near-white) reused for the overview summary card, active HUD and terminal
+ * panels so the guide reads as one family with the rest of WorkRide.
+ */
+.wr-glass {
+    background-color: rgb(255 255 255 / 0.88);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgb(255 255 255 / 0.6);
+    box-shadow: 0 8px 30px rgb(15 23 42 / 0.10);
+}
+
+/* Guide map pins — circular forest/blue head, white ring, soft breathing. */
+.wr-pin {
+    position: relative;
+    width: 34px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wr-pin-body {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9999px;
+    background-color: var(--pin, #2e7d32);
+    border: 2.5px solid #ffffff;
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgb(15 23 42 / 0.30);
+    animation: wr-pin-soft 2s var(--wr-ease-in-out) infinite;
+}
+
+.wr-pin::after {
+    content: '';
+    position: absolute;
+    bottom: 1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 9px solid var(--pin, #2e7d32);
+    filter: drop-shadow(0 2px 3px rgb(15 23 42 / 0.25));
+}
+
+.wr-pin-badge {
+    position: absolute;
+    right: -2px;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background-color: #fbc02d;
+    border: 1.5px solid #ffffff;
+    color: #0f172a;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* Vehicle pin pulses while moving (JS adds/removes over ~2.8 s). */
+.wr-pin-move {
+    animation: wr-pin-move 1.4s var(--wr-ease-in-out) 2;
+}
+
+@keyframes wr-pin-soft {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.08);
+    }
+}
+
+@keyframes wr-pin-move {
+    0%,
+    100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.14);
+    }
+}
+
+/* Forest walking polyline with a soft glow; readability first. */
+.wr-route-line {
+    filter: drop-shadow(0 0 4px rgb(46 125 50 / 0.45));
 }
 
