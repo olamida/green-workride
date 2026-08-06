@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips)
 
 | Area | Status |
 |------|--------|
@@ -54,7 +54,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Connect guide pass complete — participant-only live connection guide (`/trips/{trip}/guide`): Leaflet map + live driver position on the private `trip.{id}` channel (live target → next boarding waypoint → `none`), privacy = no coords ever broadcast to non-participants, walking ETA/distance via `RoutingService` foot profile (OSRM `foot`/Google `walking`/Mapbox `walking`) with haversine × `route_factor` straight-line fallback, 50 m arrived radius, `guide_opened` activity-log entry, a11y live regions + `prefers-reduced-motion` |
 | Feature modules | ✅ Map-first trip board complete — Leaflet/OSM map canvas above the trip list (live trips pinned at `current_lat/lng`, scheduled pinned at corridor anchors Kubwa/Nyanya/Lugbe/CBD), color legend (green live / gold free volunteer / slate scheduled), tooltips with route · departure · seats · fare, click-to-view cards, live seat-counter updates push into the map via `window.__tripsMap.updateTripSeats()` |
 | Feature modules | ✅ Accessibility pass complete — visible `:focus-visible` outlines (forest, 2px offset), `prefers-reduced-motion` collapse, Leaflet attribution sizing + 44×44 min hit-area for map controls, aria-live distance/ETA/status regions on the connect guide, aria-labeled board map region |
-| Tests | ✅ 423 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger + connect guide / board map / foot-profile routing)
+| Tests | ✅ 428 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger + connect guide / board map / foot-profile routing + guide states / branded pins / live corridor chips / seat-count ticks)
 
 ---
 
@@ -785,6 +785,33 @@ Three slices from the post-trust-report audit: a participant-only **connect guid
 
 **Tests (17 new — 424 total, 1337 assertions):** `ConnectGuideTest` (13) — guest redirect, non-participant 403, driver sees live target, passenger view + `guide_opened` activity-log row, next-waypoint fallback, completed/cancelled 404, `trips.guide.route` 200 for participants + walking payload, 403 non-participant, 422 outside FCT, 422 no-target, service walking math (factor + speed), straight-line fallback on provider failure, zero-coords never `type:live`. `RoutingServiceTest` — foot profile hits the `/route/v1/foot/` endpoint and reports `provider`. `TripTest` (3) — map present when trips exist, `Map view` + `initTripsMap` + legend render, map hidden (no `trips-map` string) when the board is empty.
 
+### 4.29 Guide Motion & Branding + Live Corridor Chips + Seat-Count Tick (COMPLETE)
+
+Adopted from the guide-motion review (AN01): the connect guide gets a purposeful, accessible, brand-aligned motion + state language, and the trip board's live corridor chips + seat counters now pulse/tick on live events. Forbidden by the review: 3D/pitch/robot-eye nav, Lottie/Rive, particles/confetti, motion while the user walks, and any change to money/verification/core matching — motion is feedback and orientation only, never decoration. No schema changes.
+
+**Motion tokens (`resources/css/design-system.css`)** — `:root` motion scale (`--wr-motion-fast 150ms` / `normal 200ms` / `slow 320ms`), easing tokens (`--wr-ease-spring`, `--wr-ease-out`, `--wr-ease-in-out`), pulse tokens (`--wr-pulse-duration 2000ms`, `--wr-pulse-scale 1.04`, `--wr-pulse-opacity 0.7`), a `:root` reduced-motion override collapsing all motion tokens to `0ms`, `wr-transition-fast/normal/slow` utility classes, and reusable one-shot `wr-pulse` (transform+opacity, `transform-box: fill-box`), `wr-fade-in`, `wr-scale-in` + keyframes. The old opacity-only `wr-pulse` (consumed by `matching-anim`) is replaced by the token-based pulse.
+
+**Guide styles (`resources/css/app.css`)** — `.wr-glass` frosted card (the app's existing `blur(20px)` + 12 % white elevation language, so the guide reads as one family with the rest of WorkRide), `.wr-seat-tick` (300 ms forest highlight + scale on a live seat-count), `.wr-number-tick` (150 ms gold flash on a changed distance/ETA number, no layout shift), branded map pins (`.wr-pin`/`.wr-pin-body`/`.wr-pin-badge` gold "B" / `.wr-pin-dot` "you" dot / `.wr-pin-soft` one-shot acknowledgement / `.wr-pin-move` 2-shot while-moving pulse — pins **no longer breathe infinitely**, so the map stays calm while walking), and `.wr-route-line` (forest polyline glow).
+
+**Connect-guide states (`resources/js/connect-guide.js` + `resources/js/connect-guide-ui.js` + `resources/views/trips/guide.blade.php`):**
+- The guide is now a three-state flow — **overview** (pin the vehicle, "Start guide" snap) → **active** (compact glass HUD while walking) → **arrived / missed** (terminal panels). The Alpine shell (`connectGuideUI`, registered in `app.js`) owns the state machine, the status copy and the HUD; the map module stays presentation-free and reports through callbacks (`onStatus` / `onDistance` / `onArrived` / `onMissed`).
+- Branded `divIcon` pins: forest vehicle pin with a gold "B" badge, blue "You" pin with a white dot; solid 4 px forest polyline with the `wr-route-line` glow.
+- Overview mode shows a **quiet straight-line estimate** (distance/ETA number tick) — no route fetch, no camera movement, no polylines until the passenger chooses to start, so the map never jumps before the user hands over.
+- `startFollow()` snaps to the follow zoom (`fitBounds` / `setView` to `zoom_follow`), and only then draws the walking route; the vehicle pin does a one-shot pulse on `TripLocationUpdated`; the HUD distance/ETA re-trigger the 150 ms gold `wr-number-tick` on every update.
+- Terminal states: **arrived** (`route.distance_m <= arrived_radius_m` → "You are here — wave to the driver" panel) and **missed** (`TripCancelled` / `TripCompleted` while not arrived / own `BookingCancelled` → slate panel with Find another ride / Open trip page / Call driver recovery). All Leaflet pan/zoom animations respect `prefers-reduced-motion`.
+- `guide.blade.php` keeps the `#connect-guide-map` id and the `Boarding point → label` row (test contract: `Your ride · ABJ-777-KJ`, `Berger Junction`), adds `x-cloak` panels, `aria-live="polite"` status regions, 44 px touch targets, and a one-shot `wr-scale-in` entrance on the overview/arrived cards. A `type:none` target (no position, no waypoint) renders a dashed "No boarding point shared yet" notice in the map element and hides the Start button.
+
+**Live corridor chips + seat-count tick (trip board):**
+- `TripMatchingService::liveCorridors(): array<string,bool>` — corridors with a Scheduled/Active trip leaving within `workride.departure_window_minutes`; `TripBoardController::index()` passes `$corridorLive`; `trips/board.blade.php` chips render a `wr-pulse` live dot + `data-corridor-chip` (sr-only "live trips leaving soon") for live corridors and a quiet `opacity-40` dot otherwise.
+- Seat counters now carry `data-seats data-corridor aria-live="polite"`, and `board-live.js` re-triggers the one-shot `wr-seat-tick` (via `remove → void offsetWidth → add`) on `.TripSeatsUpdated` instead of the old 1600 ms gold toggle — shorter, meaningful, token-based.
+- Blade gotcha re-confirmed: inline `@php($x = ! empty($y))` with nested parens breaks the directive regex → switched to the block `@php … @endphp` form.
+
+**Bugs fixed during hardening:**
+- `assertSee('x-ref="hudDistance"')` failed because Blade/assertSee HTML-escapes the search string (`x-ref=&quot;hudDistance&quot;`) — the assertion now checks the unquoted `hudDistance` fragment.
+- The old `.wr-pin-body` had an infinite breathing animation; while walking the vehicle pin should only pulse on movement — moved to one-shot `wr-pin-soft` / two-shot `wr-pin-move` classes toggled by JS.
+
+**Tests (4 new — 428 total, 1361 assertions):** `ConnectGuideTest` (+2) — overview state renders the glass HUD, Start guide button, `connectGuideUI`, `data-config`/`data-target`, terminal panels, and the `route_url` JSON contract; a `type:none` target hides Start guide and shows `n/a`. `TripTest` (the 3 chip/seat tests landed in §4.28's follow-up) — live corridor chip pulses when a trip leaves soon, quiet corridor has no live dot, seat counter carries corridor + live region data.
+
 ---
 
 ## 5. Issues Resolved
@@ -1001,6 +1028,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Realtime Board + Demand-Aware Planning | Trip interest (pending→matched/revert) + live seat-counter channel + active-first leaving-soon sort + demand-aware empty state + next-departure guide + Community Trust float ledger (`community_trust`, `TrustService`) | ✅ Complete (v0.17.0) |
 | Community Trust Reconciliation Report | Control Tower `/admin/trust` (per-fund + net balance, float KPIs, from-scratch running-balance rebuild flagging drifted `balance_after`) + full-ledger CSV export + `TrustLedgerTest` | ✅ Complete (v0.18.0) |
 | Connect Guide + Map-First Board + Accessibility | Participant-only live connect guide (`/trips/{trip}/guide`, private channel, walking ETA) + Leaflet map-first trip board (corridor anchors, live seats into map) + a11y hardening (focus-visible, reduced-motion, 44px map controls, aria-live) | ✅ Complete (v0.19.0) |
+| Guide Motion & Branding + Live Corridor Chips | Connect guide three-state flow (overview → active HUD → arrived/missed) + branded pins + glass HUD + number ticks + motion tokens (reduced-motion-safe) + live corridor chip pulse + seat-count tick | ✅ Complete (v0.20.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -1012,6 +1040,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 7. ✅ DONE — Realtime board + demand-aware planning + trust float ledger (see §4.26); next: Trust reconciliation report + ledger tests
 8. ✅ DONE — Trust reconciliation report + ledger tests (see §4.27); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 9. ✅ DONE — Connect guide + map-first board + accessibility pass (see §4.28); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+10. ✅ DONE — Guide motion & branding + live corridor chips + seat-count tick (see §4.29); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -1043,6 +1072,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.17.0` | Realtime Board + Demand-Aware Planning | Trip interest (idempotent `trip_interests`, Pending→Matched on book / revert on cancel) + live seat-counter `TripSeatsUpdated` channel (`board-live.js`) + active-first "Leaving soon" sort + demand-aware empty state + "How to book / Next departure" guide + interest panel + Community Trust float ledger (`community_trust` + `TrustService`, idempotent `TB-FLOAT-{bookingId}` / `TB-REPAY-{bookingId}-{seats}`) | 395 (1254) | 2026-08-05 |
 | `v0.18.0` | Community Trust Reconciliation Report | Control Tower `/admin/trust` — net + per-fund credit/debit/balance, float issued/released/outstanding KPIs, from-scratch running-balance rebuild flagging drifted `balance_after` (0.005 tolerance) + recent-movements ledger + full-ledger CSV export (meta JSON round-trip) + sidebar link + `TrustLedgerTest` (12) | 407 (1298) | 2026-08-05 |
 | `v0.19.0` | Connect Guide + Map-First Board + Accessibility Pass | Participant-only live connect guide (`/trips/{trip}/guide` — Leaflet + private `trip.{id}` live driver/waypoint target, walking ETA via `RoutingService` foot profile + haversine × `route_factor` fallback, 50 m arrived, `guide_opened` audit log) · map-first trip board (live trips at coords, scheduled at corridor anchors, color legend, live seat-counter pushes into the map) · accessibility pass (`:focus-visible`, reduced-motion, 44×44 map controls, aria-live guide regions) — gated on `FEATURE_GUIDE` | 424 (1337) | 2026-08-06 |
+| `v0.20.0` | Guide Motion & Branding + Live Corridor Chips + Seat-Count Tick | Connect guide three-state flow (overview quiet straight-line estimate + Start guide → active glass HUD with 150 ms gold number ticks → arrived / missed terminal panels) · branded map pins (forest vehicle + gold "B", blue "You" dot; one/two-shot pulses while moving, never a constant beat) · solid 4 px forest polyline glow · motion tokens + `wr-pulse`/`wr-fade-in`/`wr-scale-in` + `.wr-glass` (all collapse under `prefers-reduced-motion`) · `connectGuideUI` Alpine shell owns the state machine + HUD via callbacks · live corridor chip `wr-pulse` dot (`TripMatchingService::liveCorridors()`) · seat counters carry corridor data + one-shot `wr-seat-tick` on `TripSeatsUpdated` | 428 (1361) | 2026-08-06 |
 
 ---
 
