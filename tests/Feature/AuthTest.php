@@ -162,4 +162,23 @@ class AuthTest extends TestCase
             'password' => 'wrong',
         ])->assertStatus(422);
     }
+
+    public function test_login_shows_continue_with_google_when_configured(): void
+    {
+        config(['workride.google_enabled' => true]);
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee('Continue with Google')
+            ->assertSee(route('auth.google'));
+    }
+
+    public function test_login_hides_google_button_when_not_configured(): void
+    {
+        config(['workride.google_enabled' => false]);
+
+        $this->get('/login')
+            ->assertOk()
+            ->assertDontSee('Continue with Google');
+    }
 }

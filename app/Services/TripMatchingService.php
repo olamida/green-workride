@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\Corridor;
 use App\Enums\TripStatus;
+use App\Models\DriverScore;
 use App\Models\Trip;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -79,6 +80,7 @@ class TripMatchingService
         });
 
         $this->ratings->attachDriverRatingToTrips($trips);
+        DriverScore::attachLatestToTrips($trips);
 
         return $trips;
     }

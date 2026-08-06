@@ -6,6 +6,7 @@ use App\Enums\DriverScoreLevel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
 
 /**
  * Weekly driver score snapshot: rides, punctuality, ratings, pothole reports,
@@ -46,5 +47,50 @@ class DriverScore extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Attach the latest weekly score snapshot to each trip in a collection as
+     * a dynamic `driver_score` attribute (null when the driver has no score yet).
+     * Uses one grouped query — never a per-trip lookup.
+     */
+    public static function attachLatestToTrips(Collection $trips): Collection
+    {
+        $trips = $trips->values();
+
+        $ids = $trips
+            ->map(fn ($trip) => $trip->driver_id)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            foreach ($trips as $trip) {
+                $trip->setAttribute('driver_score', null);
+            }
+
+            return $trips;
+        }
+
+        $latest = static::query()
+            ->whereIn('user_id', $ids->all())
+            ->orderByDesc('period_start')
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn (Collection $rows) => $rows->first());
+
+        foreach ($trips as $trip) {
+            $trip->setAttribute('driver_score', $latest->get($trip->driver_id));
+        }
+
+        return $trips;
+    }
+
+    /**
+     * Read a trip's attached scorecard snapshot (null when absent).
+     */
+    public static function forTrip($trip): ?self
+    {
+        return $trip->driver_score ?? null;
     }
 }

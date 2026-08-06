@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Enums\Corridor;
 use App\Events\NewChatMessage;
 use App\Http\Controllers\Controller;
+use App\Models\DriverScore;
 use App\Models\Trip;
 use App\Services\DemandService;
 use App\Services\RatingService;
@@ -110,6 +111,8 @@ class TripBoardController extends Controller
 
         $trip->load(['driver', 'vehicle', 'waypoints', 'bookings.passenger', 'chatMessages.sender']);
         $this->ratings->attachDriverRating($trip);
+        DriverScore::attachLatestToTrips(collect([$trip]));
+        $driverScore = DriverScore::forTrip($trip);
 
         $canStart = $trip->driver_id === $user->id && $trip->status->value === 'scheduled';
         $canComplete = $trip->driver_id === $user->id && $trip->status->value === 'active';
@@ -130,6 +133,7 @@ class TripBoardController extends Controller
         return view('trips.show', compact(
             'trip',
             'user',
+            'driverScore',
             'canStart',
             'canComplete',
             'canCancelTrip',

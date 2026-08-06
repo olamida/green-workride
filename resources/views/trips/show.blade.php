@@ -62,6 +62,9 @@
                                     · <span class="text-gold-600">★ {{ number_format((float) $trip->driver_rating_avg, 1) }}</span>
                                     <span class="text-ink-400">({{ $trip->driver_rating_count }})</span>
                                 @endif
+                                @if ($driverScore)
+                                    · <span class="font-semibold text-forest-700">{{ $driverScore->score }} {{ $driverScore->level->label() }} driver</span>
+                                @endif
                             </span>
                         </span>
                     </div>

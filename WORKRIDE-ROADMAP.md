@@ -11,11 +11,11 @@
 
 | # | Gap | Current state | Why it matters | Done when |
 |---|-----|---------------|----------------|-----------|
-| 1.1 | **Seeder README** (`database/seeders/README.md`) | Prompt requested it; only `RichSeederTest` + this guide cover it | New devs / funder walkthroughs need "log in as X to see Y" | File exists with per-feature demo login walkthrough |
-| 1.2 | **Google OAuth enabled** | Routes exist (`auth/google/redirect|callback`); disabled until `GOOGLE_CLIENT_ID` set | Guide §3 says "AuthController (Google Sign-In, email)"; one-line sign-in is a trust + conversion lever | `GOOGLE_*` in `.env`; `/login` shows "Continue with Google"; tested |
-| 1.3 | **Live seat-counter channel** | Board is static between requests; Reverb trip channels exist for chat/location | "Seats visibly filling" is the demo's aliveness moment | Reverb channel emits seat-count on `BookingConfirmed`; board subscribes |
-| 1.4 | **"Leaving soon" boost** | Board orders by distance + departure | Day-ahead trips bury the trip leaving in 15 min | `≤15min` sort boost on the `now` preset + test |
-| 1.5 | **Demand-aware empty state** | Empty board says "no trips" | Ops loop: demand check-ins should seed supply prompts | Board shows "12 people want Kubwa→CBD tomorrow 7:00 — be the driver" from `demand_requests`/`forecasts` |
+| 1.1 | **Seeder README** (`database/seeders/README.md`) | ✅ Done — `database/seeders/README.md` ships with a per-feature demo login walkthrough (admin/driver/volunteer/passenger/rich-demo users + seeder-by-seeder tour + suite idempotency marker) | New devs / funder walkthroughs need "log in as X to see Y" | File exists with per-feature demo login walkthrough |
+| 1.2 | **Google OAuth enabled** | ✅ Done — Socialite `redirect`/`callback` live; `/login` renders "Continue with Google" only under `workride.google_enabled` (env `GOOGLE_CLIENT_ID`); `AuthTest` covers on/off | Guide §3 says "AuthController (Google Sign-In, email)"; one-line sign-in is a trust + conversion lever | `GOOGLE_*` in `.env`; `/login` shows "Continue with Google"; tested |
+| 1.3 | **Live seat-counter channel** | ✅ Done — `TripSeatsUpdated` broadcast on the public `trips` channel; `board-live.js` updates seats/Full/book-links and pushes into the map (since v0.17.0) | "Seats visibly filling" is the demo's aliveness moment | Reverb channel emits seat-count on `BookingConfirmed`; board subscribes |
+| 1.4 | **"Leaving soon" boost** | ✅ Done — active-first sort + `leaving_soon` flag; `now` preset filters to 30 min (since v0.17.0) | Day-ahead trips bury the trip leaving in 15 min | `≤15min` sort boost on the `now` preset + test |
+| 1.5 | **Demand-aware empty state** | ✅ Done — board shows "N people want this journey" + top destinations + "I need a ride" check-in link from `DemandService::demandSnapshot()` (since v0.17.0) | Ops loop: demand check-ins should seed supply prompts | Board shows "12 people want Kubwa→CBD tomorrow 7:00 — be the driver" from `demand_requests`/`forecasts` |
 
 ## Priority 2 — Production wiring (mocked → real)
 
@@ -43,7 +43,7 @@
 | 3.7 | **Export `maatwebsite/excel`** | CSV exports exist everywhere | FERMA + subsidy reports asked for real .xlsx | `composer require maatwebsite/excel`; admin exports xlsx |
 | 3.8 | **EV lease-to-own schema seams** | DEFER per review; schema seams described | Only if EV pilot lands | `assets.propulsion`, `telemetry.battery_soc`, `lease_agreements`, `charging_stations` behind `FEATURE_EV_LEASE` |
 | 3.9 | **Forecast Phase 2 ML job** | Phase-1 manual multiplier in `ForecastService` | "Predicted = avg × multiplier" is manual; ML predicts automatically | `CalculateDemandForecastJob` trains on bookings history |
-| 3.10 | **Driver scorecards (rider-facing)** | Scoreboard lives in Control Tower only | Riders should see driver scores pre-booking (trust) | Score badge on trip cards from `CalculateDriverScoresJob` |
+| 3.10 | **Driver scorecards (rider-facing)** | ✅ Done — `DriverScore::attachLatestToTrips()` (one grouped query) + `forTrip()`; score badge on board trip cards + trip detail; `TripTest` covers shown/omitted | Riders should see driver scores pre-booking (trust) | Score badge on trip cards from `CalculateDriverScoresJob` |
 | 3.11 | **Pay-it-forward statement** | No Trust-facing Time-Bank report | Board governance | Monthly report: who rode / repaid / overdue / waived |
 | 3.12 | **Multi-tenant city/country** | `workplaces` single-city; guide §16 wants `country_id`/`city_id` | International expansion (Nairobi, Accra, Manila) | Migrations add country/city; GTFS + currency per city |
 | 3.13 | **USSD/WhatsApp demand bot** | Rider check-in exists in-app only | Junction people without the app | Bot saves to `demand_surveys`; ops sees it in the demand calendar |

@@ -207,6 +207,11 @@
                     @if ($trip->driver_rating_count)
                         <span class="text-gold-600">★ {{ number_format((float) $trip->driver_rating_avg, 1) }} ({{ $trip->driver_rating_count }})</span>
                     @endif
+                    @if ($trip->driver_score)
+                        <span class="inline-flex items-center rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700" title="{{ $trip->driver_score->level->label() }} driver · {{ $trip->driver_score->rides_completed }} rides this week">
+                            {{ $trip->driver_score->score }} · {{ $trip->driver_score->level->label() }}
+                        </span>
+                    @endif
                     <span data-book-link class="ml-auto font-semibold text-forest-700 group-hover:underline">View &amp; book →</span>
                 </div>
             </a>

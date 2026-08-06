@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Enums\Corridor;
+use App\Enums\DriverScoreLevel;
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Enums\VerificationLevel;
+use App\Models\DriverScore;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -333,5 +335,63 @@ class TripTest extends TestCase
         $trip = Trip::factory()->forDriver($driver)->create();
 
         $this->get("/trips/{$trip->id}")->assertRedirect('/login');
+    }
+
+    public function test_board_card_shows_driver_scorecard_badge(): void
+    {
+        $driver = $this->driver();
+        $trip = Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Kubwa → CBD',
+            'departure_time' => now()->addMinutes(15),
+        ]);
+
+        DriverScore::create([
+            'user_id' => $driver->id,
+            'period_start' => now()->startOfWeek()->toDateString(),
+            'period_end' => now()->endOfWeek()->toDateString(),
+            'rides_completed' => 12,
+            'score' => 82,
+            'level' => DriverScoreLevel::Gold,
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertSee('82 · Gold');
+    }
+
+    public function test_board_card_omits_scorecard_without_snapshot(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Kubwa → CBD',
+            'departure_time' => now()->addMinutes(15),
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertSee('Kubwa → CBD')
+            ->assertDontSee('Gold driver');
+    }
+
+    public function test_trip_detail_shows_driver_scorecard(): void
+    {
+        $driver = $this->driver();
+        $trip = Trip::factory()->forDriver($driver)->create();
+
+        DriverScore::create([
+            'user_id' => $driver->id,
+            'period_start' => now()->startOfWeek()->toDateString(),
+            'period_end' => now()->endOfWeek()->toDateString(),
+            'rides_completed' => 40,
+            'score' => 95,
+            'level' => DriverScoreLevel::Platinum,
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get("/trips/{$trip->id}")
+            ->assertOk()
+            ->assertSee('95 Platinum driver');
     }
 }
