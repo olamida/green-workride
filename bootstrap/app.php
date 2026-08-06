@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EffectiveRoleMiddleware;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureDriverVerified;
 use App\Http\Middleware\EnsureNotBanned;
@@ -18,6 +19,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(append: [
+            EffectiveRoleMiddleware::class,
+        ]);
+
         $middleware->alias([
             'admin' => EnsureAdmin::class,
             'verified.worker' => EnsureVerifiedWorker::class,

@@ -1,0 +1,524 @@
+I reviewed your 3 implementation docs — you have 22 models, 10 enums, triple balance wallet, GTFS publisher, road intelligence, time-bank already built. The docs show a feature-complete but form-first app, not navigation-first. Your suggestions are correct.
+
+Here is the comprehensive guide to implement them:
+
+WORKRIDE NAVIGATION-FIRST REDESIGN & BRANDING UPGRADE — Implementation Guide v5.0
+Problem: Current app is dashboard-first (like Jira). Users want "Where are you going?" first (like Google Maps/Uber). Admin sidebar has 30+ flat items, not mobile friendly. Map is top-view, empty on zoom, no road labels/arrows. No timing, no progress wizard.
+
+1. GLOBAL BRANDING UPGRADE (Across whole app)
+Create Single Source of Truth: resources/css/design-system.css
+
+Current workride green is flat. Upgrade to premium system:
+
+CSS
+@theme {
+  --color-primary: #0F5132; /* Deep Forest - trust, govt */
+  --color-primary-light: #2E7D32;
+  --color-accent: #FFC300; /* Safety Yellow - for CTA, live */
+  --color-surface: #F6F9F6;
+  --color-ink: #0F172A;
+  --font-heading: 'Sora', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --radius-card: 16px;
+  --shadow-live: 0 0 0 4px rgba(46,125,50,0.15);
+}
+
+7 lines hidden
+Actions:
+
+Replace all bg-green-600 with bg-[var(--color-primary)] via Pint replace
+New logo: Rounded "W" with road + location pin negative space, animated 2s splash (keep existing splash structure in USER-GUIDE)
+Update manifest.json: theme_color: #0F5132, add 512px maskable icon
+All cards: glassmorphism backdrop-blur-xl bg-white/80 border border-white/50 shadow-sm + 16px radius
+Buttons: Primary = Forest, 48px min height (thumb friendly), Accent = Yellow for "Join Ride"
+Mobile-first rider / Laptop-first admin split:
+
+Rider PWA: layouts/app → bottom navigation (5 items max), no sidebar, 100% mobile. Tailwind max-w-[480px] mx-auto container like WhatsApp
+Admin: layouts/admin → sidebar collapsible, desktop-first (1024px+), but responsive with drawer on mobile for testing. Admin who goes to user section must switch role via RoleSwitcherService.
+2. RE-ORGANIZE AS NAVIGATION APP — Core UX Rewrite
+Current: Topnav → Trips → filter corridor → card list
+New: Google Maps pattern
+
+New Rider Home / (Mobile Focused):
+
+Code
+[Header: Logo + Bell + Avatar]
+[Where to? Search Bar - BIG, sticky, with mic icon]
+[Corridor Chips horizontal scroll: All, Kubwa→CBD, Nyanya→Idu, Lugbe→CBD, Garki→Wuse - each shows "12 leaving"]
+[Map - 60% screen height, tilted, live vehicles]
+[Bottom Sheet - drag up: Nearby Rides Going Your Way]
+Flow 1: Passenger Journey (First contact):
+
+Where are you going? User types destination: "Federal Secretariat" → Use places table (junctions + workplaces + OSRM geocoding) with autocomplete. You have 45 junctions seeded (Nyanya, Zuba, Suleja, Gwagwalada, Lugbe etc) — use them as search index.
+How? After destination picked → Show Direction Options:
+Share Ride (Carpool - cheapest)
+Join Staff Bus (Coaster - scheduled)
+Volunteer Free (if exists)
+Show ETA, fare, seats, CO2
+Pick ride: List of trips going that way — using your TripMatchingService Haversine 2km + corridor + time window (already built). Sort by departure time soonest.
+Book: Progress wizard (see #6) → Payment → Share link generation: /trips/{id}/share?ref={user} — anyone with link can join same ride (creates referral tracking)
+In-Trip: Live view with junctions as milestones
+Implementation:
+
+New controller: NavigationController with search(Request: q), directions(from, to), nearby(lat,lng)
+New service: NavigationService that merges TripMatchingService + GeofenceService + RoutingService (OSRM chain you already have)
+Frontend: resources/js/navigation/search.js Alpine component x-data="whereTo()" with debounce 300ms, calls /api/v1/navigation/search
+Reuse existing junctions table as primary search source + fallback to OSRM geocode
+Traditional Transport Scenarios Mapping:
+
+Scenario
+
+Current
+
+New Navigation
+
+Join existing car/bus
+
+Filter board
+
+Search destination → see cars going there
+
+Order vehicle
+
+Publish trip
+
+"Schedule Ride" button → wizard
+
+Book ride
+
+Book button
+
+Bottom sheet → Join → progress bar → QR
+
+On-route user
+
+Chat
+
+Live map with junctions + ETA to next junction
+
+3. LIVE TRIP PROGRESS THROUGH JUNCTIONS (Driver, Passenger, Admin)
+You have TripWaypoint already. Upgrade it:
+
+Add columns to trip_waypoints: eta_minutes, is_major_hub, distance_from_origin_km
+
+Trip Progress UI:
+
+For active trip, show horizontal stepper + map:
+
+Code
+[Driver] ●━━━━●━━━━●━━━━○━━━━○
+        Berger Banex Wuse Secretariat
+        6:30am 6:45 ETA 7:10 7:30
+        ✓ Passed ✓ Passed Live → Pending
+Backend:
+
+TripService::calculateProgress(trip) — for each waypoint, compute ETA using RoutingService + current location
+Broadcast TripLocationUpdated every 15s via Reverb (you already have)
+Admin sees same view in /admin/trips/{id}/live
+Map: Show driver marker + polyline + waypoint markers with checkmarks. Use Leaflet L.polyline with arrow decorator plugin leaflet-polylinedecorator for direction arrows (like Google Maps).
+
+4. MAP UPGRADE — Tilted, Road Labels, Arrows, Meaningful Zoom
+Problem: Zoom to location shows empty map.
+
+Solution Stack (Keep Leaflet — Don't switch to Mapbox yet to keep $0):
+
+Tiles: Switch from OSM default to CartoDB Positron or Stadia Alidade Smooth for clean road labels. Or use MapTiler free tier with road labels + 3D.
+JavaScript
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png')
+Tilted view: Leaflet doesn't natively tilt, but simulate:
+Use Leaflet Tilted effect: CSS transform: perspective(800px) rotateX(30deg) on map container for ride view OR
+Better: Use MapLibre GL JS (open-source Mapbox GL fork) for true 3D pitch map.setPitch(45) + bearing. Keep Leaflet for admin, MapLibre for rider navigation view. Both can use same tiles.
+Road labels & arrows:
+Add leaflet-polylinedecorator for arrows along route
+Add junction labels: L.marker(junction).bindTooltip("Berger Junction", {permanent: true})
+After selecting location, map.flyTo([lat][lng], 15, {duration: 1.5}) + show 1km radius circle with "Rides near here" + fetch nearby trips
+If zoomed area has no trips, show "No rides here, be first to publish? " + demand check-in button[Publish]
+Zoom fix: On search select, don't just zoom to point. Do fitBounds with padding + show corridor chip context. If junction, zoom 15 + show 500m geofence circle.
+Implementation:
+
+New component: resources/views/components/map/navigation-map.blade.php — props: center, zoom, pitch, showArrows, waypoints
+New JS: resources/js/map/navigation.js — init MapLibre or Leaflet with arrow decorator
+Install: npm install leaflet-polylinedecorator maplibre-gl
+5. ADMIN SIDEBAR RE-GROUPING (Control Tower)
+Current flat 30+ items → Group into 5 packages with dropdown + topnav.
+
+New Structure config/admin_nav.php:
+
+PHP
+[
+  'operations' => ['label'=>'Operations','icon'=>'truck','items'=>['trips','bookings','live-map','driver-scores','fleet']],
+  'people' => ['label'=>'People','icon'=>'users','items'=>['users','verifications','employers','workplaces','junctions']],
+  'finance' => ['label'=>'Finance','icon'=>'wallet','items'=>['wallets','transactions','subsidies','business','stakeholders','payouts']],
+  'intelligence' => ['label'=>'Intelligence','icon'=>'map','items'=>['road-map','road-events','gtfs','demand','forecasts','impact']],
+  'system' => ['label'=>'System','icon'=>'settings','items'=>['activity-logs','api-costs','imports','flags']]
+]
+
+2 lines hidden
+UI:
+
+Sidebar: Accordion dropdown, active package highlighted, badge counts (e.g., Verifications 12 pending)
+Topnav: Search command palette (⌘K) that searches all admin pages (you have Alpine dispatch bug fix in DEV-GUIDE — use native CustomEvent)
+Reduce topnav links to 4: Dashboard | Operations | Finance | Intelligence + user menu + role switcher "View as: Passenger/Driver/Admin"
+Role Switcher: Admin can "View as Passenger" — sets session view_as_role = passenger — middleware EnsureVerifiedWorker sees this role, so admin can test user flow without leaving admin.
+
+6. PROGRESS TRACKER / WIZARD (Everywhere)
+Where to add:
+
+Onboarding: Phone OTP → Workplace ID → NIN → Driver docs — show 4-step wizard with progress bar
+Publish Trip: Route → Schedule → Vehicle → Fare → Review — stepper
+Booking: Select Ride → Pickup → Payment → Confirm — 4 steps, show timing at each
+Trip Progress: Waypoints stepper (above)
+Component: resources/views/components/progress-wizard.blade.php props: steps, current, showTime
+
+Use Tailwind + Alpine for animated progress.
+
+7. TIMING INDICATORS (Critical for navigation app)
+Add to ALL relevant views:
+
+Before trip: "Leaves in 12 mins", "Driver arrives in 5 mins (500m away)", "Time to pickup: 8 mins walk"
+During trip: "ETA Secretariat 7:10am (12 mins left)", "Next: Wuse Market in 4 mins", "Delayed 5 mins due to traffic"
+Bus scheduling: "Bus every 15 mins peak, 30 mins off-peak. Next: 7:30am"
+Implementation:
+
+TripService add getTimingAttributes() returns minutesToDeparture, etaToPickup, etaToDestination, delayMinutes
+Use Carbon::diffForHumans() + ->addMinutes()
+Frontend: Alpine x-init="setInterval(()=>updateEta(), 30000)" — refresh every 30s
+Notifications: When driver enters 500m geofence, push FCM "Driver arriving in 2 mins"
+8. BUS & RIDE SCHEDULING — World-Class Flow
+Research: Citymapper, Transit app, Google Maps transit, Uber Shuttle
+
+Best patterns:
+
+For Staff Bus (Coaster, fixed route, fixed schedule):
+Create BusSchedule model: route_id (FK GtfsRoute), vehicle_id, driver_id, departure_time, frequency (15m peak), days (mon-fri)
+UI: Calendar view like Google Calendar + list of trips generated from schedule
+Passenger: Sees "Bus leaves Berger every 15 mins 6:30-9am. Next 3: 7:15, 7:30, 7:45 — Book seat"
+Use GenerateRecurringTripsJob that runs daily 5am to create actual Trip records from BusSchedule
+For Carpool (on-demand, flexible):
+Keep publish flow but add recurring option: "Repeat Mon-Fri" — creates multiple Trip records
+Show driver availability calendar
+Allow instant vs scheduled: Toggle "Leave now" vs "Schedule for later" — if now, set departure_time = now+15m
+Scheduling UI:
+Date picker: Show demand forecast from ForecastService — "Friday 2:30pm after Juma'a — high demand expected"
+Time picker: Show peak indicator
+Route builder: Click map to add waypoints (Berger, Banex...) — you already have trip_waypoints
+Files to create:
+
+app/Models/BusSchedule.php
+app/Services/SchedulingService.php
+resources/views/admin/scheduling/index.blade.php — with FullCalendar.js (open source)
+IMPLEMENTATION ROADMAP (4 Sprints, 3 Weeks)
+Sprint 1: Foundation (Week 1)
+
+Branding upgrade: design-system.css, new icons, mobile container
+Admin nav grouping: config/admin_nav.php + accordion sidebar + role switcher
+Install map libs: leaflet-polylinedecorator, maplibre-gl
+Sprint 2: Navigation-First (Week 2)
+
+Build NavigationController + search + directions
+New rider home / with Where to? bar + Corridor Chips + bottom sheet
+Map upgrade: tilted view, road labels, arrows, fitBounds fix
+Share link feature: /trips/{id}/share?ref=
+Sprint 3: Live & Timing (Week 2-3)
+
+Trip progress stepper + waypoint ETAs + live map
+Timing indicators everywhere + 30s refresh + FCM geofence
+Progress wizard component + apply to onboarding, publish, booking
+Sprint 4: Scheduling & Polish (Week 3)
+
+BusSchedule model + recurring trips job
+Admin mobile friendly: responsive drawer + command palette
+QA: Test on real phone on Berger→Secretariat route
+Definition of Done per DEV-GUIDE: pint, phpstan, php artisan test, npm run build, update DEVELOPMENT-LOG.md
+
+This makes WorkRide feel like Citymapper + Waze + Uber Shuttle combined, but for Abuja's informal junctions — exactly what wins Apple Design Award Social Impact like Watch Duty did.
+
+-----------------------------------------------
+
+Based on your 3 implementation docs + the input_section.txt you attached, here is the redrafted comprehensive guide — this version replaces my last response and is aligned 100% to your stated navigation-first direction.
+
+I reviewed your current state: Modular monolith Laravel 11, 22 models, TripWaypoint, TripMatchingService with 2km Haversine, GeofenceService 500m, RoutingService OSRM chain, WalletService triple balance with optimistic locking, Reverb live events. The core logic is solid — the UX is not navigation-first yet.
+
+WorkRide v5.0 — Navigation-First Redesign, Map Upgrade & Control Tower Mobile Fix
+Comprehensive Implementation Guide
+Mandate from input_section.txt: Make search box the new front door. Make map clear, labelled, slightly perspective when guiding. Make progress through city visible. Make Admin usable on phone. Protect engineering excellence already shipped.
+
+A. RE-ORGANISE AROUND TRUE NAVIGATION-FIRST MENTAL MODEL
+New primary job: When user opens WorkRide, first question interface must answer is:
+“Where are you going?” → “How can I get there?” → “How do I join / pay / share?”
+This replaces old “browse corridors first”.
+
+New Rider Information Architecture (Mobile Focused):
+
+Priority
+
+Screen / Action
+
+Purpose
+
+1
+
+Home / Search
+
+Large "Where are you going?" search + recent/favourite destinations + live Corridor Chips as shortcuts (Kubwa→CBD 12 leaving)
+
+2
+
+Results
+
+List + map of options: Join existing live trip, Book ahead, Demand check-in, Share link to join friend's trip
+
+3
+
+Booking / Join
+
+Payment + seat confirmation (your existing atomic flow with hold/capture)
+
+4
+
+Connect Guide + Live Progress
+
+Last-mile walking guide + live trip progress through junctions (Berger, Banex, Wuse...)
+
+5
+
+My Rides / Wallet / Impact / More
+
+Secondary
+
+Traditional transport scenarios you listed — must support cleanly:
+
+Join already-moving car/bus going my way (live seat + share link)
+Book future seat on published corridor trip
+Driver publishes trip → passengers join
+Passenger already on trip shares private link so colleague can request to join same vehicle — /trips/{id}/share?ref={userId} → referral tracked, atomic seat check
+Demand signal "I'm at Berger, need CBD" that seeds empty states and driver supply — your DemandService + probe_demand_points already exists, now surface it on Results screen when no trip found
+Live progress visible to passenger, driver and Control Tower as vehicle passes defined junctions/milestones
+This keeps corridor + verification + fixed-fare DNA from APP-GUIDE v1.0, but first 3 seconds feel like Google Maps/Citymapper.
+
+Implementation:
+
+New NavigationController: search(q), directions(from,to), nearby(lat,lng) — reuses junctions (45 locations: Nyanya, Zuba, Suleja, Gwagwalada, Lugbe etc from seeding prompt) as search index + fallback to OSRM geocode
+New service NavigationService merges TripMatchingService + GeofenceService + RoutingService
+Frontend Alpine x-data="whereTo()" with debounce 300ms → /api/v1/navigation/search
+B. MAP QUALITY — DIAGNOSIS & WAY FORWARD
+Current problems you reported: After selecting location map zooms to almost empty / meaningless view, pure top-down, missing road labels, direction arrows, slight perspective.
+
+Research Summary 2025-2026:
+
+Library
+
+Bundle
+
+Tilt/Pitch
+
+Vector Labels
+
+Cost
+
+Fit for WorkRide
+
+Leaflet (current)
+
+∼40kb
+
+No native
+
+Limited (plugins)
+
+Free
+
+Excellent for 3G, but limited visual quality
+
+MapLibre GL JS
+
+∼200-290kb
+
+Yes (up to 85°)
+
+Excellent
+
+Free (OpenFreeMap, Protomaps)
+
+Best open-source upgrade path
+
+Mapbox GL JS
+
+∼300kb
+
+Yes
+
+Excellent
+
+Paid after free tier
+
+Avoid for cost & open-data story
+
+Recommended Path (Staged):
+
+Phase 1 — Immediate (Keep Leaflet, fix empty-zoom):
+
+Use better tiles with labels: CartoDB Positron/Voyager, Stadia, or OpenFreeMap raster
+Always fitBounds with generous padding 40-80px when showing origin + destination + route — never setView to single point
+Add direction arrows on polyline: Leaflet.PolylineDecorator or leaflet-arrowheads plugin
+Set sensible minZoom=10 and maxBounds for Abuja FCT polygon so map never zooms into empty tiles
+Show road names via labels-only overlay pane, origin "You" and vehicle pins always visible and labelled
+On destination select → smooth flyTo/fitBounds with full route in view
+Phase 2 — High-impact upgrade (Award-grade look):
+
+Introduce MapLibre GL JS for main Trips map and Connect Guide — feature-flagged FEATURE_MAPLIBRE
+Use free vector tiles: OpenFreeMap (no key, unlimited) or Protomaps / self-hosted PMTiles
+Enable moderate pitch 35-55° for gentle "front-of-the-road" view during active navigation — NOT extreme 70-85° that kills low-end Android
+Vector tiles give sharp road labels, better contrast, brandable in Forest Green #0F5132
+Keep Leaflet as fallback for very light public pages if bundle size critical
+Reuse existing RoutingService geometry, only renderer changes
+Acceptance for map:
+
+After selecting any destination (Nyanya, Zuba, Gwagwalada, Lugbe) map always shows meaningful context (roads, labels, both pins, full route)
+Active Connect Guide feels clearer than generic top-down
+Performance acceptable on mid-range Android + 3G
+C. LIVE TRIP PROGRESS THROUGH JUNCTIONS (Milestones)
+You have TripWaypoint model — upgrade it:
+
+Add eta_minutes, is_major_hub, distance_from_origin_km, geofence_radius 100m
+Define small ordered list of named junctions per corridor from your 45 junctions: e.g., Kubwa-CBD: Suleja → Zuba → Kubwa Junction → Dutse → Berger → Banex → Wuse → Secretariat
+As vehicle live location crosses each geofence, broadcast TripLocationUpdated + WaypointReached via Reverb (you already have this event)
+Shared Progress Tracker component visible to:
+Passenger (Connect Guide + My Rides)
+Driver (live trip view)
+Control Tower (ops live view)
+Visual: Horizontal stepper on desktop, vertical on mobile:
+Booked → Approaching Berger → At Berger → En-route to CBD → Arriving → Completed
+Current step highlighted Forest Green, past muted, future outlined, with ETA: "Next: Banex in 4 mins", "ETA Secretariat 7:10am (12 mins left)", "Time to pickup: 5 mins"
+
+D. BRANDING UPGRADE ACROSS WHOLE APP + MOBILE FOCUS
+Design Tokens — Single file resources/css/design-system.css:
+
+CSS
+@theme {
+  --color-primary: #0F5132; --color-primary-light: #2E7D32;
+  --color-accent: #FFC300; --color-surface: #F6F9F6; --color-ink: #0F172A;
+  --font-heading: 'Sora'; --font-body: 'Inter'; --radius-card: 16px;
+}
+Apply to Rider + Admin. Same tokens, Admin just denser (slate variant allowed).
+
+Mobile-Focused Rider / Laptop-Focused Admin:
+
+Rider PWA: layouts/app → bottom navigation 5 items max (Home, Trips, My Rides, Wallet, More), max-w-[480px] mx-auto container, 48px touch targets, no sidebar
+Admin: layouts/admin → sidebar desktop-first but responsive with drawer/bottom nav for 4-5 most used on mobile for testing. Admin who goes to user section must switch role via RoleSwitcherService — session view_as_role, so EnsureVerifiedWorker sees switched role
+E. ADMIN SIDEBAR — GROUP INTO PACKAGES + MOBILE-FRIENDLY
+Current 30+ flat items → Group into 5 collapsible packages (Filament NavigationGroup or custom Blade equivalent):
+
+Operations: Live Trips, Demand, Fleet Assignment, Verifications, SOS
+People: Users, Drivers, Employers/Programmes, Workplaces, Junctions
+Intelligence: Road Heatmap, GTFS, Impact & Certificates, Reports, Forecasts
+Business: Wallets, Subsidies, Settlements, API Keys, Time-Bank Trust, Payouts, Stakeholders
+System: Feature Flags, Settings, Activity Logs, Seeder/Demo Tools, Api Costs
+Groups collapsible, badge counts (e.g., Verifications 12 pending), desktop collapsible to icons via sidebarCollapsibleOnDesktop()
+Mobile: hamburger + slide-over + bottom navigation for Live Trips, Demand, Fleet, Verifications, More
+Tables: Use Filament Split/Stack responsive patterns, touch targets ≥44px
+Topnav: Simplify once groups exist, add command palette ⌘K (fix Alpine $dispatch bug per DEV-GUIDE: use window.dispatchEvent(new CustomEvent(...)))
+F. PROGRESS TRACKERS / WIZARDS + TIMING
+Add consistent stepper where user can get lost:
+
+Booking flow: Destination → Options → Payment → Confirmed
+Driver Publish flow: Corridor → Time/Seats → Vehicle/Inspection → Publish
+Verification level upgrades
+Connect Guide mini walking progress
+Stepper uses design tokens, accessible, collapses to dots on mobile, respects reduced-motion.
+
+Timing indicators (critical for navigation app):
+
+Before trip: "Leaves in 12 mins", "Driver arrives in 5 mins (500m away)", "Time to get to pickup: 8 mins walk"
+During trip: "ETA Secretariat 7:10am (12 mins left)", "Next: Wuse Market in 4 mins"
+Bus scheduling: "Bus every 15 mins peak, 30 mins off-peak. Next: 7:30am"
+Implementation: TripService::getTimingAttributes() returns minutesToDeparture, etaToPickup, etaToDestination, delayMinutes using Carbon + RoutingService. Frontend Alpine setInterval(updateEta, 30000) + FCM push on 500m geofence enter.
+
+G. BUS & RIDE SCHEDULING — WORLD-CLASS FLOW
+Inspired by Citymapper, Transit, Uber Shuttle:
+
+Staff Bus (Coaster, fixed route):
+
+New model BusSchedule: route_id (GtfsRoute), vehicle_id, driver_id, departure_time, frequency 15m peak / 30m off-peak, days mon-fri
+UI: Calendar + list of generated trips, shows demand forecast from ForecastService ("Friday Juma'a + FAAC → 0.7 on CBD, extra buses after 2:30pm")
+Passenger sees: "Bus leaves Berger every 15 mins 6:30-9am. Next 3: 7:15, 7:30, 7:45 — Book seat"
+Job GenerateRecurringTripsJob runs daily 5am to create actual Trip records from BusSchedule
+Carpool (on-demand):
+
+Keep publish flow but add recurring toggle "Repeat Mon-Fri", instant vs scheduled "Leave now" (now+15m) vs "Schedule for later"
+Files: BusSchedule model, SchedulingService, resources/views/admin/scheduling/index.blade.php with FullCalendar.js (open source)
+
+H. IMPLEMENTATION ORDER
+Execute in sequence, small commits, pint + phpstan + test + build after each:
+
+Design-system tokens confirmed in Admin + Rider
+Navigation-first Home + Search + Results screen
+Leaflet fixes: fitBounds, labels, arrows, no empty zoom
+Share-to-Join link + join request flow
+Live junction Progress Tracker + Reverb events + timing indicators
+Progress steppers on Booking and Publish flows
+Admin sidebar grouping into packages + mobile responsiveness + role switcher
+MapLibre evaluation feature-flagged for Connect Guide (pitch + vector labels)
+BusSchedule + recurring trips
+Accessibility + reduced-motion pass + update DEVELOPMENT-LOG.md
+Definition of Done for this extension (from input_section.txt):
+
+Opening app immediately presents "Where are you going?"
+User goes destination → join live / book / share in very few taps
+Map never shows empty/meaningless view; route + labels + pins always clear
+Live trip progress through junctions visible to passenger, driver, admin
+Share link allows colleague to request to join ongoing ride safely
+Admin sidebar grouped, collapsible, usable on mobile
+Progress steppers on multi-step flows
+Entire app uses same design tokens, feels premium, coherent
+All money, verification, seat invariants intact (per DEV-GUIDE non-negotiables)
+Tests green, pint clean, build succeeds
+This makes first 3 seconds feel world-class navigation, while deeper experience remains uniquely WorkRide: verified colleagues, fixed fares, junction intelligence, Time-Bank.
+
+
+
+-------------------------
+
+Here are your 4 standalone sprint prompts — each copy-paste ready for an AI code writer, with exact file paths, code snippets, and acceptance criteria.
+
+📦 Download All 4:
+**
+
+Loading artifact...
+
+SPRINT-1-FOUNDATION-BRANDING-ADMIN.md
+MD
+** — Design-system.css single token file, mobile-first rider max-w-[480px], admin grouped into 5 packages (Operations, People, Intelligence, Business, System) with collapsible accordion + bottom nav on mobile, role switcher "View as Passenger", install leaflet-polylinedecorator + maplibre-gl
+
+**
+
+Loading artifact...
+
+SPRINT-2-NAVIGATION-HOME-SEARCH-MAP.md
+MD
+** — Navigation-first Home: big "Where are you going?" search bar + Corridor Chips with live counts + 60% map + bottom sheet. Backend NavigationController search/directions/nearby using your 45 junctions (Nyanya, Zuba, Suleja, Gwagwalada, Lugbe) + TripMatchingService. Map fixes: CartoDB Positron tiles with labels, fitBounds with padding (never empty zoom), direction arrows via PolylineDecorator, minZoom=10 + maxBounds FCT. Share-to-join link /trips/{id}/share?ref= with QR
+
+**
+
+Loading artifact...
+
+SPRINT-3-LIVE-PROGRESS-TIMING-WIZARDS.md
+MD
+** — trip_waypoints upgrade with eta_minutes, is_major_hub, geofence_radius. Events WaypointReached + TripLocationUpdated via Reverb. Shared progress-tracker component horizontal/vertical: Booked → Approaching Berger → At Berger → En-route → Arriving. Timing everywhere: "Leaves in 12 mins", "ETA 7:10am (12 mins left)", "Next: Wuse in 4 mins", "Time to pickup: 8 mins walk" + 30s refresh + 500m geofence FCM push. Progress wizards: Booking (Destination→Options→Payment→Confirmed) + Publish (Corridor→Time/Seats→Vehicle→Publish) + verification. Secure share request flow: A shares → B requests → driver approves → atomic seat decrement + referred_by
+
+**
+
+Loading artifact...
+
+SPRINT-4-SCHEDULING-MAPLIBRE-POLISH.md
+MD
+** — BusSchedule model + SchedulingService + GenerateRecurringTripsJob daily 5am + FullCalendar.js admin calendar with demand forecast from ForecastService ("Friday Juma'a + FAAC → 0.7x"). Carpool recurring toggle. MapLibre upgrade: OpenFreeMap free vector tiles (no key), pitch 35-55° gentle front-view, Forest Green route, direction arrows, feature-flag FEATURE_MAPLIBRE, fallback to Leaflet on low-end. Final polish: VoiceOver announces junctions, respects prefers-reduced-motion, bundle code-split, <2s on 3G, admin tables responsive Split/Stack, touch targets ≥44px
+
+Execution Order from input_section.txt §F:
+
+Design tokens → 2. Navigation Home + Search → 3. Leaflet fixes → 4. Share-to-Join → 5. Live Progress Tracker + Reverb → 6. Steppers → 7. Admin grouping + mobile → 8. MapLibre flagged upgrade → 9. Accessibility pass → 10. Update DEVELOPMENT-LOG.md
+Definition of Done (input_section.txt §G): Opening shows "Where are you going?", destination → join live/book/share in few taps, map never empty with labels+arrows+pins, live progress through junctions visible to passenger/driver/admin, share link allows colleague to request join safely, admin grouped/collapsible/mobile-usable, progress steppers, same tokens everywhere, money/verification/seat invariants intact, tests green.
+
+
+

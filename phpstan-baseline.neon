@@ -139,6 +139,24 @@ parameters:
 			path: app/Http/Controllers/Admin/AdminController.php
 
 		-
+			message: '#^Parameter \#1 \$admin of method App\\Services\\RoleSwitcherService\:\:reset\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/AdminController.php
+
+		-
+			message: '#^Parameter \#1 \$admin of method App\\Services\\RoleSwitcherService\:\:switch\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/AdminController.php
+
+		-
+			message: '#^Parameter \#1 \$user of method App\\Services\\RoleSwitcherService\:\:effectiveRole\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/AdminController.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\Wallet\|stdClass\:\:\$cash\.$#'
 			identifier: property.notFound
 			count: 1
@@ -367,6 +385,12 @@ parameters:
 			path: app/Http/Controllers/Admin/EmployerController.php
 
 		-
+			message: '#^Method App\\Http\\Controllers\\Admin\\EmployerController\:\:report\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Admin/EmployerController.php
+
+		-
 			message: '#^Method App\\Http\\Controllers\\Admin\\EmployerController\:\:reviewMember\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -393,6 +417,12 @@ parameters:
 		-
 			message: '#^Method App\\Http\\Controllers\\Admin\\EmployerController\:\:vehicles\(\) has no return type specified\.$#'
 			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Admin/EmployerController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, int\|false given\.$#'
+			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Admin/EmployerController.php
 
@@ -470,6 +500,12 @@ parameters:
 
 		-
 			message: '#^Method App\\Http\\Controllers\\Admin\\ForecastController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Admin/ForecastController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Admin\\ForecastController\:\:train\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Admin/ForecastController.php
@@ -637,6 +673,24 @@ parameters:
 			path: app/Http/Controllers/Admin/ScoreboardController.php
 
 		-
+			message: '#^Method App\\Http\\Controllers\\Admin\\SettingsController\:\:index\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Admin/SettingsController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Admin\\SettingsController\:\:store\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Admin/SettingsController.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method App\\Models\\ActivityLog\:\:log\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Admin/SettingsController.php
+
+		-
 			message: '#^Method App\\Http\\Controllers\\Admin\\StakeholderController\:\:index\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -673,9 +727,33 @@ parameters:
 			path: app/Http/Controllers/Admin/SubsidyController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$email\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
 			message: '#^Cannot access property \$value on string\.$#'
 			identifier: property.nonObject
-			count: 10
+			count: 11
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Cannot call method toDateTimeString\(\) on Carbon\\Carbon\|null\.$#'
+			identifier: method.nonObject
+			count: 1
 			path: app/Http/Controllers/Admin/TrustController.php
 
 		-
@@ -691,26 +769,56 @@ parameters:
 			path: app/Http/Controllers/Admin/TrustController.php
 
 		-
+			message: '#^Method App\\Http\\Controllers\\Admin\\TrustController\:\:exportPayItForward\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
 			message: '#^Method App\\Http\\Controllers\\Admin\\TrustController\:\:index\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Admin/TrustController.php
 
 		-
-			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
+			message: '#^Method App\\Http\\Controllers\\Admin\\TrustController\:\:payItForward\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Parameter \#1 \$boolean of function abort_unless expects bool, int\|false given\.$#'
 			identifier: argument.type
 			count: 2
 			path: app/Http/Controllers/Admin/TrustController.php
 
 		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\RideCredit\>\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Parameter \#1 \$stream of function fputcsv expects resource, resource\|false given\.$#'
+			identifier: argument.type
+			count: 4
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
 			message: '#^Parameter \#1 \$stream of function rewind expects resource, resource\|false given\.$#'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: app/Http/Controllers/Admin/TrustController.php
 
 		-
 			message: '#^Parameter \#1 \$stream of function stream_get_contents expects resource, resource\|false given\.$#'
 			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\RideCredit\>\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
 			count: 1
 			path: app/Http/Controllers/Admin/TrustController.php
 
@@ -724,6 +832,24 @@ parameters:
 			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\TrustLedgerType\:\:TimeBankFloat will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
 			count: 1
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>email" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Admin/TrustController.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
 			path: app/Http/Controllers/Admin/TrustController.php
 
 		-
@@ -1565,6 +1691,24 @@ parameters:
 			identifier: missingType.return
 			count: 1
 			path: app/Http/Controllers/Web/AuthController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$status\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$trip\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
+			message: '#^Cannot access property \$bookings on App\\Models\\User\|null\.$#'
+			identifier: property.nonObject
+			count: 3
+			path: app/Http/Controllers/Web/BookingController.php
 
 		-
 			message: '#^Cannot call method canBook\(\) on App\\Models\\User\|null\.$#'
@@ -2473,6 +2617,18 @@ parameters:
 			path: app/Http/Controllers/Web/TripBoardController.php
 
 		-
+			message: '#^Cannot call method canBook\(\) on App\\Models\\User\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/TripBoardController.php
+
+		-
+			message: '#^Cannot call method canBookBenefits\(\) on App\\Models\\User\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/TripBoardController.php
+
+		-
 			message: '#^Cannot call method canDrivePaid\(\) on App\\Models\\User\|null\.$#'
 			identifier: method.nonObject
 			count: 1
@@ -2755,6 +2911,24 @@ parameters:
 			path: app/Http/Requests/StoreP2pTransferRequest.php
 
 		-
+			message: '#^Cannot access property \$dayOfWeek on Carbon\\Carbon\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Jobs/CalculateDemandForecastJob.php
+
+		-
+			message: '#^Cannot call method format\(\) on Carbon\\Carbon\|null\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Jobs/CalculateDemandForecastJob.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Jobs/CalculateDemandForecastJob.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\RideRating\:\:\$avg\.$#'
 			identifier: property.notFound
 			count: 1
@@ -2819,6 +2993,12 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Jobs/DeleteExpiredSelfiesJob.php
+
+		-
+			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:notify\(\)\.$#'
+			identifier: method.notFound
+			count: 1
+			path: app/Jobs/SendRideCreditRemindersJob.php
 
 		-
 			message: '#^Class App\\Models\\ActivityLog uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
@@ -2935,6 +3115,12 @@ parameters:
 			path: app/Models/Booking.php
 
 		-
+			message: '#^Class App\\Models\\ChargingStation uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/ChargingStation.php
+
+		-
 			message: '#^Class App\\Models\\ChatMessage uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
 			identifier: missingType.generics
 			count: 1
@@ -2995,6 +3181,12 @@ parameters:
 			path: app/Models/CommunityTrust.php
 
 		-
+			message: '#^Class App\\Models\\DemandForecast uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/DemandForecast.php
+
+		-
 			message: '#^Class App\\Models\\DemandRequest uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
 			identifier: missingType.generics
 			count: 1
@@ -3033,6 +3225,24 @@ parameters:
 		-
 			message: '#^Class App\\Models\\DriverScore uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
 			identifier: missingType.generics
+			count: 1
+			path: app/Models/DriverScore.php
+
+		-
+			message: '#^Method App\\Models\\DriverScore\:\:attachLatestToTrips\(\) has parameter \$trips with generic class Illuminate\\Support\\Collection but does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/DriverScore.php
+
+		-
+			message: '#^Method App\\Models\\DriverScore\:\:attachLatestToTrips\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/DriverScore.php
+
+		-
+			message: '#^Method App\\Models\\DriverScore\:\:forTrip\(\) has parameter \$trip with no type specified\.$#'
+			identifier: missingType.parameter
 			count: 1
 			path: app/Models/DriverScore.php
 
@@ -3275,6 +3485,24 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Junction.php
+
+		-
+			message: '#^Class App\\Models\\LeaseAgreement uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/LeaseAgreement.php
+
+		-
+			message: '#^Method App\\Models\\LeaseAgreement\:\:asset\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/LeaseAgreement.php
+
+		-
+			message: '#^Method App\\Models\\LeaseAgreement\:\:driver\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/LeaseAgreement.php
 
 		-
 			message: '#^Class App\\Models\\MaintenanceSchedule uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
@@ -4093,6 +4321,18 @@ parameters:
 			path: app/Notifications/EmployerWelcome.php
 
 		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Notifications/RideCreditDueSoon.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Notifications/RideCreditDueSoon.php
+
+		-
 			message: '#^Call to function in_array\(\) with arguments string, array\{App\\Enums\\BookingStatus\:\:Completed, App\\Enums\\BookingStatus\:\:Cancelled, App\\Enums\\BookingStatus\:\:NoShow\} and true will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
@@ -4429,6 +4669,72 @@ parameters:
 			path: app/Services/EmployerLedgerService.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$passenger\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$trip\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Cannot access property \$created_at on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Cannot call method toDateString\(\) on Carbon\\Carbon\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Method App\\Services\\EmployerReportService\:\:distanceKm\(\) has parameter \$trip with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Method App\\Services\\EmployerReportService\:\:pathKm\(\) has parameter \$points with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Method App\\Services\\EmployerReportService\:\:report\(\) return type with generic class Illuminate\\Support\\Collection does not specify its types\: TKey, TValue$#'
+			identifier: missingType.generics
+			count: 2
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Parameter \#1 \$callback of function array_map expects \(callable\(Illuminate\\Database\\Eloquent\\Model\)\: mixed\)\|null, Closure\(App\\Models\\Booking\)\: float given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Parameter \#1 \$groupBy of method Illuminate\\Support\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:groupBy\(\) expects \(callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: string\)\|list\<Closure\|string\>\|string, Closure\(App\\Models\\Booking\)\: string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>email" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/EmployerReportService.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$employer\.$#'
 			identifier: property.notFound
 			count: 1
@@ -4573,26 +4879,56 @@ parameters:
 			path: app/Services/ForecastService.php
 
 		-
+			message: '#^Cannot access property \$corridor on App\\Models\\DemandForecast\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/ForecastService.php
+
+		-
+			message: '#^Cannot access property \$date on App\\Models\\DemandForecast\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/ForecastService.php
+
+		-
 			message: '#^Cannot access property \$dayOfWeek on Carbon\\Carbon\|null\.$#'
 			identifier: property.nonObject
 			count: 1
 			path: app/Services/ForecastService.php
 
 		-
+			message: '#^Cannot access property \$hour on App\\Models\\DemandForecast\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Services/ForecastService.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/ForecastService.php
+
+		-
 			message: '#^Cannot call method format\(\) on string\.$#'
 			identifier: method.nonObject
-			count: 1
+			count: 2
 			path: app/Services/ForecastService.php
 
 		-
 			message: '#^Cannot call method label\(\) on string\.$#'
 			identifier: method.nonObject
-			count: 1
+			count: 2
 			path: app/Services/ForecastService.php
 
 		-
 			message: '#^Cannot call method toDateString\(\) on string\.$#'
 			identifier: method.nonObject
+			count: 3
+			path: app/Services/ForecastService.php
+
+		-
+			message: '#^Method App\\Services\\ForecastService\:\:learned\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
 			count: 1
 			path: app/Services/ForecastService.php
 
@@ -4609,8 +4945,20 @@ parameters:
 			path: app/Services/ForecastService.php
 
 		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\DemandForecast\>\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/ForecastService.php
+
+		-
 			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\Forecast\>\:\:map\(\) contains unresolvable type\.$#'
 			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/ForecastService.php
+
+		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<\(int\|string\),Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\DemandForecast\>\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
 			count: 1
 			path: app/Services/ForecastService.php
 
@@ -5281,6 +5629,18 @@ parameters:
 			path: app/Services/RoadIntelligenceService.php
 
 		-
+			message: '#^Method App\\Services\\RoleSwitcherService\:\:effectiveRole\(\) should return App\\Enums\\UserRole but returns App\\Enums\\UserRole\:\:Both\|App\\Enums\\UserRole\:\:Driver\|App\\Enums\\UserRole\:\:Passenger\|string\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/RoleSwitcherService.php
+
+		-
+			message: '#^Method App\\Services\\RoleSwitcherService\:\:effectiveRole\(\) should return App\\Enums\\UserRole but returns string\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/RoleSwitcherService.php
+
+		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.expr
 			count: 1
@@ -5437,6 +5797,18 @@ parameters:
 			path: app/Services/TripMatchingService.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$min_fare\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripMatchingService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$trip_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripMatchingService.php
+
+		-
 			message: '#^Cannot access property \$timestamp on string\.$#'
 			identifier: property.nonObject
 			count: 1
@@ -5445,6 +5817,12 @@ parameters:
 		-
 			message: '#^Cannot call method lte\(\) on string\.$#'
 			identifier: method.nonObject
+			count: 1
+			path: app/Services/TripMatchingService.php
+
+		-
+			message: '#^Instanceof between string and App\\Enums\\Corridor will always evaluate to false\.$#'
+			identifier: instanceof.alwaysFalse
 			count: 1
 			path: app/Services/TripMatchingService.php
 

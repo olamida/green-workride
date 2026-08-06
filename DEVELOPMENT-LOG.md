@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips + PHPStan Gate + STEP 3 UI/UX Pass — Corridor Stats Hero + Payment Picker + My Rides Segments + Guide From-To & Voice + Roadmap P1 Closed — Seeder README + Google OAuth Tests + Rider-Facing Driver Scorecards + Roadmap P3 Closed — Employer CSR Report + Pay-it-Forward Statement + Forecast ML Job + EV Lease Seams + Ride-Credit Reminders + Corridor Fare Config UI)
+## 2. Current Status (Phase: Foundation / … Roadmap P3 Closed — Employer CSR Report + Pay-it-Forward Statement + Forecast ML Job + EV Lease Seams + Ride-Credit Reminders + Corridor Fare Config UI + Navigation-First Sprint 1 — Admin Grouped Nav + Role Switcher + Map Common + UI Primitives)
 
 | Area | Status |
 |------|--------|
@@ -59,6 +59,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ STEP 3 UI/UX pass complete — corridor chip hero stats (`TripMatchingService::corridorStats` → per-corridor `· N trips · ₦min` on the board chips, live pulse preserved) + calm payment picker on `trips/show` (`x-payment-picker`: 56px tappable rows, checkmark, single Confirm-seat button, submit spinner, press feedback, free-ride label; posts a real `payment_method` for free rides since the controller validates `wallet|cash|subsidy_credit|ride_credit`) + My Rides segmented Active/Upcoming/Past control (`BookingController::index` grouping, `bookings/_booking-card` with Open Guide CTA + Cancel + Receipt + rating form) + connect guide from-to journey framing (`origin_text → boarding point` strip + Walk chip) + opt-in voice announcements (`x-guide-voice-toggle`, Web Speech, off by default, ~100 m distance nudges + arrived/missed messages, reduced-motion safe) + `OPENCODE_PROMPT_REBRAND.md` merged with `suggestion.txt` learnings (from-to/voice, open-source package shortlist, restrained motion principles, step status table) |
 | Feature modules | ✅ Roadmap P3 closed — Employer CSR report (3.14): `EmployerReportService` + `/admin/employers/{id}/report` printable monthly CO₂/fuel/trips/subsidy aggregate · Pay-it-forward statement (3.11): `/admin/trust/pay-it-forward` monthly rode/repaid/overdue/waived report + CSV export · Forecast ML job (3.9): `CalculateDemandForecastJob` trains 4-week same-weekday+hour baselines × event multipliers into `demand_forecasts` (14-day horizon, nightly + manual train) · EV lease-to-own schema seams (3.8, gated `FEATURE_EV_LEASE`): `assets.propulsion`, `telemetry.battery_soc`/`range_km`, `lease_agreements`, `charging_stations` · Ride-credit reminders (3.4): `SendRideCreditRemindersJob` + `RideCreditDueSoon` (database + log) with idempotent `reminder_sent_at` · Corridor fare config UI (3.6): `settings` table + `SettingsService` + `/admin/settings` (override-first fares, blank restores default, `corridor_fare_updated` change-control trail) |
 | Tests | ✅ 428+ feature tests passing (… + employer CSR report + pay-it-forward statement + demand-forecast ML job + EV lease seams + ride-credit reminders + corridor fare config UI) |
+| Feature modules | ✅ Navigation-First Sprint 1 complete — Admin grouped nav (`config/admin_nav.php` 5 groups + `admin-sidebar` Alpine accordion + badge counts + mobile drawer + bottom tab bar) · Role switcher (`RoleSwitcherService` display-only session switch + `EffectiveRoleMiddleware` in the web group + "Viewing as … — Back to admin" banner + topbar dropdown; admin middleware/EnsureAdmin untouched) · map common (`npm i leaflet-polylinedecorator leaflet-arrowheads maplibre-gl` + `resources/js/map/common.js`: CartoDB tiles, FCT maxBounds, fitOrCenter, `addRouteLine` arrowheads, `corridorAnchor`) · UI primitives (`ui/card` + `ui/button` wired to design tokens) · icons `menu/users/map/settings/truck` · rider container `max-w-[480px] … lg:max-w-5xl` |
+| Tests | ✅ 466 feature tests passing (… + navigation-first: grouped admin nav render, role-switch/reset, display-only never-mutates-role, non-admin 403, invalid-role reset, non-admin effective-role ignore) |
 
 ## 3. Environment
 
@@ -868,6 +870,35 @@ The last six Priority-3 gap rows from `WORKRIDE-ROADMAP.md` (3.14, 3.11, 3.9, 3.
 - View `admin/settings.blade.php`, routes `admin.settings.index|store`, "Settings" sidebar link. Tests: 6 / 27 assertions.
 
 **Tests:** 22 new across the six rows. Full suite re-run after `pint` + `npm run build` (see the commit gate).
+
+### 4.32 Navigation-First Sprint 1 — Admin Grouped Nav + Role Switcher + Map Common + UI Primitives (COMPLETE)
+
+Sprint 1 of the navigation-first redesign (per `WORKRIDE-NAVIGATION-FIRST-MERGED.md`, the merged reconciliation of the v5 master + Sprint 1–4 prompt docs + `gallery_of_files/input section.txt`). Foundations for the remaining sprints: a usable-on-mobile admin sidebar, a display-only "view as" role switcher, a shared map toolkit, and design-token UI primitives.
+
+**Admin grouped sidebar (replaces the flat ~19-link list):**
+- `config/admin_nav.php` — 5 collapsible groups (Operations, People, Intelligence, Business, System), each with `label`/`icon` and items carrying `route`, comma-separated `active` routeIs patterns, and optional `badge` keys. Adding future admin pages is a one-line config edit.
+- `resources/views/components/admin-sidebar.blade.php` — Alpine accordion (one group open, `aria-expanded`/`aria-controls`, chevron rotation), auto-opens the group containing the active route, gold count badges next to Verifications + Employers.
+- `layouts/admin.blade.php` rewritten — `x-data="navOpen"` mobile drawer (slide-over with backdrop, `md:hidden`), mobile bottom tab bar (Overview/Demand/Fleet/Business), h-14 header with hamburger, role-switcher dropdown, "Viewing as …" banner, and an `@php` block that resolves `$navGroups`/`$activeGroupKey`/`$badges` once per request.
+- Icons added: `menu`, `users`, `map`, `settings`, `truck`.
+
+**Role switcher (display-only, security untouched):**
+- `app/Services/RoleSwitcherService.php` — `switch(User, string)` writes `view_as_role` to the session (only `passenger|driver|both`; anything else resets), `effectiveRole(User)` returns the admin's real role when not viewing-as, `isViewingAs()`. Never mutates the persisted role.
+- `app/Http/Middleware/EffectiveRoleMiddleware.php` — appended to the global **web** group; for admins it shares `$effectiveRole` + `$viewingAs` with every view. Non-admin requests leave them unset (layouts fall back to `auth()->user()->role`). `EnsureAdmin` + the `admin` middleware still read the real role, so Control Tower gating is byte-for-byte unchanged.
+- `AdminController::viewAs()` / `resetViewAs()` + routes `admin.view-as` / `admin.view-as.reset` (both `RedirectResponse`, admin-group only). Topbar dropdown lists the viewable roles with a check on the active one + "Back to admin view"; a gold banner ("Viewing as Passenger — admin controls are unchanged") persists while switched.
+
+**Shared map toolkit (`resources/js/map/common.js`):**
+- `npm i leaflet-polylinedecorator leaflet-arrowheads maplibre-gl` (leaflet-arrowheads + maplibre-gl are reserved for later sprints; polylinedecorator used now).
+- `createMap` — CARTO Voyager labelled tiles (free, no key), FCT `maxBounds` from `config('workride.fct_bounds')`, `minZoom` 9, `scrollWheelZoom` off; `fitOrCenter` — padded `fitBounds` with CBD-anchor fallback (never a blank world map); `addRouteLine` — Forest-Green polyline + `L.Symbol.arrowHead` direction decorators (progressive enhancement); `corridorAnchor` — corridor slug → anchor point; `fctBounds`/`maxBounds`. Exposed as a Vite entry so it compiles and is importable by later sprints.
+
+**UI primitives:**
+- `resources/views/components/ui/card.blade.php` — `rounded-[var(--radius-card)]`, `shadow-[var(--shadow-card)]`, `ring-ink-900/5`, optional `:padding`.
+- `resources/views/components/ui/button.blade.php` — `primary|secondary|ghost|danger|accent` variants wired to the v5 token aliases; renders `<a>` when `:href` is passed.
+
+**Rider layout container:** `layouts/app.blade.php` main + header moved to `max-w-[480px] ... lg:max-w-5xl` (phone-first reading width, desktop keeps the wider board).
+
+**Tests (7 new — `tests/Feature/NavigationFirstTest.php`):** grouped nav render (Operations/Demand Research/Intelligence/Community Trust/View as), admin switch → session + effectiveRole + banner, reset, display-only never changes persisted role (admin routes still 200), non-admin 403 on view-as, invalid role resets, non-admin effective-role ignores the session switch.
+
+**DoD:** `pint` clean · PHPStan L8 gate green (baseline regenerated — it was stale for the v0.21.0 P3 files; +383 entries) · `npm run build` clean · 466 tests / 1504 assertions green.
 
 ---
 

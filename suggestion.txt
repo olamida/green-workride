@@ -1,0 +1,1977 @@
+# WorkRide — Award-Grade UI/UX & Functionality Upgrade Prompt
+### Single Source of Truth for AI Code Generator / Agent
+
+You are a world-class product engineer, accessibility specialist, and Laravel architect. Your mission is to upgrade **Green WorkRide** from its current funding-ready state into an **Apple Design Award–calibre** experience while strictly obeying the existing engineering contract, schema, money invariants, and dual-app architecture.
+
+Consume this entire prompt as the authoritative specification. Do not invent parallel systems. Extend what already exists.
+
+---
+
+## 0. Non-Negotiables (Never Violate)
+
+1. **Never store raw NIN** — only `nin_hash` (SHA-256) + `nin_last4`.
+2. **Money = `decimal(15,2)`**. Every hold / capture / refund / transfer runs inside a DB transaction with `SELECT … FOR UPDATE` + optimistic locking on `wallets.version` + unique idempotency reference.
+3. **Feature flags** (`FEATURE_*` in `config/workride.php`) — new modules default `false` unless they are the critical path.
+4. **Board shows ahead (48 h), matcher books near (30 min)**. Never pre-empt near-term seats.
+5. **Guest-safe layouts**: public routes extend `layouts/public`. Never read `auth()->user()` unconditionally.
+6. **Design tokens live in exactly one file**: `resources/css/design-system.css`.
+7. **Services own business logic**; controllers stay thin; every trust-relevant action writes an `activity_logs` row.
+8. **Tests must stay green**. Run `vendor/bin/pint`, `php artisan test` (assert money invariants), `npm run build` before every commit. Update `DEVELOPMENT-LOG.md`.
+9. **Conventional Commits**. Tag only at sprint boundaries.
+10. **Do not clone Google Maps**. WorkRide wins on corridor + verification + junction demand + road intelligence + Time-Bank.
+
+Reference documents (already in repo):
+- `WORKRIDE-APP-GUIDE.md`
+- `WORKRIDE-DEV-GUIDE.md` (known traps table is mandatory reading)
+- `WORKRIDE-DESIGN-REVIEWS.md`
+- `WORKRIDE-ROADMAP.md`
+- `DEVELOPMENT-LOG.md`
+- `WORKRIDE-USER-GUIDE.md`
+
+---
+
+## 1. Strategic Goal & Apple Design Award Alignment
+
+Primary target categories (in priority order):
+1. **Social Impact** — improve lives of working-class civil servants facing fuel-poverty commuting; publish open GTFS + road data; measurable on-time arrivals, CO₂, fuel saved.
+2. **Inclusivity** — great experience for all backgrounds, abilities, and languages; accessibility treated as structural from Day 1.
+3. **Interaction** — intuitive, effortless, platform-tailored controls; map-first, one-handed, calm.
+4. **Delight and Fun** — purposeful micro-interactions that make the hard daily commute feel solvable.
+5. **Innovation** — novel use of real-time junction demand + RoadLab sensors + GTFS-Flex for informal transit.
+6. **Visuals and Graphics** — calm, hierarchical, premium glass design that remains legible on 3G and low-end devices.
+
+Success narrative the product must embody:
+> “Google Maps knows roads. Uber knows rides. WorkRide knows Abuja’s junctions. We verify people (NIN hashed, never stored raw), publish the first GTFS, let you ride now and drive later, and give every passenger a live guide that updates until they connect with the bus.”
+
+---
+
+## 2. Apple Human Interface Guidelines + Accessibility Standards (Mandatory)
+
+Apply these rigorously on every screen and component:
+
+### Core HIG Principles
+- **Purpose** — every screen exists to help a verified worker get to (or from) work on time.
+- **Agency** — users stay in control; easy undo, clear confirmation for destructive actions, no forced paths.
+- **Responsibility** — safety, privacy (NIN never raw), transparency of data use.
+- **Familiarity** — respect platform conventions (bottom tabs, bottom sheets, system gestures).
+- **Flexibility** — adapt across phone / tablet / desktop; preserve context.
+- **Simplicity** — progressive disclosure; primary job ≤ 2 taps from home.
+- **Craft** — attention to every detail, loading states, empty states, error states.
+- **Delight** — purposeful 200 ms spring motion only; never decorative noise.
+
+### Accessibility Requirements (WCAG 2.2 AA + Apple HIG Accessibility)
+- Full **VoiceOver / TalkBack** support on every interactive element and live update.
+- **Dynamic Type** — all text scales; layout does not break.
+- **Reduce Motion** respected (`prefers-reduced-motion`); no essential information conveyed by motion alone.
+- **High Contrast** and sufficient colour contrast (4.5:1 minimum).
+- Touch targets ≥ 44 × 44 pt (iOS) / 48 × 48 dp (Android).
+- Clear focus management and visible focus rings.
+- Live regions announced correctly for seat-count changes, location updates, and guide status.
+- Semantic HTML / ARIA where needed; never rely on colour alone.
+- Offline and low-bandwidth graceful degradation treated as accessibility features.
+- Women-only preference remains opt-in and never a hard sort.
+- Prepare localisation keys (English ships first; Hausa / Yoruba / Igbo ready).
+
+### Platform-Native Targets (when mobile shell ships)
+- Live Activities / Dynamic Island for ongoing trips.
+- System haptics (tick on arrival, confirmation on seat booked).
+- Proper safe-area handling.
+- Background location only while trip is active and with clear user consent.
+
+---
+
+## 3. Current-State Baseline (Do Not Rebuild)
+
+Already solid:
+- Dual-app (Rider PWA Blade+Tailwind+Alpine + Ops Control Tower).
+- Atomic booking, triple-balance wallet, Time-Bank, subsidy, employer programs.
+- GTFS + GTFS-RT, Road Intelligence (IRI + 5-within-20 m clustering).
+- 48 h board window / 30 min matcher split.
+- Design tokens, glass intent, PWA offline board, rich demo seeder (100 users / 554 bookings).
+- Feature flags, change-control logs, 384+ tests.
+
+Known gaps to close:
+- Live seat counter still static between requests.
+- No dynamic passenger-to-bus “connect” guide.
+- Empty states do not seed supply from demand.
+- Map is functional but not yet the calm primary canvas.
+- Accessibility is partial — needs systematic audit and remediation.
+- Fleet assignment UI for programme-allocated buses is thin.
+- Trust float ledger for Time-Bank still missing.
+
+---
+
+## 4. Core User Mental Model (Simplify Ruthlessly)
+
+Expose only three clear jobs:
+
+| Job | Primary Entry | Experience |
+|-----|---------------|------------|
+| **Get me there** | Trips / Map | Corridor → options → pay → live guide until connect |
+| **I drive / volunteer** | Publish + Fleet | Inspection → publish → live location → board |
+| **My money & impact** | Wallet + Impact | Balances, statements, certificates, Green Points |
+
+Primary navigation (mobile + responsive):  
+1. Trips  
+2. My Rides  
+3. Wallet  
+4. Impact  
+5. More (Demand, Road map, Profile, Fleet if driver, SOS)
+
+Never put more than five items in primary nav. Command palette (⌘K) already exists — keep and enrich it.
+
+---
+
+## 5. Concrete Feature & UI Work (Ordered by Leverage)
+
+### Priority 1 — Interaction & Core Loop (Weeks 1–5)
+1. **Map-first home** — Leaflet + OSM remains; controls float with glassmorphism (`backdrop-blur`, `bg-white/12`). Map ≈ 70 %, actions 30 %.
+2. **Corridor Chips** — 60 px pills, live pulse, one-tap, show live seat count + fare + “leaving soon”.
+3. **Live seat-counter Reverb channel** on `BookingConfirmed` → board cards update without refresh.
+4. **“Leaving soon” sort boost** (≤ 15 min) on the `now` preset.
+5. **Demand-aware empty state** — “12 people want Kubwa→CBD tomorrow 7:00 — be the driver” (pull from `demand_requests` + `forecasts`).
+6. **Dynamic passenger-to-bus guide** (new critical experience):
+   - Once trip is `active` and booking `confirmed`, show live map with passenger pin + bus pin + walking polyline.
+   - Re-route while both move (reuse `RoutingService` + Reverb `TripLocationUpdated`).
+   - Clear terminal states: “Wave — within 50 m” / “Bus left geofence — guide stopped”.
+   - Auto-stop on `boarded`, `no_show`, or cancel.
+   - Fully accessible (VoiceOver announces distance and status changes).
+7. Payment picker reduced to one calm choice (Wallet / Cash / Subsidy / Ride Credit / Free) with clear hierarchy.
+8. Change-control timeline remains the trust spine (Booked → 500 m → Boarded → Completed + CO₂).
+
+### Priority 2 — Inclusivity & Accessibility (Parallel)
+- Systematic VoiceOver / Dynamic Type / Reduce Motion / High Contrast pass on every critical path.
+- Touch targets, focus order, live-region announcements.
+- Women-only filter UX clarity (preference, never hard sort).
+- Offline board and 3G resilience treated as accessibility features.
+- SOS, Share Trip, emergency contact remain one-tap and audited.
+
+### Priority 3 — Social Impact Visibility & Operations
+- Trust float ledger (`community_trust` / `trust_balances`) so Time-Bank is auditable.
+- Fleet assignment UI in Control Tower for programme-allocated buses (extend existing `assets` + `FleetService`).
+- Soft “interest” registration for office staff buses that feeds the same dynamic guide.
+- Impact certificates + QR verify remain prominent and guest-verifiable.
+- Public road heatmap and GTFS stay guest-accessible.
+
+### Priority 4 — Mobile Hardening (Later Phase)
+- Capacitor or React Native / Flutter shell sharing the same design tokens and API contracts.
+- Live Activities, haptics, system notifications, safe areas.
+- Full platform accessibility certification.
+
+### Explicitly Defer
+- AR overlays, full voice booking, EV lease-to-own hardware, USSD gateway, multi-tenant city/country (unless cheap schema seams).
+
+---
+
+## 6. Design System Rules
+
+- Tokens only in `resources/css/design-system.css`.
+- Colours: Forest Green `#2E7D32`, Gold `#FBC02D`, Slate `#0F172A`, Paper `#F6F9F6`.
+- Typography: Sora (headings), Inter (body), JetBrains Mono (numbers only).
+- 8 px grid, glassmorphism (blur 20, 12 % white), soft shadows.
+- Motion: 200 ms spring, purposeful only. Decorative SVGs remain gated behind `WORKRIDE_ANIMATIONS=false`.
+- Components must expose all states: default, hover/focus, loading, empty, error, live, disabled, women-only, free-volunteer.
+- Dark mode / night navigation from day one.
+
+---
+
+## 7. Technical Implementation Constraints
+
+- Prefer extending existing services: `TripService`, `BookingService`, `TripMatchingService`, `RoutingService`, `FleetService`, `DemandService`, `WalletService`, `RideCreditService`.
+- Reverb for all live updates (seats, location, guide, chat).
+- Leaflet + OSM + existing OSRM-first strategy with cost caps. Do not introduce Google Maps JS for core flows.
+- Soft interest status preferred over new money-bearing tables.
+- All new UI must be responsive and work inside the existing `max-w-5xl` / compact layout language.
+- Guest-safe public surfaces remain public.
+- Keep JS payload small (< 50 kb target for critical path).
+
+---
+
+## 8. Definition of Done (Every Change)
+
+```bash
+vendor/bin/pint
+php artisan test          # money invariants must pass
+npm run build
+# update DEVELOPMENT-LOG.md
+git add <relevant files only>
+git status                # confirm no .env / secrets
+git commit -m "feat(nav): live seat channel + dynamic passenger guide"
+Accessibility acceptance:
+
+VoiceOver can complete the full book → guide → board flow.
+Dynamic Type at largest size does not break layout.
+prefers-reduced-motion disables non-essential animation.
+Colour contrast ≥ 4.5:1.
+All live updates announced.
+
+
+9. Phased Delivery for the Generator
+Phase 1 (Core Loop)
+Live seat counter, leaving-soon boost, demand-aware empty state, map-first board polish, Corridor Chip / Live Trip Card glass treatment, dynamic passenger-to-bus guide MVP, accessibility pass on primary flow.
+Phase 2 (Trust & Ops)
+Trust float ledger, fleet assignment UI, office-bus interest → guide, Impact surface polish.
+Phase 3 (Platform Native)
+Mobile shell, Live Activities, haptics, full accessibility certification.
+Each phase ends with green tests, updated DEVELOPMENT-LOG, and a demo on the rich seeder dataset that a civil servant at Berger Junction at 6:25 am can complete without confusion.
+
+10. Final Instruction to the Code Generator
+Protect the existing engineering excellence (money safety, dual-app split, change control, feature flags, test suite).
+Elevate the three things Apple actually rewards: purposeful interaction, structural inclusivity, and measurable social impact under real conditions.
+Make the map the calm primary canvas.
+Make the corridor chip the one-tap hero.
+Make the dynamic guide the moment of trust that turns “I hope the bus is coming” into “I can see it and I will connect.”
+Everything else supports that loop without competing for attention.
+Execute in small, reviewable commits. Prefer clarity over cleverness. Ship only what a verified worker in Abuja can use on a mid-range Android phone on 3G at 6:30 am.
+End of prompt.
+
+
+Here are the most valuable open-source packages that fit WorkRide’s current stack (Laravel 13 + Blade + Tailwind + Alpine + Reverb + Leaflet/OSM + MySQL) and the award-grade goals (map-first navigation, accessibility, live tracking, GTFS, fleet/ops, exports, PWA polish).
+I prioritised packages that are actively maintained, lightweight where possible, and directly useful for the gaps we identified (live guide, accessibility, exports, admin power, geo precision, certificates).
+1. Maps, Routing & Live Tracking (Highest leverage)
+
+PackageWhy it helps WorkRideNotesLeaflet (already in use) + pluginsCore map canvasKeep it. Add only what you need.Leaflet.a11y / accessibility plugins (nfreear/leaflet.plugins)Makes the map VoiceOver / keyboard navigableCritical for Apple HIG + Inclusivity categoryLeaflet Routing Machine or lrm-osrmWalking / last-mile directions for the dynamic passenger-to-bus guideWorks with your existing OSRM-first RoutingServiceLeaflet.Realtime or custom Reverb markersSmooth live bus + passenger pins without full page reloadsPerfect for the “connect until boarded” experienceTurf.js (JS)Client-side geo calculations (distance, bearing, geofence checks)Lightweight, pure JS — great for the guidebrick/geo (PHP)Proper geometry types, distance, intersection, GeoJSONBetter than pure Haversine for complex corridor / geofence worktoin0u/geocoder-laravel or league/geotoolsGeocoding, reverse geocoding, distance helpersUseful for demand check-ins and junction labelling
+2. Admin / Control Tower Power
+
+PackageWhy it helpsNotesFilament (v3/v4)Rapid, beautiful, accessible admin panelsStrongest recommendation if you want to accelerate the Ops Control Tower (fleet assignment, demand calendar, verifications, business KPIs). MIT, Livewire + Tailwind — fits your stack.Laravel Nova (paid)Polished alternativeOnly if budget allows; Filament is usually better value.Backpack for LaravelAnother mature free/paid admin optionGood if you prefer classic Blade over Livewire.
+Filament is the clear winner for speed + accessibility + dark mode + mobile-friendly tables.
+3. Exports, Certificates & Documents
+
+
+
+PackageWhy it helpsNotesmaatwebsite/excel (Laravel Excel)Proper .xlsx exports for FERMA, subsidy reports, OD matrix, settlementsAlready on your roadmap — highest prioritybarryvdh/laravel-dompdf or spatie/laravel-pdf / bladepdfHigh-quality PDF certificates & receiptsYour QR-verifiable CO₂ / fuel / monthly statements will look premiumsimplesoftwareio/simple-qrcodeQR generation for certificates & receiptsLightweight and reliable
+4. GTFS & Transit Intelligence
+
+
+PackageWhy it helpsNotestrafiklab/gtfs-php-sdkCleaner reading / validation of static GTFSComplements your existing GtfsServiceMobilityData GTFS Validator (Java, run via process)Official feed validation before Google submissionCritical for the “first Abuja GTFS” pitchgtfs-realtime-bindings (PHP / JS)Stronger GTFS-RT protobuf handlingYou already generate RT; this hardens it
+5. Accessibility, PWA & Frontend Polish
+
+
+PackageWhy it helpsNotesAlpine.js plugins / official directivesKeep the lightweight interactive layerYou already use it — extend carefullyHeadless UI or Radix-inspired Alpine componentsAccessible dropdowns, modals, tabsImproves Interaction + Inclusivity scoresLaravel Head (laravel/head — new official)Clean meta, Open Graph, PWA manifest, theme-color managementPerfect for installable PWA + share cardsspatie/laravel-missing-page-redirector or similarGraceful 404 / offline handlingSmall UX win
+6. Real-time, Queues & Reliability (already strong, but useful additions)
+
+
+
+PackageWhy it helpsNotesLaravel Reverb (already present)Live seat counts, location, guide updatesKeep + expand channelsLaravel HorizonBeautiful queue dashboardUseful once Redis is livespatie/laravel-backupAutomated backups of the demo + production DBOperational hygiene for funders
+7. Other High-Value Utilities
+
+
+
+PackageWhy it helpsNotesspatie/laravel-activitylogYou already have custom activity_logs — this can enrich itOptional; your change-control is already solidspatie/laravel-permissionCleaner role/permission management if you expand MDA / union rolesOptionalintervention/image or spatie/laravel-medialibraryBetter handling of inspection photos, avatars, certificate imagesUseful for fleet inspectionsmeilisearch/meilisearch-php + Laravel ScoutFast search across trips, users, demand if the board growsOnly if search becomes a bottleneck
+Recommended Adoption Order (practical)
+
+Immediate (high impact, low risk)
+maatwebsite/excel
+Leaflet accessibility plugins + Routing Machine
+laravel/head
+QR + PDF packages for certificates
+
+Next (Control Tower acceleration)
+Filament (or continue custom Blade if you prefer full control)
+
+Geo / Guide hardening
+brick/geo + Turf.js + Leaflet.Realtime patterns
+
+GTFS polish
+trafiklab SDK + official MobilityData validator
+
+
+What to avoid (for now)
+
+Heavy SPA frameworks (Vue/React full rewrite) — you win on 3G with Blade + Alpine.
+Google Maps JS as the primary engine — stay with Leaflet + OSM + OSRM for cost and open-data story.
+Packages that force Livewire everywhere if you want to keep the Rider PWA extremely light.
+Unmaintained geo libraries.
+
+These packages let you close the biggest remaining gaps (live connect guide, accessibility, professional exports, faster Ops UI) while staying true to the lightweight, open, Nigeria-hosted, working-class DNA of WorkRide.
+Would you like a ready-to-paste Composer / npm install list for the Priority 1 set, or a short implementation sketch for any specific package (e.g. Filament integration or the dynamic guide with Leaflet Routing)?your last suggested AI prompt is as follows:
+"# WorkRide — Award-Grade UI/UX & Functionality Upgrade Prompt
+### Single Source of Truth for AI Code Generator / Agent
+## You are a world-class product engineer, accessibility specialist, and Laravel architect. Your mission is to upgrade **Green WorkRide** from its current funding-ready state into an **Apple Design Award–calibre** experience while strictly obeying the existing engineering contract, schema, money invariants, and dual-app architecture.
+Consume this entire prompt as the authoritative specification. Do not invent parallel systems. Extend what already exists.
+## 0. Non-Negotiables (Never Violate)
+
+**Never store raw NIN** — only nin_hash (SHA-256) + nin_last4.
+**Money = decimal(15,2)**. Every hold / capture / refund / transfer runs inside a DB transaction with SELECT … FOR UPDATE + optimistic locking on wallets.version + unique idempotency reference.
+**Feature flags** (FEATURE_* in config/workride.php) — new modules default false unless they are the critical path.
+**Board shows ahead (48 h), matcher books near (30 min)**. Never pre-empt near-term seats.
+**Guest-safe layouts**: public routes extend layouts/public. Never read auth()->user() unconditionally.
+**Design tokens live in exactly one file**: resources/css/design-system.css.
+**Services own business logic**; controllers stay thin; every trust-relevant action writes an activity_logs row.
+**Tests must stay green**. Run vendor/bin/pint, php artisan test (assert money invariants), npm run build before every commit. Update DEVELOPMENT-LOG.md.
+**Conventional Commits**. Tag only at sprint boundaries.
+**Do not clone Google Maps**. WorkRide wins on corridor + verification + junction demand + road intelligence + Time-Bank.
+Reference documents (already in repo):
+
+
+WORKRIDE-APP-GUIDE.md
+WORKRIDE-DEV-GUIDE.md (known traps table is mandatory reading)
+WORKRIDE-DESIGN-REVIEWS.md
+WORKRIDE-ROADMAP.md
+DEVELOPMENT-LOG.md
+WORKRIDE-USER-GUIDE.md
+
+
+## 1. Strategic Goal & Apple Design Award Alignment
+Primary target categories (in priority order):
+
+**Social Impact** — improve lives of working-class civil servants facing fuel-poverty commuting; publish open GTFS + road data; measurable on-time arrivals, CO₂, fuel saved.
+**Inclusivity** — great experience for all backgrounds, abilities, and languages; accessibility treated as structural from Day 1.
+**Interaction** — intuitive, effortless, platform-tailored controls; map-first, one-handed, calm.
+**Delight and Fun** — purposeful micro-interactions that make the hard daily commute feel solvable.
+**Innovation** — novel use of real-time junction demand + RoadLab sensors + GTFS-Flex for informal transit.
+**Visuals and Graphics** — calm, hierarchical, premium glass design that remains legible on 3G and low-end devices.
+Success narrative the product must embody:
+
+“Google Maps knows roads. Uber knows rides. WorkRide knows Abuja’s junctions. We verify people (NIN hashed, never stored raw), publish the first GTFS, let you ride now and drive later, and give every passenger a live guide that updates until they connect with the bus.”
+
+## 2. Apple Human Interface Guidelines + Accessibility Standards (Mandatory)
+Apply these rigorously on every screen and component:
+### Core HIG Principles
+
+**Purpose** — every screen exists to help a verified worker get to (or from) work on time.
+**Agency** — users stay in control; easy undo, clear confirmation for destructive actions, no forced paths.
+**Responsibility** — safety, privacy (NIN never raw), transparency of data use.
+**Familiarity** — respect platform conventions (bottom tabs, bottom sheets, system gestures).
+**Flexibility** — adapt across phone / tablet / desktop; preserve context.
+**Simplicity** — progressive disclosure; primary job ≤ 2 taps from home.
+**Craft** — attention to every detail, loading states, empty states, error states.
+**Delight** — purposeful 200 ms spring motion only; never decorative noise.
+
+### Accessibility Requirements (WCAG 2.2 AA + Apple HIG Accessibility)
+
+Full **VoiceOver / TalkBack** support on every interactive element and live update.
+**Dynamic Type** — all text scales; layout does not break.
+**Reduce Motion** respected (prefers-reduced-motion); no essential information conveyed by motion alone.
+**High Contrast** and sufficient colour contrast (4.5:1 minimum).
+Touch targets ≥ 44 × 44 pt (iOS) / 48 × 48 dp (Android).
+Clear focus management and visible focus rings.
+Live regions announced correctly for seat-count changes, location updates, and guide status.
+Semantic HTML / ARIA where needed; never rely on colour alone.
+Offline and low-bandwidth graceful degradation treated as accessibility features.
+Women-only preference remains opt-in and never a hard sort.
+Prepare localisation keys (English ships first; Hausa / Yoruba / Igbo ready).
+
+### Platform-Native Targets (when mobile shell ships)
+
+Live Activities / Dynamic Island for ongoing trips.
+System haptics (tick on arrival, confirmation on seat booked).
+Proper safe-area handling.
+Background location only while trip is active and with clear user consent.
+
+
+## 3. Current-State Baseline (Do Not Rebuild)
+Already solid:
+
+Dual-app (Rider PWA Blade+Tailwind+Alpine + Ops Control Tower).
+Atomic booking, triple-balance wallet, Time-Bank, subsidy, employer programs.
+GTFS + GTFS-RT, Road Intelligence (IRI + 5-within-20 m clustering).
+48 h board window / 30 min matcher split.
+Design tokens, glass intent, PWA offline board, rich demo seeder (100 users / 554 bookings).
+Feature flags, change-control logs, 384+ tests.
+Known gaps to close:
+Live seat counter still static between requests.
+No dynamic passenger-to-bus “connect” guide.
+Empty states do not seed supply from demand.
+Map is functional but not yet the calm primary canvas.
+Accessibility is partial — needs systematic audit and remediation.
+Fleet assignment UI for programme-allocated buses is thin.
+Trust float ledger for Time-Bank still missing.
+
+
+## 4. Core User Mental Model (Simplify Ruthlessly)
+Expose only three clear jobs:
+
+
+
+JobPrimary EntryExperience**Get me there**Trips / MapCorridor → options → pay → live guide until connect**I drive / volunteer**Publish + FleetInspection → publish → live location → board**My money & impact**Wallet + ImpactBalances, statements, certificates, Green PointsPrimary navigation (mobile + responsive):
+
+Trips
+My Rides
+Wallet
+Impact
+More (Demand, Road map, Profile, Fleet if driver, SOS)
+Never put more than five items in primary nav. Command palette (⌘K) already exists — keep and enrich it.
+
+
+## 5. Concrete Feature & UI Work (Ordered by Leverage)
+### Priority 1 — Interaction & Core Loop (Weeks 1–5)
+
+**Map-first home** — Leaflet + OSM remains; controls float with glassmorphism (backdrop-blur, bg-white/12). Map ≈ 70 %, actions 30 %.
+**Corridor Chips** — 60 px pills, live pulse, one-tap, show live seat count + fare + “leaving soon”.
+**Live seat-counter Reverb channel** on BookingConfirmed → board cards update without refresh.
+**“Leaving soon” sort boost** (≤ 15 min) on the now preset.
+**Demand-aware empty state** — “12 people want Kubwa→CBD tomorrow 7:00 — be the driver” (pull from demand_requests + forecasts).
+**Dynamic passenger-to-bus guide** (new critical experience):
+   - Once trip is active and booking confirmed, show live map with passenger pin + bus pin + walking polyline.
+   - Re-route while both move (reuse RoutingService + Reverb TripLocationUpdated).
+   - Clear terminal states: “Wave — within 50 m” / “Bus left geofence — guide stopped”.
+   - Auto-stop on boarded, no_show, or cancel.
+   - Fully accessible (VoiceOver announces distance and status changes).
+Payment picker reduced to one calm choice (Wallet / Cash / Subsidy / Ride Credit / Free) with clear hierarchy.
+Change-control timeline remains the trust spine (Booked → 500 m → Boarded → Completed + CO₂).
+
+### Priority 2 — Inclusivity & Accessibility (Parallel)
+
+Systematic VoiceOver / Dynamic Type / Reduce Motion / High Contrast pass on every critical path.
+Touch targets, focus order, live-region announcements.
+Women-only filter UX clarity (preference, never hard sort).
+Offline board and 3G resilience treated as accessibility features.
+SOS, Share Trip, emergency contact remain one-tap and audited.
+
+### Priority 3 — Social Impact Visibility & Operations
+
+Trust float ledger (community_trust / trust_balances) so Time-Bank is auditable.
+Fleet assignment UI in Control Tower for programme-allocated buses (extend existing assets + FleetService).
+Soft “interest” registration for office staff buses that feeds the same dynamic guide.
+Impact certificates + QR verify remain prominent and guest-verifiable.
+Public road heatmap and GTFS stay guest-accessible.
+
+### Priority 4 — Mobile Hardening (Later Phase)
+
+Capacitor or React Native / Flutter shell sharing the same design tokens and API contracts.
+Live Activities, haptics, system notifications, safe areas.
+Full platform accessibility certification.
+
+### Explicitly Defer
+
+AR overlays, full voice booking, EV lease-to-own hardware, USSD gateway, multi-tenant city/country (unless cheap schema seams).
+
+
+## 6. Design System Rules
+
+Tokens only in resources/css/design-system.css.
+Colours: Forest Green #2E7D32, Gold #FBC02D, Slate #0F172A, Paper #F6F9F6.
+Typography: Sora (headings), Inter (body), JetBrains Mono (numbers only).
+8 px grid, glassmorphism (blur 20, 12 % white), soft shadows.
+Motion: 200 ms spring, purposeful only. Decorative SVGs remain gated behind WORKRIDE_ANIMATIONS=false.
+Components must expose all states: default, hover/focus, loading, empty, error, live, disabled, women-only, free-volunteer.
+Dark mode / night navigation from day one.
+
+
+## 7. Technical Implementation Constraints
+
+Prefer extending existing services: TripService, BookingService, TripMatchingService, RoutingService, FleetService, DemandService, WalletService, RideCreditService.
+Reverb for all live updates (seats, location, guide, chat).
+Leaflet + OSM + existing OSRM-first strategy with cost caps. Do not introduce Google Maps JS for core flows.
+Soft interest status preferred over new money-bearing tables.
+All new UI must be responsive and work inside the existing max-w-5xl / compact layout language.
+Guest-safe public surfaces remain public.
+Keep JS payload small (< 50 kb target for critical path).
+
+
+## 8. Definition of Done (Every Change)
+Bashvendor/bin/pint
+php artisan test # money invariants must pass
+npm run build
+# update DEVELOPMENT-LOG.md
+git add <relevant files only>
+git status # confirm no .env / secrets
+git commit -m "feat(nav): live seat channel + dynamic passenger guide""
+using your last suggestion on "great open source packages to enhance the application", kindly redraft the comprehensive AI prompt, to include you great open source packages suggestion, to be consumed by an AI code generator.
+also include in your thinking the user experience and view, like when the passenger is navigating to meet the ordered car or join a bus, the view should be similar (better than) google map directions, with the idea of from-to, pick start location as current location, how are you connecting with the car/bus (walk, drive, bike, bus, train, list optional route, zoom-in on select route, map should be clear detailed). This is a suggested prompt to support your task here:
+"Act as a Principal UX/UI Copywriter and Technical Product Manager. Write a comprehensive UI/UX specification document that describes the visual transitions, icon states, and camera behavior for a new navigation app.
+The description must capture a "robot-eye/first-person" view, moving from the initial route overview to real-time navigation.
+Please structure the output into the following sections:
+1. UI STATE 1: ROUTE OVERVIEW (MACRO VIEW)
+- Describe the visual layout when the user fetches directions.
+- Detail the static map view, route polyline appearance, and summary card.
+- List the specific system icons needed for this state (e.g., origin, destination, transport modes).
+2. THE TRANSITION: "SNAP-TO-NAV" ANIMATION
+- Describe the step-by-step visual camera movement when the user hits "Start Navigation."
+- Detail how the map pitches from a 2D flat bird's-eye view into a 3D first-person perspective.
+3. UI STATE 2: ACTIVE NAVIGATION (MICRO/ROBOT-EYE VIEW)
+- Describe the dynamic HUD (Heads-Up Display) layout overlaying the screen.
+- Detail the adaptive camera zoom behavior: how it automatically zooms in tightly when approaching a turn and zooms out during long straightaways.
+- Describe the rotation physics: how the map smoothly pans, tilts, and auto-rotates around the user avatar (the robot/self-eye) during a turning event.
+4. ICONOGRAPHY & HUD MATRIX
+- Provide a clear markdown table listing the necessary icons, their functional triggers, and their placement on the screen (e.g., Compass, Next-Turn Arrow, Destination Flag).
+Style Guideline: Write with technical precision using software development and design terminology (e.g., polyline, camera pitch, interpolation, bounding box, HUD, viewport). Do not write a story; write a functional design specification."
+All this are my sugggestions, kindly consider all i have suggested, then criticize, and if relevant, enhance and implement into our application.
+then redraft the AI prompt for an AI code writer (opencode) to consume and do the needfulMarkdown# WorkRide — Award-Grade UI/UX, Navigation & Functionality Upgrade Prompt
+### Single Source of Truth for AI Code Generator / Agent (opencode / Cursor / etc.)
+
+You are a world-class product engineer, accessibility specialist, UX architect, and Laravel specialist. Your mission is to upgrade **Green WorkRide** from its current funding-ready state into an **Apple Design Award–calibre** experience while strictly obeying the existing engineering contract, schema, money invariants, dual-app architecture, and lightweight PWA constraints.
+
+Consume this entire prompt as the authoritative specification. Do not invent parallel systems. Extend what already exists. Prefer clarity, performance on 3G/low-end Android, and real-world usefulness for Abuja civil servants over visual novelty.
+
+---
+
+## 0. Non-Negotiables (Never Violate)
+
+1. **Never store raw NIN** — only `nin_hash` (SHA-256) + `nin_last4`.
+2. **Money = `decimal(15,2)`**. Every hold / capture / refund / transfer runs inside a DB transaction with `SELECT … FOR UPDATE` + optimistic locking on `wallets.version` + unique idempotency reference.
+3. **Feature flags** (`FEATURE_*` in `config/workride.php`) — new modules default `false` unless they are the critical path.
+4. **Board shows ahead (48 h), matcher books near (30 min)**. Never pre-empt near-term seats.
+5. **Guest-safe layouts**: public routes extend `layouts/public`. Never read `auth()->user()` unconditionally.
+6. **Design tokens live in exactly one file**: `resources/css/design-system.css`.
+7. **Services own business logic**; controllers stay thin; every trust-relevant action writes an `activity_logs` row.
+8. **Tests must stay green**. Run `vendor/bin/pint`, `php artisan test` (assert money invariants), `npm run build` before every commit. Update `DEVELOPMENT-LOG.md`.
+9. **Conventional Commits**. Tag only at sprint boundaries.
+10. **Do not clone Google Maps**. WorkRide wins on corridor + verification + junction demand + road intelligence + Time-Bank + last-mile connect clarity.
+
+Reference documents (already in repo):
+- `WORKRIDE-APP-GUIDE.md`
+- `WORKRIDE-DEV-GUIDE.md` (known traps table is mandatory reading)
+- `WORKRIDE-DESIGN-REVIEWS.md`
+- `WORKRIDE-ROADMAP.md`
+- `DEVELOPMENT-LOG.md`
+- `WORKRIDE-USER-GUIDE.md`
+
+---
+
+## 1. Strategic Goal & Apple Design Award Alignment
+
+Primary target categories (priority order):
+1. **Social Impact** — measurable improvement in on-time arrivals, fuel/CO₂ saved, open GTFS + road data for FERMA.
+2. **Inclusivity** — accessibility treated as structural from Day 1 (VoiceOver, Dynamic Type, Reduce Motion, high contrast, women-only preference).
+3. **Interaction** — map-first, one-handed, effortless “Where → How → Pay → Connect” flow.
+4. **Delight and Fun** — purposeful micro-interactions only.
+5. **Innovation** — junction demand + RoadLab sensors + GTFS-Flex for informal transit + superior last-mile connect guide.
+6. **Visuals and Graphics** — calm glass hierarchy that remains legible on 3G and low-end devices.
+
+Success narrative:
+> “Google Maps knows roads. Uber knows rides. WorkRide knows Abuja’s junctions. We verify people (NIN hashed, never stored raw), publish the first GTFS, let you ride now and drive later, and give every passenger a live, clear guide that updates until they connect with the bus.”
+
+---
+
+## 2. Apple HIG + Accessibility Standards (Mandatory)
+
+Apply on every screen and component:
+
+**Core HIG Principles**: Purpose, Agency, Responsibility, Familiarity, Flexibility, Simplicity, Craft, Delight.
+
+**Accessibility (WCAG 2.2 AA + Apple HIG Accessibility)**:
+- Full VoiceOver / TalkBack support on every interactive element and live update.
+- Dynamic Type (layout must not break at largest sizes).
+- `prefers-reduced-motion` respected; no essential information by motion alone.
+- Colour contrast ≥ 4.5:1.
+- Touch targets ≥ 44×44 pt / 48×48 dp.
+- Visible focus rings and correct focus order.
+- Live regions for seat counts, location updates, guide status, and distance announcements.
+- Semantic HTML / ARIA; never colour alone.
+- Offline + low-bandwidth graceful degradation treated as accessibility features.
+- Women-only remains opt-in preference, never a hard sort.
+- Localisation keys prepared (English first; Hausa / Yoruba / Igbo ready).
+
+**Platform-native targets (mobile shell phase)**: Live Activities / Dynamic Island, system haptics, safe-area handling, background location only while trip active + explicit consent.
+
+---
+
+## 3. Current-State Baseline (Do Not Rebuild)
+
+Already solid:
+- Dual-app (Rider PWA Blade+Tailwind+Alpine + Ops Control Tower).
+- Atomic booking, triple-balance wallet, Time-Bank, subsidy, employer programs.
+- GTFS + GTFS-RT, Road Intelligence (IRI + 5-within-20 m clustering).
+- 48 h board / 30 min matcher split.
+- Design tokens, glass intent, PWA offline board, rich demo seeder.
+- Feature flags, change-control logs, 384+ tests.
+
+Known gaps:
+- Live seat counter still static.
+- No high-quality dynamic passenger-to-vehicle “connect” guide.
+- Empty states do not seed supply from demand.
+- Map is functional but not the calm primary canvas.
+- Accessibility is partial.
+- Fleet assignment UI thin.
+- Trust float ledger missing.
+
+---
+
+## 4. Core User Mental Model
+
+Only three jobs:
+
+| Job | Primary Entry | Experience |
+|-----|---------------|------------|
+| **Get me there** | Trips / Map | Corridor → options → pay → live connect guide |
+| **I drive / volunteer** | Publish + Fleet | Inspection → publish → live location → board |
+| **My money & impact** | Wallet + Impact | Balances, statements, certificates, Green Points |
+
+Primary navigation (≤ 5 items):
+1. Trips  
+2. My Rides  
+3. Wallet  
+4. Impact  
+5. More (Demand, Road map, Profile, Fleet if driver, SOS)
+
+Command palette (⌘K) already exists — keep and enrich.
+
+---
+
+## 5. Critical New Experience: Dynamic Passenger-to-Vehicle Connect Guide
+
+**Critique of the full “robot-eye / 3D first-person Google-style navigation” suggestion**  
+A complete 3D pitched camera with adaptive zoom/rotation physics is excellent for a dedicated navigation app, but it is **not the right primary implementation for WorkRide right now**:
+
+- WorkRide’s hard problem is the **last 200–500 m at informal junctions** (Berger, Nyanya, Lugbe), not city-wide turn-by-turn driving.
+- Current stack is Leaflet + OSM + Alpine (lightweight, 3G-friendly). True 3D pitch requires Mapbox GL / MapLibre or native maps and significantly more JS.
+- Full robot-eye navigation would violate the “do not clone Google Maps” and “keep JS < 50 kb critical path” principles and hurt performance on the target devices.
+
+**What we adopt and enhance instead** (high relevance, high impact):
+
+Design a **superior last-mile connect guide** that feels clearer and more trustworthy than Google Maps for the specific job of “walk to my verified WorkRide vehicle”.
+
+### 5.1 UI State 1 — Route Overview (Macro View)
+When a confirmed passenger opens the active trip or taps “Guide me to the bus/car”:
+
+- Full-screen or large map (Leaflet + OSM).
+- Origin pin = passenger’s current location (blue, pulsing, labelled “You”).
+- Destination pin = current vehicle location (or next waypoint / boarding point) with vehicle type icon + plate + verification badge.
+- Clear route polyline (Forest Green, slight glow) calculated via existing `RoutingService` (OSRM-first).
+- Bottom summary card (glass):  
+  Distance • Walking ETA • Vehicle plate / driver name • “Leaving in X min” or “Waiting at Berger”.
+- Transport mode selector (default **Walk**; future: Bike / Keke if relevant). Only show realistic last-mile options.
+- “Start Guide” primary button (large, thumb-zone).
+- Fit-bounds so both pins + full polyline are visible with comfortable padding.
+- Icons: origin (person), destination (bus/car), transport mode chips, compass, recenter.
+
+### 5.2 Transition — “Snap-to-Guide”
+On “Start Guide”:
+
+- Smooth animated transition (respect `prefers-reduced-motion`):
+  - Map eases from overview bounding box to a follow mode centred on the passenger.
+  - Polyline remains visible; vehicle pin stays live.
+  - Bottom card collapses into a compact HUD.
+- No dramatic 3D pitch yet (keep 2D / slight perspective maximum for performance). True 3D camera deferred to native mobile phase.
+
+### 5.3 UI State 2 — Active Guide (Micro / Follow View)
+- Map follows passenger location (Reverb + device geolocation).
+- Vehicle pin updates every ~10–15 s via existing `TripLocationUpdated`.
+- Polyline re-routes when either party moves significantly (throttle via `RoutingService` + cost caps).
+- Compact HUD overlay (glass, bottom or top-safe):
+  - Large next-instruction or distance-to-vehicle (“240 m • 3 min walk”).
+  - Vehicle plate + verification badge.
+  - Progress or “Wave when you see the plate”.
+  - Recenter button, mute voice, end guide.
+- Adaptive behaviour (2D):
+  - Zoom in when distance < 150 m.
+  - Slightly zoom out on longer approaches.
+  - Keep both pins in view when possible; prioritise passenger when very close.
+- Voice announcements (Web Speech API, optional, respect system settings): distance and “You have arrived” / “Vehicle has left the area”.
+- Clear terminal states:
+  - **Arrived** (within ~40–50 m geofence) → “Wave — you are here” + success state.
+  - **Missed** (vehicle left geofence or booking → no_show) → “Guide stopped. Vehicle has left.” + option to re-book or contact.
+  - Auto-stop on `boarded`, `cancelled`, or manual end.
+- Fully accessible: VoiceOver announces distance, bearing changes, and terminal states. Live regions used correctly.
+
+### 5.4 Iconography & HUD Matrix (minimal set)
+
+| Icon / Element          | Trigger / State                  | Placement          |
+|-------------------------|----------------------------------|--------------------|
+| Person (You)            | Always                           | Map + HUD          |
+| Bus / Car + badge       | Vehicle location                 | Map                |
+| Route polyline          | Active guide                     | Map                |
+| Next distance / ETA     | Active guide                     | HUD primary        |
+| Recenter                | User pans map                    | Floating button    |
+| End Guide               | Always in active guide           | HUD                |
+| Wave / Arrived          | < 50 m                           | HUD + map          |
+| Missed / Stopped        | Terminal miss                    | Full-screen state  |
+
+Keep icon set small and system-consistent. Prefer SF Symbols / Material equivalents when native shell arrives.
+
+This guide must feel **calmer, clearer, and more trustworthy than Google Maps** for the specific context of meeting a verified colleague’s vehicle at an Abuja junction.
+
+---
+
+## 6. Concrete Feature & UI Work (Ordered by Leverage)
+
+### Priority 1 — Interaction & Core Loop + Connect Guide
+1. Map-first home (Leaflet + OSM, glass floating controls, ~70 % map / 30 % actions).
+2. Corridor Chips — 60 px pills, live pulse, live seat count, “leaving soon”.
+3. Live seat-counter Reverb channel on `BookingConfirmed`.
+4. “Leaving soon” (≤ 15 min) sort boost on `now` preset.
+5. Demand-aware empty state from `demand_requests` + `forecasts`.
+6. **Full dynamic passenger-to-vehicle connect guide** as specified in §5 (overview → transition → active follow → terminal states). Reuse `RoutingService`, Reverb location, existing geofence events.
+7. Calm payment picker (Wallet / Cash / Subsidy / Ride Credit / Free).
+8. Change-control timeline remains trust spine.
+
+### Priority 2 — Inclusivity & Accessibility (Parallel)
+Systematic VoiceOver, Dynamic Type, Reduce Motion, high contrast, focus order, live regions on every critical path including the new guide. Offline board and 3G resilience as accessibility features.
+
+### Priority 3 — Social Impact & Operations
+- Trust float ledger (`community_trust` / `trust_balances`).
+- Fleet assignment UI for programme-allocated buses (extend `assets` + `FleetService`).
+- Soft “interest” registration for office buses that feeds the same guide.
+- Impact certificates + QR remain prominent and guest-verifiable.
+- Public road heatmap + GTFS stay guest-accessible.
+
+### Priority 4 — Mobile Hardening (Later)
+Capacitor / React Native / Flutter shell sharing design tokens + API contracts. Live Activities, haptics, safe areas, full accessibility certification. Only then consider richer 3D camera if needed.
+
+### Explicitly Defer
+AR overlays, full city-wide robot-eye 3D navigation, EV lease hardware, USSD, multi-tenant city (unless cheap seams).
+
+---
+
+## 7. Recommended Open-Source Packages (Adopt Selectively)
+
+Integrate only what directly closes gaps. Keep the critical path lightweight.
+
+**Maps / Guide / Geo**
+- Leaflet (already present) + **Leaflet.a11y** / accessibility plugins.
+- Leaflet Routing Machine (or lrm-osrm) for walking directions in the connect guide.
+- Turf.js (client-side distance, bearing, simple geofence helpers).
+- `brick/geo` (PHP) for robust server-side geometry if needed beyond Haversine.
+- `toin0u/geocoder-laravel` or league/geotools for geocoding helpers.
+
+**Exports & Certificates**
+- `maatwebsite/excel` — FERMA, subsidy, OD matrix, settlements (.xlsx).
+- PDF package (`barryvdh/laravel-dompdf`, `spatie/laravel-pdf`, or bladepdf) for high-quality certificates & receipts.
+- `simplesoftwareio/simple-qrcode` for certificate / receipt QR codes.
+
+**Admin / Control Tower acceleration**
+- **Filament** (preferred) for faster, accessible Ops UI (fleet assignment, demand, verifications, business KPIs). Stay with custom Blade if you want zero Livewire surface on the Rider side.
+
+**PWA / Meta / Head**
+- `laravel/head` (official) for clean meta, Open Graph, theme-color, PWA manifest management.
+
+**GTFS polish**
+- `trafiklab/gtfs-php-sdk` to harden static feed handling.
+- MobilityData GTFS Validator (run as process) before Google submission.
+
+**Other useful**
+- Intervention Image or Spatie Media Library for inspection photos / avatars.
+- Laravel Horizon once Redis is live.
+
+Do **not** pull in heavy SPA frameworks or Google Maps JS for core flows.
+
+---
+
+## 8. Design System Rules
+
+- Tokens only in `resources/css/design-system.css`.
+- Colours: Forest Green `#2E7D32`, Gold `#FBC02D`, Slate `#0F172A`, Paper `#F6F9F6`.
+- Typography: Sora (headings), Inter (body), JetBrains Mono (numbers).
+- 8 px grid, glassmorphism (blur ~20, ~12 % white), soft shadows.
+- Motion: 200 ms spring, purposeful only. Decorative SVGs gated behind `WORKRIDE_ANIMATIONS=false`.
+- Components expose all states: default, focus, loading, empty, error, live, disabled, women-only, free-volunteer.
+- Dark mode / night navigation from day one.
+- All new UI works inside existing compact / `max-w-5xl` language and is fully responsive.
+
+---
+
+## 9. Technical Implementation Constraints
+
+- Extend existing services: `TripService`, `BookingService`, `TripMatchingService`, `RoutingService`, `FleetService`, `DemandService`, `WalletService`, `RideCreditService`, `GeofenceService`.
+- Reverb for all live updates (seats, location, guide status, chat).
+- Leaflet + OSM + existing OSRM-first strategy with cost caps. No Google Maps JS for core experience.
+- Soft interest status preferred over new money-bearing tables.
+- Keep critical-path JS small.
+- Guest-safe public surfaces remain public.
+
+---
+
+## 10. Definition of Done (Every Change)
+
+```bash
+vendor/bin/pint
+php artisan test          # money invariants must pass
+npm run build
+# update DEVELOPMENT-LOG.md
+git add <relevant files only>
+git status                # confirm no .env / secrets
+git commit -m "feat(nav): dynamic passenger-to-vehicle connect guide + live seat channel"
+Accessibility acceptance for the guide:
+
+VoiceOver can complete overview → start → follow → arrived/missed.
+Dynamic Type at largest size does not break HUD or map controls.
+prefers-reduced-motion disables non-essential animation.
+Live distance and status changes are announced.
+Colour contrast and touch targets meet standards.
+
+
+11. Phased Delivery
+Phase 1 (Core Loop + Connect Guide)
+Live seat counter, leaving-soon boost, demand-aware empty state, map-first polish, Corridor Chip / Live Trip Card glass treatment, full dynamic connect guide (overview → active → terminal), accessibility pass on primary + guide flows. Adopt Leaflet a11y + routing + Turf.js + excel + QR/PDF packages as needed.
+Phase 2 (Trust & Ops)
+Trust float ledger, fleet assignment UI, office-bus interest → guide, Impact surface polish. Consider Filament for Control Tower acceleration.
+Phase 3 (Platform Native)
+Mobile shell, Live Activities, haptics, full accessibility certification. Only then evaluate richer camera behaviour if still needed.
+Each phase ends with green tests, updated DEVELOPMENT-LOG, and a demo on the rich seeder that a civil servant at Berger Junction at 6:25 am can complete without confusion.
+
+12. Final Instruction to the Code Generator
+Protect the existing engineering excellence (money safety, dual-app split, change control, feature flags, test suite, lightweight PWA).
+Elevate the three things Apple actually rewards: purposeful interaction, structural inclusivity, and measurable social impact under real conditions.
+Make the map the calm primary canvas.
+Make the corridor chip the one-tap hero.
+Make the dynamic last-mile connect guide the moment of trust that turns “I hope the bus is coming” into “I can see it, I know exactly how far, and I will connect.”
+Everything else supports that loop without competing for attention or bloating the critical path.
+Execute in small, reviewable commits. Prefer clarity and real-world performance over cleverness or visual spectacle. Ship only what a verified worker in Abuja can successfully use on a mid-range Android phone on 3G at 6:30 am.
+End of prompt.
+
+
+Yes — but only purposeful, restrained branding and motion.
+Not decorative “wow” graphics that fight the product’s real job.
+Why restrained motion & branding are needed
+WorkRide’s navigation is the last-mile connect guide (passenger walking to a verified bus/car at an informal junction). In this context:
+
+Calm, consistent visual language builds trust (the core differentiator vs Google Maps / Bolt).
+Subtle motion gives feedback and orientation (live pulse on seats, smooth follow, clear “you have arrived”).
+Branding (Forest Green, glass, clear icons) makes the experience feel like WorkRide, not a generic map.
+Apple Design Award criteria reward Delight that is purposeful and Craft that is consistent — not spectacle.
+
+What is not needed (and actively harmful):
+
+Heavy 3D robot-eye camera, particle effects, looping decorative SVGs, or constant animation.
+Anything that increases JS payload significantly or breaks on 3G / low-end Android.
+Motion that conveys essential information (violates prefers-reduced-motion and accessibility).
+
+The current design system already points in the right direction (glass, 8 px grid, 200 ms spring, WORKRIDE_ANIMATIONS gate). We should enhance within those constraints, not abandon them.
+Recommended Principles
+
+Motion = feedback, not decoration
+Use it for state changes the user needs to notice: seat taken, vehicle moving, arriving, missed, success.
+Respect prefers-reduced-motion
+All non-essential animation must be disabled or reduced to opacity/position fades only.
+Performance budget
+Keep the critical path lightweight. Prefer CSS transforms/opacity and Alpine/CSS transitions over heavy JS animation libraries on the Rider PWA.
+Brand consistency
+Everything stays inside the existing tokens (Forest Green #2E7D32, Gold #FBC02D, Slate, Paper, Sora/Inter, glass).
+Progressive enhancement
+Base experience works with zero motion. Motion is layered on top.
+
+What to Brand & Animate (Priority Order)
+
+
+
+ElementRecommended TreatmentWhyCorridor ChipSoft live pulse (scale + opacity) on “leaving soon” / active countMakes the board feel alive without noiseLive seat counterBrief highlight / number tick when a seat is takenInstant feedbackConnect Guide – Overview → ActiveSmooth fitBounds → follow transition (ease, 300–400 ms)Clear mode changeVehicle & passenger pinsSubtle pulse on vehicle; steady “You” pinOrientationRoute polylineDraw-on or fade-in when guide starts; slight glow in brand greenFeels intentionalDistance / ETA HUDNumber changes with a short cross-fade or countReadable updatesTerminal statesArrived: short success confirmation (check + gentle scale). Missed: calm fade to “Guide stopped”Closure without dramaMap controls & cardsGlass + soft shadow + 200 ms spring on appear/dismissPremium but lightImpact / CO₂ momentsVery light confetti or number reveal only on certificate generation (already gated)Delight at the right moment
+Avoid: continuous floating illustrations, complex Lottie loops on the map, parallax, or anything that runs while the user is trying to walk and look at the real world.
+Implementation Advice & Tools
+1. Prefer CSS + Alpine first (Rider PWA)
+
+CSS transition / transform / opacity + prefers-reduced-motion media query.
+Alpine.js for simple enter/leave and state-driven classes (you already use it).
+Tailwind’s built-in transition utilities + your design tokens.
+This keeps the bundle small and works well on 3G.
+
+2. Lightweight animation helpers (only if needed)
+
+Motion One or Auto Animate — very small, excellent performance.
+Alpine Animations or simple @keyframes in design-system.css.
+Avoid full Framer Motion or GSAP on the critical Rider path unless you tree-shake aggressively.
+
+3. Lottie / Rive (use sparingly)
+
+Only for isolated, non-critical moments (e.g. empty-state illustration, certificate success, onboarding).
+Always respect reduced-motion (show static fallback).
+Keep files tiny and load them lazily.
+
+4. Map-specific motion
+
+Leaflet’s built-in flyTo, fitBounds, pan/zoom options with easing.
+Custom CSS on markers and polylines for pulse/glow.
+For the guide: throttle location updates and animate marker position with simple interpolation if needed (Turf.js can help).
+True 3D pitch/rotation stays deferred to the native mobile shell (Mapbox GL / MapLibre / Apple Maps).
+
+5. Design system discipline
+
+All motion durations, easings, and reduced-motion fallbacks live in resources/css/design-system.css (or a small motion.css imported by it).
+Name tokens clearly: --wr-motion-fast, --wr-motion-spring, --wr-pulse, etc.
+Gate decorative brand cards / heavy SVGs behind the existing WORKRIDE_ANIMATIONS flag.
+
+6. Accessibility & testing
+
+Test every animated element with VoiceOver + Reduce Motion enabled.
+Ensure focus and live regions still work when motion is off.
+Measure performance on a mid-range Android device on throttled 3G.
+
+Suggested Implementation Sequence
+
+Audit & tokens — Add motion tokens and reduced-motion rules to the design system.
+Core feedback — Live seat pulse, Corridor Chip pulse, pin states, guide transition.
+Guide polish — Smooth overview → follow, polyline treatment, HUD number updates, clear terminal states.
+Delight moments — Certificate / impact success only (already gated).
+Native phase later — Richer camera and haptics when you ship Capacitor / native maps.
+
+Bottom line
+Yes, brand and enhance the navigation look — but treat motion as communication and trust, not decoration.
+A calm glass interface with a soft live pulse, a smooth “start guide” transition, clear pins, and a decisive “you have arrived” state will feel more premium and more WorkRide than any heavy animation library. It will also stay fast, accessible, and aligned with both Apple HIG and the real conditions of Abuja junctions.
+If you want, I can next draft the exact CSS motion tokens + Alpine patterns, or a short implementation checklist for the connect-guide animations that an AI code generator can execute.go ahead and draft the implementation checklist for the (motion & branding) connect-guide animations that an AI code generator can execute to align with our appMarkdown# WorkRide — Connect Guide Motion & Branding Implementation Checklist
+### Executable specification for AI Code Generator / Agent
+
+**Goal**  
+Add purposeful, accessible, brand-aligned motion and visual polish to the **passenger-to-vehicle connect guide** only.  
+Motion = feedback and orientation. Never decoration. Must remain fast on 3G / low-end Android and fully respect `prefers-reduced-motion`.
+
+**Scope**  
+- Connect Guide only (overview → active follow → terminal states).  
+- Corridor Chip live pulse and live seat-counter highlight (supporting the board that leads into the guide).  
+- All work stays inside existing design tokens, Blade + Tailwind + Alpine, Leaflet, and the `WORKRIDE_ANIMATIONS` gate where appropriate.
+
+**Non-negotiables**  
+- All non-essential motion disabled under `@media (prefers-reduced-motion: reduce)`.  
+- No new heavy animation libraries on the critical path (prefer CSS + Alpine).  
+- Keep critical-path JS small.  
+- Touch targets, focus, VoiceOver live regions, and Dynamic Type must not break.  
+- Tokens only in `resources/css/design-system.css` (or a small imported motion partial).  
+- Tests + pint + build must stay green. Update `DEVELOPMENT-LOG.md`.
+
+---
+
+## 1. Design Tokens (do this first)
+
+**File**: `resources/css/design-system.css`
+
+Add (or extend) the following tokens:
+
+```css
+:root {
+  /* Motion */
+  --wr-motion-fast: 150ms;
+  --wr-motion-normal: 200ms;
+  --wr-motion-slow: 320ms;
+  --wr-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --wr-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --wr-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Pulse */
+  --wr-pulse-scale: 1.04;
+  --wr-pulse-opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wr-motion-fast: 0ms;
+    --wr-motion-normal: 0ms;
+    --wr-motion-slow: 0ms;
+  }
+}
+Also define reusable utility classes (or Tailwind @utility / component classes):
+
+.wr-transition-fast, .wr-transition-normal, .wr-transition-slow
+.wr-pulse (subtle scale + opacity loop, disabled under reduced motion)
+.wr-fade-in, .wr-scale-in (enter animations)
+Glass card elevation remains as already defined
+
+Acceptance
+
+Tokens compile.
+Under reduced-motion everything becomes instant (0 ms).
+No visual regression on existing pages.
+
+
+2. Corridor Chip — Live Pulse (Board)
+Where: Trip board Corridor Chips (the chips that show “12 leaving • ₦600”).
+Behaviour
+
+When a corridor has trips in the “leaving soon” window (≤ 15 min) or has live seat activity, apply a soft pulse.
+Pulse = gentle scale (1 → 1.04 → 1) + slight opacity change, ~1.8–2.2 s loop.
+Stop pulse when the chip is not in a live state.
+Completely disabled under prefers-reduced-motion.
+
+Implementation notes
+
+CSS class .wr-pulse toggled by Alpine or a Blade conditional based on existing “leaving soon” / live data.
+Do not animate layout (no width/height changes). Use transform + opacity only.
+
+Acceptance
+
+Pulse visible only on live chips.
+Reduced-motion = static chip.
+No layout shift. Accessibility tree unchanged.
+
+
+3. Live Seat Counter Highlight
+Where: Seat count on trip cards / Corridor Chips when a seat is taken (Reverb BookingConfirmed).
+Behaviour
+
+On seat-count change: brief highlight (background or text colour flash in Forest Green / Gold, 200–300 ms) + optional subtle scale.
+Number itself can cross-fade or simply update (prefer simple update + highlight for performance).
+No continuous animation.
+
+Implementation notes
+
+Alpine / Reverb listener already (or will) update the number.
+Add a temporary class .wr-seat-tick for the highlight duration, then remove it.
+Use CSS transition on background-colour / colour / transform.
+
+Acceptance
+
+Visible feedback when a colleague books.
+Reduced-motion = instant number change, no highlight animation.
+Screen reader still announces the new count via live region.
+
+
+4. Connect Guide — UI State 1: Route Overview (Macro)
+Visual requirements
+
+Origin pin (“You”) — blue / brand accent, subtle idle pulse (optional, very soft).
+Destination / vehicle pin — Forest Green or vehicle-type icon + verification badge.
+Route polyline — Forest Green, 4–6 px, slight glow or higher opacity.
+Bottom glass summary card (distance, ETA, plate, “Start Guide” button).
+Fit-bounds with comfortable padding so both pins + full polyline are visible.
+
+Motion
+
+On first load of overview: polyline can fade/draw in once (optional, 300–400 ms).
+Pins fade or scale in once.
+Card uses existing glass enter transition (.wr-fade-in / .wr-scale-in).
+All one-shot; no loops except the very soft origin pulse if enabled.
+
+Acceptance
+
+Overview is calm and readable.
+Reduced-motion = instant appearance, no draw animation.
+
+
+5. Connect Guide — Transition: “Snap-to-Guide”
+Trigger: User taps “Start Guide”.
+Behaviour (respect reduced motion)
+
+Summary card collapses / morphs into compact HUD (height + opacity transition, ~250–320 ms).
+Map eases from current overview bounds to a follow framing centred on the passenger (Leaflet flyTo / fitBounds with duration matching --wr-motion-slow, or instant under reduced motion).
+Polyline remains visible; vehicle pin stays live.
+No 3D pitch. Stay 2D (or very slight perspective at most).
+
+Implementation notes
+
+Use Leaflet’s built-in animation options.
+Under prefers-reduced-motion, call the map methods with duration 0 / animate: false and show the final state immediately.
+Alpine drives the card state (overview → active).
+
+Acceptance
+
+Transition feels decisive but not dramatic.
+Reduced-motion = instant switch to active HUD + final map framing.
+Focus moves logically; VoiceOver announces “Guide started”.
+
+
+6. Connect Guide — UI State 2: Active Follow (Micro)
+Map behaviour
+
+Map follows passenger location (existing geolocation + Reverb).
+Vehicle pin updates on TripLocationUpdated.
+When distance < ~150 m, slightly tighter zoom; otherwise keep both pins reasonably in view.
+Throttle re-routing and marker animation to avoid jank.
+
+HUD
+
+Compact glass bar: large distance + ETA, vehicle plate + badge, “Wave when you see the plate”, Recenter, End Guide.
+Distance / ETA number updates with a short cross-fade or simple replacement + optional 150 ms colour tick.
+No continuous pulsing on the HUD itself.
+
+Pins
+
+Passenger pin: steady or very soft pulse.
+Vehicle pin: soft pulse while moving; steady when stopped / waiting.
+
+Acceptance
+
+Follow feels stable, not nauseating.
+Reduced-motion: no pin pulse, instant number updates, map jumps instead of easing if needed.
+Live region announces significant distance changes and “approaching vehicle”.
+
+
+7. Terminal States
+7.1 Arrived (within ~40–50 m geofence)
+
+Map stops aggressive following.
+HUD switches to success state: checkmark + “Wave — you are here” (or equivalent).
+Short, one-shot confirmation: scale + fade of success icon / card (200–300 ms).
+Optional very light success colour flash on the card.
+Auto-stop guide updates after confirmation.
+
+7.2 Missed / Stopped
+
+Calm fade to “Guide stopped. Vehicle has left the area.” (or booking no-show message).
+No alarming red flash loops. Use slate / muted treatment + clear primary action (re-book, contact, back).
+Instant under reduced motion.
+
+Acceptance
+
+Clear emotional closure without drama.
+VoiceOver announces the terminal state.
+User can dismiss or take next action easily.
+
+
+8. Branding Details (Graphics)
+
+Use existing Forest Green for polyline, primary buttons, success.
+Gold sparingly for “leaving soon” / important live badges only.
+Vehicle pin: simple, recognisable bus/car glyph + small verification badge (Level 3).
+Origin pin: standard “You” / person glyph.
+Keep icon set minimal and consistent with the rest of the app.
+No Lottie or complex illustrations on the active guide map itself.
+Glass cards keep the existing blur + 12 % white language.
+
+
+9. Reduced-Motion & Accessibility Checklist (must pass)
+
+@media (prefers-reduced-motion: reduce) forces all guide and chip motion to 0 ms / static.
+ No essential information is conveyed only by motion.
+ VoiceOver can complete: open guide → Start → follow → Arrived / Missed.
+ Distance and status changes use appropriate live regions.
+ Focus order remains logical when cards morph.
+ Dynamic Type at largest size does not break HUD or pins.
+ Colour contrast of polyline, pins, and HUD text ≥ 4.5:1.
+ Touch targets on Recenter / End Guide / Start Guide ≥ 44×44 pt.
+
+
+10. Performance Guardrails
+
+Prefer CSS transform and opacity only.
+Avoid animating layout properties.
+Throttle location-driven marker moves and re-routes.
+Do not load Lottie/Rive on the guide path.
+Measure on a mid-range Android device with network throttling.
+Keep the guide’s additional JS minimal (Alpine + existing Leaflet + optional Turf helpers only).
+
+
+11. Files Likely Touched
+
+resources/css/design-system.css (tokens + utilities)
+Trip board Blade / Alpine (Corridor Chip pulse, seat tick)
+Connect Guide Blade view + Alpine component (states: overview / active / arrived / missed)
+Leaflet map init / helper JS for fitBounds, follow, marker updates
+Possible small shared motion helper if needed (keep tiny)
+Tests for guide states and reduced-motion behaviour where practical
+DEVELOPMENT-LOG.md
+
+
+12. Definition of Done for this checklist
+
+All tokens and utilities land in the design system.
+Corridor Chip pulse and seat-tick highlight work and respect reduced motion.
+Connect Guide has clear Overview → Snap-to-Guide → Active Follow → Arrived / Missed with the motion described above.
+Accessibility and reduced-motion checks pass.
+No new heavy dependencies on the critical path.
+vendor/bin/pint, php artisan test, npm run build green.
+DEVELOPMENT-LOG.md updated.
+Commit message example:
+feat(nav): purposeful motion & branding for connect guide + live chips
+
+
+13. Explicitly Out of Scope (do not implement now)
+
+Full 3D camera pitch / robot-eye navigation.
+Continuous decorative Lottie on the map.
+Particle effects or confetti on the guide itself.
+Any animation that runs while the user is walking and needs to watch the real world.
+Changes to money flows, verification, or core matching logic.
+
+Execute the checklist in small, reviewable commits. Prefer the simplest CSS + Alpine + Leaflet solution that delivers calm, trustworthy feedback.
+
+
+Here is a clear, page-by-page visual and experiential description of the WorkRide app as I imagine it — a calm, premium, Apple-like experience built for real Abuja conditions (3G, one-handed use, trust, clarity).
+I describe layout, hierarchy, colour, motion, and feeling so you can picture every major screen.
+
+1. Landing / Marketing Homepage (Public)
+Feeling: Quiet confidence. “This solves a real problem.”
+
+Full-bleed soft paper background (#F6F9F6) with very subtle map texture or abstract corridor lines in the distance (almost invisible).
+Top: minimal logo (WorkRide wordmark + small green mark) + “Sign in” / “Get started”.
+Hero (above the fold):
+Large, confident headline in Sora:
+“Get to Federal Secretariat by 7:30. Every day.”
+Subline in Inter: “Verified colleagues. Fixed fare. No surge.”
+Three large live Corridor Chips sitting on a soft glass card:
+Kubwa → CBD  •  12 leaving  •  ₦600
+(soft live pulse on the count).
+Primary button: deep Forest Green, large touch target — “Find a ride”.
+
+Below: three trust badges in a row (small, calm):
+“NIN-hashed, never stored” • “1,240+ verified civil servants” • “First Abuja GTFS”.
+Further down: simple impact strip (CO₂ saved, fuel saved) and a short “How it works” in three quiet steps.
+No carousels, no noise, no dark patterns.
+
+Apple-like quality: Lots of breathing room, perfect typography hierarchy, one clear action.
+
+2. Login / Register / Phone Verification
+Feeling: Fast, respectful, almost invisible.
+
+Clean centred card on paper background.
+Phone-first: large input for Nigerian number, big green “Send code”.
+OTP screen: six large digit boxes, auto-focus, resend timer.
+Minimal copy: “We’ll only use this to verify it’s you.”
+After success → gentle fade into the main app (no heavy celebration).
+
+Secondary options (Google, email) are present but visually quieter.
+
+3. Main App Shell (Authenticated)
+Global chrome (consistent across the app):
+
+Top: thin, translucent header (glass) with logo on left, ⌘K search / command palette icon, profile avatar on right.
+Bottom: five-item tab bar (iOS-style, thumb-friendly):
+Trips | My Rides | Wallet | Impact | More
+Active tab: Forest Green icon + label. Inactive: muted slate.
+Safe-area respected. Header collapses slightly on scroll.
+
+
+4. Trips (Home / Board) — The Heart of the App
+Feeling: Map-first, alive but calm. One-handed.
+Layout (mobile):
+
+~65–70 % of screen = live map (Leaflet + OSM, clean, light style).
+User location shown as a soft blue “You” pulse.
+Floating glass controls on the map (top-right): recenter, layers (optional road condition toggle).
+Bottom third = glass sheet that can be dragged up:
+Horizontal scroll of large Corridor Chips (60 px tall pills).
+Live ones have a very soft breathing pulse.
+Below chips: vertical list of trip cards (or the chips expand into cards).
+
+Each Live Trip Card:
+Left: driver avatar + Level 3 badge.
+Middle: route name, departure time, seats left (live number), fixed fare.
+Right: small IRI colour dot + CO₂ estimate.
+Badges: “Live now”, “Book ahead”, “Women-only”, “Free”.
+
+Empty state (no trips): calm illustration + text
+“12 people want Kubwa → CBD tomorrow at 7:00. Be the driver.”
+with a clear “Publish a trip” button.
+
+Desktop / tablet: side-by-side map + list, more breathing room.
+Motion: seat numbers tick with a brief green highlight when someone books; chips pulse only when live.
+
+5. Trip Detail / Booking Sheet
+Feeling: Decisive, transparent, zero anxiety.
+
+Map still visible in the background (dimmed slightly).
+Bottom sheet rises:
+Driver info + rating stars + verification badge.
+Clear pickup point (defaults to current location or nearest waypoint).
+Payment method selector (large radio-style rows):
+Wallet • Cash • Subsidy • Ride Credit (Time-Bank) • Free
+Big green “Confirm seat” button.
+
+After confirmation: gentle success state → “You’re on the trip” → automatic entry into the Connect Guide if the trip is active or soon.
+
+
+6. Connect Guide (the navigation experience you asked about)
+Feeling: Clearer and calmer than Google Maps for the specific job of meeting a verified vehicle.
+State A – Overview
+
+Full map.
+Blue “You” pin + green vehicle pin (with tiny bus/car icon + verification badge).
+Forest-green route polyline.
+Bottom glass card: distance, walking ETA, plate number, large “Start Guide” button.
+
+State B – Active Guide
+
+Map follows the passenger.
+Compact glass HUD at bottom (or top-safe):
+Large distance (“240 m”) • ETA • plate • “Wave when you see it”.
+Recenter and End Guide buttons.
+Soft pulse on the vehicle pin while it moves.
+When < 50 m: HUD changes to “You’re here — wave” with a gentle success confirmation.
+
+State C – Terminal
+
+Arrived: quiet success.
+Missed: calm “Guide stopped. Vehicle has left.” + clear next actions.
+
+No dramatic 3D camera. Just excellent 2D clarity, perfect hierarchy, and trustworthy feedback.
+
+7. My Rides
+Feeling: Personal history + active trips.
+
+Segmented control: Active | Upcoming | Past.
+Active trips show a live mini-map thumbnail + “Open Guide” button.
+Past trips: simple list with date, corridor, fare, CO₂ saved, and a “Rate” or “View certificate” action.
+Empty state is encouraging, not sad.
+
+
+8. Wallet
+Feeling: Clear, bank-grade, no clutter.
+
+Three large balance cards in a row (or stacked on mobile):
+Cash | Subsidy | Earned
+Quick actions: Top up • Send • Withdraw.
+Transaction list below (clean rows with icons, amounts, dates, status).
+“Monthly statement” and “Download receipt” are easy to find.
+Everything uses the same glass + Forest Green language.
+
+
+9. Impact
+Feeling: Quiet pride.
+
+Big personal numbers: CO₂ saved, fuel saved, trees equivalent, Green Level.
+Simple bar or ring visualisation (not noisy).
+“Download CO₂ certificate” (QR-verifiable) as a prominent but calm button.
+Workplace leaderboard (optional, collapsible).
+Short line of copy: “Every ride is a small act of collective progress.”
+
+
+10. More / Profile & Secondary Pages
+More sheet or page:
+
+Profile & Safety (emergency contact, women-only preference).
+Demand check-in.
+Road map (public heatmap).
+Fleet (if driver).
+Settings, Help, Sign out.
+
+Profile:
+
+Avatar, name, verification level badges (clearly explained), workplace.
+Clean list of preferences and security options.
+
+Road Map (public):
+
+Full-screen map with Green / Yellow / Red IRI segments.
+Simple legend and “Worst segments” list.
+Feels like a public good, not a marketing page.
+
+Admin / Control Tower (separate, denser):
+
+Darker slate sidebar, data-dense but still using the same design tokens.
+KPIs at top, clear tables, map views for live fleet and demand.
+Feels like a professional operations tool, not a consumer app.
+
+
+11. Overall Visual Language (the “Apple-like” part)
+
+Colour: Paper background, Forest Green primary, Gold only for live/important accents, Slate for text.
+Typography: Sora for headlines (confident but human), Inter for everything else, mono only for numbers.
+Spacing: Generous 8 px grid. Cards and sheets have breathing room.
+Depth: Soft glassmorphism (blur + 12 % white), very subtle shadows. No heavy skeuomorphism.
+Motion: 150–320 ms springs. Only for feedback (seat taken, guide started, arrived). Everything respects reduced motion.
+Dark mode: Fully supported, equally calm.
+One-handed: Primary actions live in the bottom third of the screen.
+
+
+How it feels as a whole
+Opening the app feels like opening a well-made tool, not a startup experiment.
+The map is always the quiet hero.
+The corridor chips are the fastest way to act.
+The connect guide is the moment of trust.
+Impact and wallet feel like proof that the system is fair and real.
+It is not trying to be the flashiest map app in the world.
+It is trying to be the clearest, most trustworthy, and most respectful mobility app a civil servant in Abuja has ever used — and that clarity is what makes it feel world-class and Apple-like.
+Would you like me to zoom in and describe any single screen in even more detail (exact component hierarchy, spacing, or states)?go ahead and describe all the app pages as you expect it to be worldclass app with the award wining ui and great experience from the beginning till logout?WorkRide — Complete World-Class App Experience
+From first open to logout
+(Visual + experiential description of every major screen)
+This is the app as I imagine it at Apple Design Award level: calm, precise, trustworthy, one-handed, beautiful on 3G, and deeply respectful of the people who use it.
+
+1. First Launch / Splash & Onboarding
+Splash
+Soft paper background. Centre: the WorkRide mark (simple green geometric form) + wordmark in Sora. Very short, elegant fade-in. No loud animation.
+Onboarding (3 quiet screens, skippable)
+
+“Get to work on time. Every day.”
+“Verified colleagues. Fixed fares. No surge.”
+“You are also the sensor — helping map Abuja’s roads.”
+
+Each screen has one large illustration (simple, branded, not cartoonish) and a single clear “Continue” button. Final screen: “Get started” → goes to phone registration.
+
+2. Registration & Phone Verification (Tier-0)
+Register
+Clean centred glass card.
+Large phone number field (Nigeria flag + 80x pre-filled).
+Primary green button: “Send verification code”.
+Small text: “We only use your number to verify it’s you. NIN is never stored raw.”
+OTP screen
+Six large, evenly spaced digit boxes. Auto-advance. Resend timer.
+Success: soft green check + “Verified” → gentle transition into the main app.
+(Later levels — workplace ID, NIN hash, driver documents — are progressive and never block basic booking.)
+
+3. Main App Shell (Persistent)
+Once inside:
+
+Top bar: translucent glass. Left: WorkRide logo. Centre: optional page title. Right: search (⌘K) icon + profile avatar.
+Bottom tab bar (5 items only, large touch targets):
+Trips • My Rides • Wallet • Impact • More
+Active tab in Forest Green. Inactive in muted slate.
+Safe areas fully respected. Header can collapse slightly on scroll for more map space.
+
+The whole shell feels light, fast, and deliberately uncluttered.
+
+4. Trips (Home) — The Primary Experience
+First impression
+Map fills most of the screen (clean light OSM style). Your location is a soft blue pulsing “You” dot.
+Bottom glass sheet (draggable):
+
+Horizontal row of large Corridor Chips (Kubwa→CBD, Nyanya→Idu, Lugbe→CBD…).
+Live chips have a very gentle breathing pulse and show “12 leaving • ₦600”.
+Below: list of available trip cards.
+
+Trip Card
+
+Driver avatar + Level 3 verification badge
+Route + time + seats left (live number) + fixed fare
+Small badges: Live now / Book ahead / Women-only / Free
+Tiny IRI colour indicator + CO₂ estimate
+
+Empty state
+Calm illustration + text:
+“12 people want Kubwa → CBD tomorrow at 7:00. Be the driver.”
+Clear green button: “Publish a trip”.
+Interaction
+One tap on a chip filters the list. One tap on a card opens the booking sheet. Everything is thumb-reachable.
+
+5. Booking Sheet (Bottom Sheet)
+Map stays visible but slightly dimmed.
+Sheet contains:
+
+Driver name, photo, rating, verification badge
+Pickup selector (defaults to current location or nearest waypoint)
+Payment method list (large tappable rows):
+Wallet • Cash • Subsidy credits • Ride Credit (Time-Bank) • Free
+Big Forest Green “Confirm seat • ₦600” button
+
+On success: short, elegant confirmation → “You’re on the trip” → if the trip is live or imminent, the Connect Guide opens automatically.
+
+6. Connect Guide (The Navigation Experience)
+Overview state
+Full map. Blue “You” pin + green vehicle pin (with small bus/car icon and verification badge). Forest-green walking route.
+Bottom glass card:
+Distance • Walking time • Plate number • large “Start Guide” button.
+Active Guide state
+Map follows you. Compact HUD shows large distance + ETA + plate + “Wave when you see it”.
+Recenter and End Guide buttons. Vehicle pin soft-pulses while moving.
+When you are within ~50 m: HUD changes to a calm success state — “You’re here — wave”.
+Missed state
+Quiet message: “Guide stopped. The vehicle has left the area.” Clear next actions (re-book, message driver, go back).
+The whole guide feels clearer and more trustworthy than Google Maps for the specific job of meeting a verified vehicle at an Abuja junction.
+
+7. My Rides
+Segmented control: Active • Upcoming • Past
+
+Active: live mini-map thumbnail + “Open Guide” + status.
+Upcoming: clean list with date, corridor, seats, fare.
+Past: same list + CO₂ saved + “Rate trip” or “View certificate”.
+
+Empty states are encouraging and useful, never guilt-inducing.
+
+8. Wallet
+Three large balance cards at the top (Cash • Subsidy • Earned).
+Quick actions in a row: Top up • Send money • Withdraw.
+Below: clean transaction list (icon, description, amount, date, status).
+Easy access to monthly statement and individual QR-verifiable receipts.
+Feels like a modern, trustworthy fintech surface — not a complicated banking app.
+
+9. Impact
+Big, proud personal numbers:
+CO₂ saved • Fuel saved • Trees equivalent • Green Level
+Simple, elegant visualisation (ring or bar).
+Prominent but calm button: “Download CO₂ Certificate” (QR-verifiable).
+Optional workplace leaderboard (collapsible).
+Short line of copy: “Every shared ride is collective progress.”
+This screen is where the Social Impact story becomes personal and emotional.
+
+10. More (Profile & Secondary)
+Clean list:
+
+Profile & Safety (photo, name, verification levels, emergency contact, women-only preference)
+Demand check-in (“I’m at Berger, need a ride”)
+Road condition map (public heatmap)
+My Fleet (if driver)
+Settings
+Help & Support
+Sign out
+
+Profile detail
+Clear verification badges with short explanations.
+Emergency contact is private and easy to set.
+Women-only preference is a simple toggle (never forced on others).
+Road Map (public)
+Full-screen map with Green/Yellow/Red road segments. Simple legend. “Worst segments” list. Feels like a public service.
+Demand check-in
+Fast form: location (auto or map pin) + destination + number of people. One tap to submit. Feeds the empty states and ops planning.
+
+11. Driver / Publisher Experience (when relevant)
+Publish a trip
+Simple form: corridor, time, seats, vehicle (if fleet mode, must pass inspection first). Fixed fare shown automatically. Clear “Publish” button.
+Live trip (driver view)
+Map with passenger pins, seat list, Board / No-show actions, chat, complete trip. Clean and operational.
+Fleet page (if enabled)
+Assigned buses, pre-trip inspection checklist with photo capture, fault reporting, maintenance status.
+
+12. Admin / Control Tower (separate, denser experience)
+Darker slate sidebar. Top KPIs (trips today, active drivers, CO₂, potholes, MRR, subsidy).
+Clear sections: Verifications, Users, Trips, Demand calendar, Fleet assignment, Road Intelligence, Business, GTFS, etc.
+Still uses the same design tokens so it feels like the same product family, just built for operators.
+
+13. Supporting & Edge Screens
+
+Share Trip (public link): beautiful read-only card with map, status, no live location for privacy.
+Certificates & Receipts: clean printable/PDF layout with QR verification.
+Offline page: calm message + cached trip board if available.
+Error / empty states: always helpful and on-brand, never generic or blaming.
+Search / Command palette (⌘K): fast access to corridors, recent trips, demand, settings.
+
+
+14. Logout
+From More → Sign out.
+Simple confirmation: “Sign out of WorkRide?”
+Primary button: “Sign out”. Secondary: “Cancel”.
+After logout: gentle return to the public landing page. No drama.
+
+Overall Experience Arc
+
+You open the app → calm, confident landing.
+You verify with phone in seconds.
+You land on a live map with clear corridor chips.
+You book in two taps.
+You get a precise, trustworthy guide that helps you actually meet the vehicle.
+You finish the ride, see your impact grow, and your wallet stay clear.
+When you leave, the app says goodbye quietly and respectfully.
+
+Every screen has generous spacing, perfect hierarchy, purposeful motion only, full accessibility, and the same quiet Forest Green + glass language.
+It never shouts. It never confuses. It never makes the user feel small.
+It simply makes the hard daily act of getting to work in Abuja feel solvable, fair, and dignified — and that is what makes it feel world-class and worthy of an Apple Design Award.
+This is the complete picture I have in mind from the first pixel to logout.Describe the micro-interactions for the booking flowMicro-interactions for the WorkRide Booking Flow
+(From trip card → confirmed seat → ready for Connect Guide)
+These are purposeful, lightweight, and fully respect prefers-reduced-motion. All timing uses the design tokens (--wr-motion-fast 150 ms, --wr-motion-normal 200 ms, --wr-motion-slow 320 ms, spring easing).
+
+1. Trip Card → Open Booking Sheet
+
+User taps a trip card.
+Card gives a very short scale-down feedback (0.97 → 1.0, 120 ms) so the tap feels acknowledged.
+Bottom sheet rises from the bottom with a spring (320 ms). Map behind it dims slightly (opacity 1 → 0.85) and receives a soft blur.
+Sheet content fades + slides up 8–12 px in the same motion.
+Focus moves to the sheet; VoiceOver announces “Booking sheet, [route], [driver]”.
+
+Reduced motion: Sheet appears instantly, no scale or dim animation.
+
+2. Booking Sheet – Internal Micro-interactions
+Driver header
+
+Avatar and verification badge fade in together (150 ms).
+Rating stars appear with a tiny staggered fade (optional, very subtle).
+
+Pickup selector
+
+Tapping the pickup row: light background highlight + chevron rotates 90° (150 ms).
+If the user changes location, a short “Updated” checkmark fades in and out next to the row.
+
+Payment method rows
+
+Each row is a large tappable target.
+On press: background changes to a light Forest Green tint + subtle scale (0.98).
+On selection:
+Radio/check indicator animates in (scale + fade, 150 ms).
+Previously selected row gently deselects (indicator scales out).
+Selected row keeps a persistent soft green left border or background.
+
+Disabled methods (e.g. insufficient subsidy) are visually muted and do not respond to press.
+
+Price & seat summary
+
+When payment method changes, the price line cross-fades or ticks (150 ms) if the amount is different (rare, because fares are fixed).
+Seat count is static at this point (already locked for the user).
+
+Primary “Confirm seat” button
+
+Default: solid Forest Green, large, full-width.
+On press: darkens slightly + scale 0.98 (100–120 ms).
+While loading (atomic booking in progress):
+Button label cross-fades to a small spinner + “Confirming…”.
+Button becomes non-interactive.
+Optional very subtle progress pulse on the button edge.
+
+Success: button briefly shows a white checkmark, then the sheet begins its success transition.
+
+Reduced motion: All of the above become instant state changes (no scale, no cross-fade duration).
+
+3. Confirming → Success State
+
+After the server confirms the seat (atomic lock + hold):
+Button shows success check (150 ms).
+Entire sheet content fades out slightly while a success panel fades + scales in (200–250 ms).
+Success panel contains:
+Large green check
+“You’re on the trip”
+Route + time + seat confirmation
+Short secondary text: “We’ll guide you when it’s time to meet the vehicle.”
+
+
+Haptic (on supported devices): light success tap.
+After 1.2–1.5 s (or immediate user tap), the sheet either:
+Dismisses downward with spring, or
+Morphs directly into the Connect Guide overview if the trip is active/imminent.
+
+
+Reduced motion: Success panel appears instantly; no scale or delayed auto-advance.
+
+4. Sheet Dismiss / Return to Board
+
+If the user cancels or closes:
+Sheet slides down (250–300 ms spring).
+Map undims and loses blur in the same motion.
+Focus returns to the original trip card (which may now show “You’re booked” or an updated seat count).
+
+Live seat counter on the card (and Corridor Chip) receives the seat-tick highlight (brief green flash + optional number animation) via Reverb.
+
+
+5. Error & Edge Micro-interactions
+Seat just taken by someone else
+
+Button shakes horizontally very slightly (or flashes soft red) once.
+Message appears: “Sorry, that seat was just taken.”
+Sheet offers “View other trips” or auto-returns to the board after a moment.
+
+Network / validation error
+
+Inline error text fades in below the button (150 ms).
+Button returns to normal state.
+No aggressive shaking.
+
+Insufficient balance
+
+Selected payment method shows a calm inline warning.
+Confirm button stays disabled with clear explanation.
+
+All error states are quiet, helpful, and reversible.
+
+6. Accessibility & Reduced-Motion Summary
+
+Every interactive element has a clear pressed/selected/disabled state even when motion is off.
+VoiceOver announces state changes (“Seat confirmed”, “Payment method Wallet selected”, “Booking failed, seat no longer available”).
+Live regions update seat counts and confirmation status.
+Focus is trapped inside the sheet while it is open and correctly restored on dismiss.
+All timing tokens collapse to 0 ms under prefers-reduced-motion.
+
+
+Design Intent
+These micro-interactions make the booking feel:
+
+Responsive — every tap is acknowledged immediately.
+Safe — the user always knows what is selected and what will happen.
+Trustworthy — success is clear and calm; failures are honest and recoverable.
+Premium but light — spring motion and glass, never heavy or playful for its own sake.
+
+The entire flow from card tap to “You’re on the trip” should feel like one continuous, confident gesture that takes less than 10–12 seconds for a returning user.kindly give a visual of some pages to show a bit of your intended thought pleaseHere are visual concepts of the key screens that capture the intended world-class direction for WorkRide:
+1. Landing / Homepage
+Clean paper background, strong but calm headline (“Get to Federal Secretariat by 7:30. Every day.”), three large live Corridor Chips with soft pulse, minimal trust badges, and one clear primary action. Lots of breathing room — the opposite of a noisy marketplace.
+2. Trips (Home / Board)
+Map-first layout. The map occupies most of the screen with a soft blue “You” location. A floating glass bottom sheet holds the Corridor Chips and trip cards. Live chips gently pulse; each trip card shows driver, verification badge, seats, fixed fare, and status badges. Bottom tab bar is simple and thumb-friendly.
+3. Booking Sheet
+A glass bottom sheet rises over a slightly dimmed map. Clear driver info + verification, pickup row, large tappable payment options (Wallet / Cash / Subsidy / Ride Credit / Free), and a strong Forest Green “Confirm seat” button. Everything is decisive and low-anxiety.
+4. Connect Guide (Active)
+The last-mile experience. Clean map with blue “You” pin and green vehicle pin, Forest Green walking route, and a compact glass HUD showing distance, ETA, plate, and “Wave when you see it”. Calm, precise, and more trustworthy than a generic navigation app for meeting a verified vehicle at an Abuja junction.
+5. Impact
+Quiet pride. Large personal numbers (CO₂, fuel, trees, Green Level), a simple elegant ring or bar, and a clear “Download CO₂ Certificate” action. The social-impact story becomes personal without noise.
+
+Overall visual language these images express:
+
+Paper + Forest Green + soft glass
+Generous spacing and clear hierarchy
+Map as the quiet hero
+Motion only for feedback (pulses, sheet rises, success states)
+One-handed, accessible, premium but never flashy
+
+These concepts are meant to feel like a well-made tool for civil servants rather than a typical startup ride-hailing app. Would you like me to generate any additional specific screens (Wallet, My Rides, Driver publish flow, empty states, dark mode, etc.)?
+
+
+
+
+
+
+
+
+Markdown# WorkRide — Complete World-Class UI Rebrand & Implementation Prompt
+### Single Source of Truth for AI Code Generator (opencode / Laravel Boost / Cursor Agent)
+
+You are a world-class Laravel + Tailwind + Alpine UI engineer and accessibility specialist. Your only job is to implement the full visual and interaction redesign of **Green WorkRide** so that every screen becomes calm, precise, trustworthy, and Apple Design Award–calibre while strictly obeying the existing engineering contract.
+
+**Do not invent new business logic, new database tables, or parallel systems.**  
+Extend the existing Blade views, components, Tailwind classes, Alpine components, and design tokens. Keep the dual-app architecture (Rider PWA + Ops Control Tower). Preserve every money invariant, feature flag, NIN hashing rule, and test.
+
+---
+
+## 0. Absolute Non-Negotiables (Never Break)
+
+1. Never store raw NIN — only `nin_hash` + `nin_last4`.
+2. Money remains `decimal(15,2)` with optimistic locking + idempotency.
+3. Feature flags (`FEATURE_*`) control new UI modules; default off unless critical path.
+4. Board = 48 h ahead, Matcher = 30 min near-term. Never pre-empt seats.
+5. Guest-safe layouts: public routes use `layouts/public`.
+6. Design tokens live in **exactly one file**: `resources/css/design-system.css`.
+7. Services own logic; controllers stay thin; every trust action writes `activity_logs`.
+8. Run `vendor/bin/pint`, `php artisan test`, `npm run build` after every meaningful change. Update `DEVELOPMENT-LOG.md`.
+9. Conventional Commits. Keep JS critical path small (< 50 kb goal).
+10. Do not introduce Google Maps JS. Stay with Leaflet + OSM + existing OSRM.
+
+Reference docs already in repo: WORKRIDE-APP-GUIDE.md, WORKRIDE-DEV-GUIDE.md, WORKRIDE-DESIGN-REVIEWS.md, DEVELOPMENT-LOG.md.
+
+---
+
+## 1. Design System Foundation (Implement First)
+
+**File**: `resources/css/design-system.css`
+
+### 1.1 Colour Tokens
+```css
+:root {
+  --wr-forest: #2E7D32;
+  --wr-forest-dark: #1B5E20;
+  --wr-gold: #FBC02D;
+  --wr-slate: #0F172A;
+  --wr-slate-muted: #64748B;
+  --wr-paper: #F6F9F6;
+  --wr-white: #FFFFFF;
+  --wr-glass: rgba(255, 255, 255, 0.12);
+  --wr-glass-border: rgba(255, 255, 255, 0.18);
+  --wr-success: #2E7D32;
+  --wr-warning: #FBC02D;
+  --wr-danger: #DC2626;
+  --wr-iri-green: #22C55E;
+  --wr-iri-yellow: #EAB308;
+  --wr-iri-red: #EF4444;
+}
+1.2 Typography
+
+Headings: Sora (or system fallback)
+Body: Inter
+Numbers / mono: JetBrains Mono or system mono
+Scale: text-xs → text-4xl with clear hierarchy. Support Dynamic Type (use relative units / Tailwind text sizes that scale).
+
+1.3 Spacing & Radius
+
+8 px grid only.
+Radius: 12 px (cards), 16 px (sheets), 9999 px (pills/chips).
+Touch targets ≥ 44 × 44 pt.
+
+1.4 Glass & Elevation
+CSS.wr-glass {
+  background: var(--wr-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--wr-glass-border);
+}
+1.5 Motion Tokens
+CSS:root {
+  --wr-motion-fast: 150ms;
+  --wr-motion-normal: 200ms;
+  --wr-motion-slow: 320ms;
+  --wr-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --wr-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wr-motion-fast: 0ms;
+    --wr-motion-normal: 0ms;
+    --wr-motion-slow: 0ms;
+  }
+}
+Utility classes: .wr-transition-fast, .wr-transition-normal, .wr-pulse (scale + opacity, disabled under reduced motion), .wr-fade-in, .wr-scale-in.
+1.6 Dark Mode
+Provide full dark tokens (slate backgrounds, adjusted glass, high-contrast text). Toggle via existing or new dark class / system preference.
+Acceptance: Tokens compile, no visual regression on existing pages, reduced-motion collapses all timing to 0.
+
+2. Global App Shell
+2.1 Layouts
+
+layouts/app.blade.php (authenticated Rider)
+layouts/public.blade.php (guest)
+Optional layouts/ops.blade.php for Control Tower
+
+2.2 Top Bar
+
+Translucent glass header.
+Left: WorkRide logo / wordmark.
+Right: search (⌘K / command palette) + profile avatar.
+Collapses slightly on scroll for more map space.
+
+2.3 Bottom Tab Bar (exactly 5 items)
+
+Trips (map icon)
+My Rides
+Wallet
+Impact
+More
+
+Active tab = Forest Green icon + label. Inactive = muted slate. Large touch targets. Safe-area padding.
+2.4 Command Palette
+Keep and enhance existing ⌘K. Results must be fast and keyboard-accessible.
+Implement step-by-step: Update layout files → tab bar component → header component → test on mobile viewport.
+
+3. Page-by-Page Implementation Order
+Execute in this exact sequence. After each major page, run pint + tests + build and commit.
+PHASE A — Foundation & Public
+A1. Landing / Marketing Homepage
+
+Soft paper background.
+Large Sora headline: “Get to Federal Secretariat by 7:30. Every day.”
+Subline: “Verified colleagues. Fixed fares. No surge.”
+Three live Corridor Chips (glass pills) with soft pulse on live ones.
+Primary CTA: “Find a ride” (Forest Green).
+Trust row: NIN-hashed • verified users • First Abuja GTFS.
+Impact strip (CO₂ / fuel) further down.
+No carousels, no noise.
+
+A2. Login / Register / OTP
+
+Centred glass card.
+Phone-first input (Nigeria format).
+Six large OTP boxes, auto-advance.
+Minimal copy. Success → soft transition into app.
+
+A3. Public Share Trip & Certificates
+
+Clean read-only card + map (no live location for privacy).
+Certificate layout with QR (use existing QR package if present).
+
+PHASE B — Core Rider Experience
+B1. Trips (Home / Board) — Highest Priority
+
+Map occupies ~65–70 % of screen (Leaflet + clean light OSM tiles).
+Soft blue “You” location pulse.
+Floating glass controls (recenter, optional layers).
+Bottom draggable glass sheet:
+Horizontal Corridor Chips (60 px tall pills, live pulse when ≤ 15 min or active seats).
+Vertical Live Trip Cards: avatar + Level badge, route, time, live seats, fixed fare, badges (Live / Book ahead / Women-only / Free), tiny IRI dot.
+
+Empty state: calm illustration + “12 people want Kubwa→CBD tomorrow 7:00 — Be the driver” + Publish button.
+Live seat counter via Reverb; on change apply brief .wr-seat-tick highlight.
+“Leaving soon” sort boost on now preset.
+
+B2. Booking Sheet (Bottom Sheet)
+
+Rises with spring over dimmed map.
+Driver header (avatar, name, Level 3 badge, stars).
+Pickup row (default current location).
+Payment method large tappable rows: Wallet / Cash / Subsidy / Ride Credit / Free.
+Primary “Confirm seat • ₦X” button.
+Micro-interactions exactly as previously specified (press scale, selection indicator, loading spinner, success check).
+On success → confirmation panel → auto-open Connect Guide if trip active/imminent.
+Error states calm and recoverable (seat taken, insufficient balance, network).
+
+B3. Connect Guide (Critical New Experience)
+Implement the three states with motion tokens:
+
+Overview: full map, blue You pin, green vehicle pin + badge, Forest Green polyline, bottom glass card (distance, ETA, plate, “Start Guide”).
+Snap-to-Guide transition: card collapses to compact HUD, map eases to follow passenger (Leaflet flyTo/fitBounds, duration 0 under reduced motion).
+Active Follow: map follows user, vehicle pin updates via Reverb, HUD shows large distance + ETA + plate + “Wave when you see it”, Recenter + End Guide. Zoom tighter < 150 m. Soft pin pulse while moving.
+Terminal:
+Arrived (< 50 m): success state “You’re here — wave”.
+Missed: calm “Guide stopped. Vehicle has left.” + next actions.
+
+
+
+VoiceOver announces distance and state changes. Live regions used correctly.
+Reuse RoutingService + existing geofence events. Throttle updates.
+
+B4. My Rides
+
+Segmented control: Active | Upcoming | Past.
+Active cards: mini-map thumbnail + “Open Guide” + status.
+Past: corridor, date, fare, CO₂, Rate / Certificate actions.
+Encouraging empty states.
+
+B5. Wallet
+
+Three large glass balance cards: Cash / Subsidy / Earned.
+Quick actions: Top up • Send • Withdraw.
+Clean transaction list (icon, description, amount, date, status).
+Easy statement & receipt download.
+
+B6. Impact
+
+Large personal numbers: CO₂ saved, Fuel saved, Trees, Green Level.
+Simple elegant ring or bar.
+Prominent “Download CO₂ Certificate” (QR-verifiable).
+Optional collapsible workplace leaderboard.
+Short human copy: “Every shared ride is collective progress.”
+
+B7. More / Profile & Safety
+
+Clean list: Profile & Safety, Demand check-in, Road map, My Fleet (if driver), Settings, Help, Sign out.
+Profile: avatar, name, verification badges with short explanations, emergency contact, women-only toggle (preference only).
+Demand check-in: map pin + destination + headcount + one-tap submit.
+Road heatmap: public Green/Yellow/Red IRI layers + legend + worst segments list.
+
+PHASE C — Driver & Ops
+C1. Publish Trip
+
+Simple form: corridor chips, time, seats, vehicle selector.
+Fixed fare shown automatically.
+If fleet mode: pre-trip inspection gate with photo capture.
+Large “Publish” button.
+
+C2. Driver Live Trip View
+
+Map with passenger pins, seat list, Board / No-show actions, chat entry, Complete trip.
+Clean operational UI.
+
+C3. Fleet (if enabled)
+
+Assigned assets, inspection checklist, fault reporting, status.
+
+C4. Ops Control Tower (separate denser shell)
+
+Keep or enhance with Filament if chosen, otherwise continue custom Blade.
+Darker slate sidebar, KPI strip, clear tables, live map views.
+Same design tokens so it feels like the same product family.
+
+PHASE D — Polish & Cross-Cutting
+D1. Dark Mode
+
+Full token set. Test every critical screen. High contrast.
+
+D2. Empty, Loading, Error States
+
+Every list and map has a calm, branded empty state.
+Loading: subtle skeleton or spinner using brand colours.
+Errors: quiet, actionable, never blaming.
+
+D3. Micro-interactions Audit
+
+Implement the exact booking-flow micro-interactions previously defined.
+Corridor Chip pulse, seat-tick highlight, guide transitions, terminal success.
+All respect prefers-reduced-motion.
+
+D4. Accessibility Pass
+
+VoiceOver / TalkBack full flow (especially Connect Guide).
+Dynamic Type, focus order, live regions, contrast ≥ 4.5:1, touch targets.
+Women-only remains opt-in.
+
+D5. PWA & Performance
+
+Manifest, theme-color, icons via laravel/head if adopted.
+Offline board graceful.
+Keep JS light. Measure on mid-range Android + throttled 3G.
+
+
+4. Recommended Packages (Use Only What Is Needed)
+
+Leaflet + Leaflet.a11y / accessibility plugins + Routing Machine (or lrm-osrm) + Turf.js for the guide.
+maatwebsite/excel for reports.
+QR + PDF package for certificates.
+laravel/head for meta / PWA.
+Filament (optional) only for accelerating Control Tower.
+brick/geo if server-side geometry needs strengthening.
+
+Do not add heavy SPA frameworks or animation libraries on the critical Rider path. Prefer CSS + Alpine.
+
+5. Implementation Ritual (Every Change)
+Bash# 1. Make the change in small, focused commits
+# 2. vendor/bin/pint
+# 3. php artisan test          # money invariants must pass
+# 4. npm run build
+# 5. Manual check on mobile viewport + reduced-motion
+# 6. Update DEVELOPMENT-LOG.md
+# 7. git add <relevant files only>
+# 8. git commit -m "feat(ui): [page] world-class redesign — [short detail]"
+
+6. Definition of Done for the Entire Rebrand
+
+Every screen listed above exists and matches the visual + interaction language.
+Map-first Trips + full Connect Guide (overview → active → terminal) working with Reverb.
+All motion uses tokens and respects reduced-motion.
+Accessibility checklist passes on primary flows.
+Dark mode complete.
+No new money or schema violations.
+Tests green, pint clean, build succeeds.
+DEVELOPMENT-LOG.md updated with the UI rebrand sprint.
+The app feels calm, precise, trustworthy, and worthy of an Apple Design Award while remaining usable by a civil servant on a mid-range Android phone on 3G at 6:30 am in Abuja.
+
+
+7. Final Instruction to the Code Generator
+Start with the design-system tokens and global shell.
+Then implement pages in the exact phase order above.
+One page (or one coherent group) at a time.
+After each page: test, commit, update log.
+Protect the engineering excellence that already exists.
+Elevate the three things that win awards: purposeful interaction, structural inclusivity, and measurable social impact under real conditions.
+Make the map the quiet hero.
+Make the corridor chip the fastest path to action.
+Make the Connect Guide the moment of trust.
+Make every other screen support that loop without noise.
+Execute step-by-step. Prefer clarity and performance over cleverness.
+Ship only what works for the real users of WorkRide.
+End of prompt.
+textThis prompt is ready to be copied into your AI code generator. It is deliberately sequential, data-driven, and constrained so even a less-capable agent can follow it without breaking the existing application.

@@ -10,9 +10,14 @@ use App\Models\User;
 use App\Models\Verification;
 use App\Models\Wallet;
 use App\Models\Workplace;
+use App\Services\RoleSwitcherService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class AdminController extends Controller
 {
+    public function __construct(private readonly RoleSwitcherService $roles) {}
+
     public function index()
     {
         $stats = [
@@ -39,5 +44,21 @@ class AdminController extends Controller
             ->get();
 
         return view('admin.dashboard', compact('stats', 'recentVerifications', 'recentUsers', 'recentSos'));
+    }
+
+    public function viewAs(Request $request): RedirectResponse
+    {
+        $request->validate(['role' => ['required', 'string']]);
+
+        $this->roles->switch($request->user(), $request->string('role'));
+
+        return back()->with('status', 'Now viewing the Control Tower as '.$this->roles->effectiveRole($request->user())->label().'.');
+    }
+
+    public function resetViewAs(Request $request): RedirectResponse
+    {
+        $this->roles->reset($request->user());
+
+        return back()->with('status', 'Back to admin view.');
     }
 }

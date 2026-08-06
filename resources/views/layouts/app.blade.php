@@ -20,7 +20,7 @@
         <form id="logout-form" method="POST" action="{{ route('logout') }}" class="hidden">@csrf</form>
 
         <header class="sticky top-0 z-40 border-b border-ink-200/70 bg-white/80 backdrop-blur-lg">
-            <div class="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
+            <div class="mx-auto flex h-14 max-w-[480px] items-center justify-between gap-4 px-4 sm:px-6 lg:max-w-5xl">
                 <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-2">
                     <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-forest-600 font-heading text-base font-bold text-white">W</span>
                     <span class="font-heading text-base font-semibold tracking-tight text-ink-900">Work<span class="text-forest-600">Ride</span></span>
@@ -60,7 +60,7 @@
             </div>
         </header>
 
-        <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+        <main class="mx-auto max-w-[480px] px-4 py-6 sm:px-6 lg:max-w-5xl">
             @if (session('status'))
                 <x-flash>{{ session('status') }}</x-flash>
             @endif

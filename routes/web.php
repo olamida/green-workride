@@ -189,6 +189,8 @@ Route::middleware('auth')->group(function () {
 
     Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::get('/', [AdminController::class, 'index'])->name('dashboard');
+        Route::post('/view-as', [AdminController::class, 'viewAs'])->name('view-as');
+        Route::post('/view-as/reset', [AdminController::class, 'resetViewAs'])->name('view-as.reset');
 
         Route::get('/verifications', [AdminVerificationController::class, 'index'])->name('verifications.index');
         Route::post('/verifications/{verification}/approve', [AdminVerificationController::class, 'approve'])->name('verifications.approve');

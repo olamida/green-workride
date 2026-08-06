@@ -58,6 +58,27 @@
     --color-paper: #f6f9f6;
     --color-forest: #2e7d32;
     --color-gold: #fbc02d;
+
+    /*
+     * Semantic aliases (v5.0 navigation-first merge). The raw navigation-first
+     * prompts reference --color-primary / --color-accent / --color-surface /
+     * --color-ink; these map onto the canonical palette above so doc snippets
+     * (bg-[var(--color-primary)], etc.) work verbatim WITHOUT changing the
+     * guide-mandated brand (Forest #2E7D32 · Gold #FBC02D · Slate #0F172A ·
+     * Paper #F6F9F6).
+     */
+    --color-primary: var(--color-forest-600);
+    --color-primary-light: var(--color-forest-500);
+    --color-accent: var(--color-gold-400);
+    --color-surface: var(--color-paper);
+    --color-danger: #dc2626;
+    --color-ink: var(--color-ink-900);
+
+    /* Shape & elevation */
+    --radius-card: 16px;
+    --radius-pill: 9999px;
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
+    --shadow-live: 0 0 0 4px rgba(46, 125, 50, 0.15);
 }
 
 @layer base {
