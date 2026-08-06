@@ -57,13 +57,23 @@
             'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100' => $corridor,
         ])>All corridors</a>
         @foreach (\App\Enums\Corridor::cases() as $option)
+            @php
+                $isLive = ! empty($corridorLive[$option->value]);
+            @endphp
             <a href="{{ route('trips.index', array_filter(['corridor' => $option->value, 'window' => $window])) }}" @class([
                 'rounded-full px-4 py-2 text-sm font-semibold transition',
                 'bg-ink-900 text-white' => $corridor?->value === $option->value,
                 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100' => $corridor?->value !== $option->value,
-            ])>
-                <span class="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-forest-500"></span>
+            ]) @if ($isLive) data-corridor-chip="{{ $option->value }}" @endif>
+                <span @class([
+                    'mr-1.5 inline-block h-2 w-2 rounded-full bg-forest-500',
+                    'wr-pulse' => $isLive,
+                    'opacity-40' => ! $isLive,
+                ]) aria-hidden="true"></span>
                 {{ $option->label() }}
+                @if ($isLive)
+                    <span class="sr-only"> — live trips leaving soon</span>
+                @endif
             </a>
         @endforeach
         <a href="{{ route('trips.index', array_filter(['corridor' => $corridor?->value, 'women_only' => $womenOnly ? null : '1', 'window' => $window])) }}" @class([
@@ -182,7 +192,7 @@
 
                 <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-ink-100 pt-4 text-sm text-ink-600">
                     <span>⏰ {{ $trip->departure_time->format('D, M j · g:i A') }}</span>
-                    <span>🚌 <span data-seats class="font-mono font-semibold text-ink-900">{{ $trip->available_seats }}/{{ $trip->total_seats }}</span> seats</span>
+                    <span>🚌 <span data-seats data-corridor="{{ $trip->corridor->value }}" aria-live="polite" class="font-mono font-semibold text-ink-900">{{ $trip->available_seats }}/{{ $trip->total_seats }}</span> seats</span>
                     <span data-seats-full class="{{ $trip->available_seats > 0 ? 'hidden' : '' }} rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">Full</span>
                     <span>👤 {{ $trip->driver?->name }}</span>
                     @if ($trip->driver_rating_count)

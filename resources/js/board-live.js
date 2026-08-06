@@ -15,9 +15,10 @@ export default function boardLive() {
                     const seats = card.querySelector('[data-seats]');
                     if (seats) {
                         seats.textContent = `${e.available_seats}/${e.total_seats}`;
-                        seats.classList.remove('text-paper');
-                        seats.classList.add('text-gold');
-                        window.setTimeout(() => seats.classList.remove('text-gold'), 1600);
+                        seats.classList.remove('wr-seat-tick');
+                        // Re-trigger the one-shot highlight (restart the animation).
+                        void seats.offsetWidth;
+                        seats.classList.add('wr-seat-tick');
                     }
 
                     const full = card.querySelector('[data-seats-full]');

@@ -84,6 +84,31 @@ class TripMatchingService
     }
 
     /**
+     * Corridors with live or "leaving soon" trips right now, keyed by corridor
+     * value. Drives the soft pulse on the board's corridor chips so a rider can
+     * see at a glance where something is moving without clicking through.
+     *
+     * @return array<string, bool>
+     */
+    public function liveCorridors(): array
+    {
+        $leavingSoonMinutes = (int) config('workride.departure_window_minutes', 30);
+
+        $rows = Trip::query()
+            ->select('corridor')
+            ->whereIn('status', [TripStatus::Scheduled, TripStatus::Active])
+            ->where('available_seats', '>', 0)
+            ->where('departure_time', '<=', now()->addMinutes($leavingSoonMinutes))
+            ->where('departure_time', '>=', now())
+            ->distinct()
+            ->pluck('corridor');
+
+        return $rows->mapWithKeys(fn ($corridor) => [
+            $corridor instanceof Corridor ? $corridor->value : (string) $corridor => true,
+        ])->all();
+    }
+
+    /**
      * Distance from the passenger's pickup point to the trip's live location,
      * falling back to the trip origin when no live location has been reported.
      */

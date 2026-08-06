@@ -129,6 +129,58 @@ class TripTest extends TestCase
             ->assertSee('No trips in this window yet');
     }
 
+    public function test_live_corridor_chip_pulses_when_trip_leaves_soon(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Kubwa leaving run',
+            'corridor' => Corridor::KubwaCbd->value,
+            'departure_time' => now()->addMinutes(10),
+        ]);
+
+        $response = $this->actingAs($this->verifiedWorker())->get('/trips');
+        $response->assertOk()
+            ->assertSee('Kubwa leaving run')
+            ->assertSee('data-corridor-chip="kubwa_cbd"', false);
+
+        // The corridor chip's live dot carries the wr-pulse class.
+        $this->assertStringContainsString(
+            'data-corridor-chip="kubwa_cbd"',
+            $response->getContent()
+        );
+    }
+
+    public function test_quiet_corridor_chip_has_no_live_pulse(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Day-ahead planning run',
+            'corridor' => Corridor::NyanyaIdu->value,
+            'departure_time' => now()->addDay()->setTime(7, 0),
+        ]);
+
+        $response = $this->actingAs($this->verifiedWorker())->get('/trips');
+        $response->assertOk()
+            ->assertSee('Day-ahead planning run')
+            ->assertDontSee('data-corridor-chip');
+    }
+
+    public function test_seat_counter_carries_corridor_data_and_live_region(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Kubwa seat run',
+            'corridor' => Corridor::KubwaCbd->value,
+            'departure_time' => now()->addMinutes(20),
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertSee('data-corridor="kubwa_cbd"', false)
+            ->assertSee('aria-live="polite"', false);
+    }
+
     public function test_unverified_user_cannot_publish_paid_trip(): void
     {
         $user = User::factory()->create();

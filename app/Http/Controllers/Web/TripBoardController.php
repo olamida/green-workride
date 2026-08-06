@@ -47,7 +47,10 @@ class TripBoardController extends Controller
         $demandSnapshot = $demand->demandSnapshot();
         $nextTrip = $trips->first();
 
-        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip'));
+        // Corridors that are moving right now — pulses the corridor chips.
+        $corridorLive = $matcher->liveCorridors();
+
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip', 'corridorLive'));
     }
 
     public function create()
