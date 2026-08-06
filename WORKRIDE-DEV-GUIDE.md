@@ -139,7 +139,8 @@ Run these **before every commit** (feature/process OR sprint milestone). From
 | Gate | Command (Windows) | Pass criteria |
 |------|-------------------|---------------|
 | Format | `vendor\bin\pint` | 0 errors |
-| Tests | `php artisan test` | all green (384 / 1230) |
+| Static analysis | `vendor\bin\phpstan analyse` | no errors outside the level-8 baseline |
+| Tests | `php artisan test` | all green (428 / 1361) |
 | Build | `npm run build` | no errors |
 | Docs | update `DEVELOPMENT-LOG.md` | reflects this change |
 | Stage | `git add <relevant files>` | only intended files |
@@ -149,6 +150,26 @@ Run these **before every commit** (feature/process OR sprint milestone). From
 | Push | `git push origin main && git push --tags` | after a tagged sprint |
 
 Commit message = Conventional Commits: `feat|fix|test|refactor|chore|docs|perf(scope): subject`.
+
+### PHPStan gate (level 8, baseline-managed)
+
+`vendor\bin\phpstan analyse` runs Larastan at level 8 over `app/`. The current
+level-8 findings are snapshotted in `phpstan-baseline.neon` (generated with
+`vendor\bin\phpstan analyse --generate-baseline`), so the gate is **green today
+and blocks new regressions**. Eloquent dynamic attributes (e.g. the
+`driver_rating_avg` attached by `RatingService`) are covered by the baseline —
+do not widen types or add `@phpstan-ignore` to chase zero, fix the real bug and
+regenerate the baseline when a finding is genuinely resolved:
+
+```bash
+vendor\bin\phpstan analyse                     # gate (fast, cached)
+vendor\bin\phpstan analyse --generate-baseline # re-snapshot after fixes
+```
+
+Burn the baseline down in priority order: `return.type` / `argument.type`
+(suspected real bugs) first, then `missingType.*`, then Eloquent-magic
+`property.*`/`method.nonObject`. Regenerate after each batch and keep the diff
+reviewable.
 
 ---
 
@@ -191,6 +212,7 @@ Commit message = Conventional Commits: `feat|fix|test|refactor|chore|docs|perf(s
 composer run dev      # server + queue:listen + pail + vite HMR
 php artisan test      # full suite (SQLite)
 php artisan pint      # format
+vendor\bin\phpstan analyse   # static-analysis gate (level 8 + baseline)
 npm run build         # production assets
 php artisan gtfs:generate
 php artisan db:seed   # full rich demo world (idempotent)

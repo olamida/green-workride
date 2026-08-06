@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips + PHPStan Gate)
 
 | Area | Status |
 |------|--------|
@@ -54,6 +54,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Connect guide pass complete — participant-only live connection guide (`/trips/{trip}/guide`): Leaflet map + live driver position on the private `trip.{id}` channel (live target → next boarding waypoint → `none`), privacy = no coords ever broadcast to non-participants, walking ETA/distance via `RoutingService` foot profile (OSRM `foot`/Google `walking`/Mapbox `walking`) with haversine × `route_factor` straight-line fallback, 50 m arrived radius, `guide_opened` activity-log entry, a11y live regions + `prefers-reduced-motion` |
 | Feature modules | ✅ Map-first trip board complete — Leaflet/OSM map canvas above the trip list (live trips pinned at `current_lat/lng`, scheduled pinned at corridor anchors Kubwa/Nyanya/Lugbe/CBD), color legend (green live / gold free volunteer / slate scheduled), tooltips with route · departure · seats · fare, click-to-view cards, live seat-counter updates push into the map via `window.__tripsMap.updateTripSeats()` |
 | Feature modules | ✅ Accessibility pass complete — visible `:focus-visible` outlines (forest, 2px offset), `prefers-reduced-motion` collapse, Leaflet attribution sizing + 44×44 min hit-area for map controls, aria-live distance/ETA/status regions on the connect guide, aria-labeled board map region |
+| Tooling | ✅ PHPStan gate complete — Larastan level 8 over `app/` + generated `phpstan-baseline.neon` (971 snapshot entries); gate green, blocks new regressions, wired into the DoD ritual (`WORKRIDE-DEV-GUIDE.md` §5) |
 | Tests | ✅ 428 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger + connect guide / board map / foot-profile routing + guide states / branded pins / live corridor chips / seat-count ticks)
 
 ---
@@ -811,6 +812,27 @@ Adopted from the guide-motion review (AN01): the connect guide gets a purposeful
 - The old `.wr-pin-body` had an infinite breathing animation; while walking the vehicle pin should only pulse on movement — moved to one-shot `wr-pin-soft` / two-shot `wr-pin-move` classes toggled by JS.
 
 **Tests (4 new — 428 total, 1361 assertions):** `ConnectGuideTest` (+2) — overview state renders the glass HUD, Start guide button, `connectGuideUI`, `data-config`/`data-target`, terminal panels, and the `route_url` JSON contract; a `type:none` target hides Start guide and shows `n/a`. `TripTest` (the 3 chip/seat tests landed in §4.28's follow-up) — live corridor chip pulses when a trip leaves soon, quiet corridor has no live dot, seat counter carries corridor + live region data.
+
+### 4.30 PHPStan Gate — Larastan Level 8 + Baseline (COMPLETE)
+
+Static-analysis quality gate wired into the DoD ritual. Tooling change only — zero schema/behavior changes; all 428 tests stay green.
+
+**Setup:**
+- `composer.json`/`composer.lock`: `larastan/larastan` (v3.10.0) added to `require-dev` alongside `phpstan/phpstan` 2.2.8.
+- `phpstan.neon` — level 8 over `app/`, `tmpDir: storage/phpstan`, includes the Larastan extension **and** `phpstan-baseline.neon`. The prior ad-hoc `ignoreErrors: offsetAccess.notFound` was dropped (it matched no reported error — PHPStan warns on unmatched ignore patterns).
+- `phpstan-baseline.neon` — generated snapshot of the **971** current level-8 findings (`vendor/bin/phpstan analyse --generate-baseline`). Categories: `missingType.generics` 195, `missingType.return` 158, `argument.type` 131, `property.notFound` 96, `missingType.iterableValue` 96, `property.nonObject` 75, `method.nonObject` 62, plus smaller `return.type`/`alwaysFalse`/dead-code cohorts. Eloquent dynamic attributes (e.g. `driver_rating_avg` attached by `RatingService`) live here — not silenced with `@phpstan-ignore`.
+- `.gitignore` — `/storage/phpstan` added (analysis cache stays out of git).
+- `WORKRIDE-DEV-GUIDE.md` — DoD ritual gains a **Static analysis** row; burn-down guidance + regenerate command documented.
+
+**Blocker that stalled the previous session (resolved):** larastan was added to `composer.json` but `composer dump-autoload` was never re-run, so the `Larastan\Larastan\` PSR-4 mapping was missing from `vendor/composer/autoload_psr4.php`. PHPStan's DI failed on `Service 'sqlParser': Class or interface 'Larastan\Larastan\SQL\SqlParser' not found` — every `analyse` died before producing output (the debug probe files `probe*.txt`/`pr*.txt` showed only empty runs and exit codes, and `probe5.json` "passed 0 errors" was an empty-scope run). Fixed with `composer dump-autoload`; the gate now runs and reports real findings.
+
+**Gate behavior (verified):**
+- `vendor/bin/phpstan analyse` → `result: passed, errors: 0` (baseline absorbs the 971 known findings).
+- Regression check: a file with a deliberate `return.type` error is flagged immediately — the baseline does **not** mask new errors.
+
+**Cleanup:** removed `app/PhpstanProbe.php`, `phpstan-run.txt`, `probe*.txt/json`, `p*.txt`, `pr*.txt`, `dbg.txt`, `e.txt`, `m.txt`, and the two consumed prompt docs (`WORKRIDE-PROMPT-ID-VERIFICATION-LIVENESS.md`, `WORKRIDE-PROMPT-SEEDING-DATA.md`) that were left uncommitted-deleted.
+
+**Tests:** no test changes — 428 total, 1361 assertions remain green; `pint` clean; `npm run build` clean.
 
 ---
 
