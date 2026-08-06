@@ -32,6 +32,7 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\ImpactCertificateController;
 use App\Http\Controllers\Web\ImpactController;
 use App\Http\Controllers\Web\MissionController;
+use App\Http\Controllers\Web\NavigationController;
 use App\Http\Controllers\Web\PaystackWebhookController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PwaController;
@@ -89,6 +90,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Navigation-first rider home — "Where are you going?" (navigation sprint).
+    Route::get('/go', NavigationController::class)->name('go');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');

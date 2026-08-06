@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / … Roadmap P3 Closed — Employer CSR Report + Pay-it-Forward Statement + Forecast ML Job + EV Lease Seams + Ride-Credit Reminders + Corridor Fare Config UI + Navigation-First Sprint 1 — Admin Grouped Nav + Role Switcher + Map Common + UI Primitives)
+## 2. Current Status (Phase: Foundation / … Roadmap P3 Closed — Employer CSR Report + Pay-it-Forward Statement + Forecast ML Job + EV Lease Seams + Ride-Credit Reminders + Corridor Fare Config UI + Navigation-First Sprints 1–2 — Admin Grouped Nav + Role Switcher + Map Common + UI Primitives + Destination-First Home `/go` + Search + Share Referral)
 
 | Area | Status |
 |------|--------|
@@ -61,6 +61,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Tests | ✅ 428+ feature tests passing (… + employer CSR report + pay-it-forward statement + demand-forecast ML job + EV lease seams + ride-credit reminders + corridor fare config UI) |
 | Feature modules | ✅ Navigation-First Sprint 1 complete — Admin grouped nav (`config/admin_nav.php` 5 groups + `admin-sidebar` Alpine accordion + badge counts + mobile drawer + bottom tab bar) · Role switcher (`RoleSwitcherService` display-only session switch + `EffectiveRoleMiddleware` in the web group + "Viewing as … — Back to admin" banner + topbar dropdown; admin middleware/EnsureAdmin untouched) · map common (`npm i leaflet-polylinedecorator leaflet-arrowheads maplibre-gl` + `resources/js/map/common.js`: CartoDB tiles, FCT maxBounds, fitOrCenter, `addRouteLine` arrowheads, `corridorAnchor`) · UI primitives (`ui/card` + `ui/button` wired to design tokens) · icons `menu/users/map/settings/truck` · rider container `max-w-[480px] … lg:max-w-5xl` |
 | Tests | ✅ 466 feature tests passing (… + navigation-first: grouped admin nav render, role-switch/reset, display-only never-mutates-role, non-admin 403, invalid-role reset, non-admin effective-role ignore) |
+| Feature modules | ✅ Navigation-First Sprint 2 complete — Destination-first home `/go` ("Where are you going?") replacing the auth landing: `NavigationService` read-only discovery (junctions 45 + workplaces + `RoutingService::geocode` Nominatim free fallback) · `NavigationController` web `/go` + API `search|directions|nearby` (`{data: …}`-wrapped) · hero search (`search.js` debounced, `destination-selected` events) · corridor chips w/ live pulse + trip counts · never-empty map (`map/common.js` `createMap`/`corridorAnchor`/`fitOrCenter`, `navigation.js` `focusDestination` zoom ≥13) · bottom-sheet ride cards · demand-aware empty state · share referral (`share_code` + `?ref=` session `trip_referral.{trip_id}` surviving guest→login → `bookings.referred_by_user_id` + `booking_referred` audit; driver/self never attributed) · PWA manifest `start_url` → `/go` · header Go + Trips nav |
 
 ## 3. Environment
 
@@ -902,6 +903,39 @@ Sprint 1 of the navigation-first redesign (per `WORKRIDE-NAVIGATION-FIRST-MERGED
 
 ---
 
+### 4.33 Navigation-First Sprint 2 — Navigation Home + Search + Map + Share Referral (COMPLETE)
+
+Sprint 2 of the navigation-first redesign (per `WORKRIDE-NAVIGATION-FIRST-MERGED.md` §4): the authenticated landing becomes "Where are you going?" — a destination-first home where the rider searches (junctions, workplaces, OSM geocode), sees live corridor chips, a never-empty map, and a bottom sheet of rides, and can share any ride as a referral link. **Read-only discovery** — money/verification/booking gates untouched; bookings still happen on the existing trip pages.
+
+**Schema (2 migrations, applied):**
+- `add_share_code_to_trips_table` — nullable, indexed `share_code` on `trips` (public ride share slug).
+- `add_referred_by_user_id_to_bookings_table` — nullable FK `referred_by_user_id` → `users` (referral attribution for the share flow).
+
+**`RoutingService::geocode()` (Nominatim, free):** new OSM geocoding fallback for the search box — `GET {base}/search` (`format=jsonv2`, `countrycodes=ng`, 5 results), sorted by haversine distance to the rider when `$near` given, cost-logged as `nominatim/geocode` (₦0), **never throws** (returns `[]` on any failure) so search degrades to "no results" instead of 500. Config: `routing.nominatim_base_url`, `routing.geocode_countrycodes`.
+
+**`NavigationService` (`app/Services/NavigationService.php`)** — read-only discovery composing existing services:
+- `search(string $q, ?float $lat, ?float $lng, int $limit)` — junction matches (`junctions.name`/`area`, weighted by `passenger_volume_daily` from `DemandSurvey` aggregation) + workplace matches (`workplaces.name`, only within the FCT) + `RoutingService::geocode()` when a query remains; results merged into a unified shape `{name, lat, lng, type, corridor, passenger_volume_daily}`.
+- `directions(string $from, string $to, ?float $lat, ?float $lng)` — `RoutingService::route()` OSRM driving polyline between two place names, plus matching corridor trips (`TripMatchingService::findMatches` style) and the 24 h `DemandService::demandSnapshot()` for the demand-aware empty state.
+- `nearby(float $lat, float $lng, int $radiusM)` — active/scheduled trips within a geofence radius (scheduled pinned at their `corridorAnchor`), each with `distance_m`, corridor label, fare, seats, `is_free_volunteer`, driver rating, and `url`.
+
+**Controllers:**
+- `Web\NavigationController` (single-action `__invoke`) — `GET /go` (auth group): `TripMatchingService::upcoming()` + `liveCorridors()`, corridor stats per chip, map trips (live at coords, scheduled at corridor anchors), next-departure/demand-aware empty state.
+- `Api\V1\NavigationController` — `GET /api/v1/navigation/search`, `GET /api/v1/navigation/directions`, `GET /api/v1/navigation/nearby` (all `auth:sanctum`, all `{data: …}`-wrapped).
+
+**Auth landing flips to `/go`:** `AuthController::login` + Google/SMS handlers → `redirect()->route('go')` (was `intended(route('dashboard'))`); `HomeController` authenticated branch → `route('go')`; PWA `manifest.json` `start_url` → `…/go`; header logo + nav → Go (icon `map-pin`) + Trips. `/dashboard` stays reachable.
+
+**Rider home view (`resources/views/navigation/home.blade.php`):** hero "Where are you going?" + `whereTo` Alpine search (`search.js` — debounced fetch to the search API using `window.workrideUser` lat/lng, dispatches `destination-selected`/`destination-cleared` window events), corridor chips with live pulse dots + trip-count badges, `#navigation-map` (380 px, legend, `role="region"`), bottom sheet of rides (`data-trip-card`, corridor badges, LIVE/free-volunteer/leaving-soon/book-ahead pills, fixed fare, driver stars) linking to `trips.show`, and a demand-aware empty state ("N people want this journey" + Check in / I need a ride CTAs).
+
+**Map (`resources/js/navigation/navigation.js`):** `initNavigationMap(element, trips, config)` built on the Sprint 1 `map/common.js` (`createMap`/`corridorAnchor`/`fitOrCenter`): trip pins (green live / gold free volunteer / slate scheduled) with tooltips + click-through, corridor demand pulse dots, `focusDestination(result)` pins + fits the search hit (zoom ≥13); registered in `vite.config.js` alongside `search.js`.
+
+**Share referral (`?ref=`):** `SafetyController::share()` ensures a per-trip `share_code`, and the share page (QR + Web Share + copy) now carries `?ref={userId}`; `BookingController::book()` reads it into a session key `trip_referral.{trip_id}` (**survives guest→login**), consumes it once when the booked passenger isn't the driver/self, and writes `bookings.referred_by_user_id` + a `booking_referred` change-control log. Never attributes a referral to the trip's driver or to the booker.
+
+**Tests (`tests/Feature/NavigationTest.php`, 8 new — 474 total, 1546 assertions):** guest `/go` → `/login`; auth `/go` renders search + map + pins + chips; map renders even with an empty board; API search returns a junction ranked by `passenger_volume_daily`; API directions (OSRM faked) returns route + matching trips + demand; API nearby honours radius; share referral attributes via session (`referred_by_user_id` + `booking_referred` log); own-driver ref never attributed. `AuthTest`/`PwaControllerTest` updated for the `/go` flip.
+
+**DoD:** `pint` clean · PHPStan L8 gate green (baseline regenerated; touched-file findings fixed in-code where trivial — `isset()` on nullable `$data`, missing `__invoke(): View` return type, `collect((array) $response->json())` — Eloquent relation/dynamic-attribute findings stay in the baseline per the documented ritual) · `npm run build` clean · **474 tests / 1546 assertions green**.
+
+---
+
 ## 5. Issues Resolved
 
 ### Feature tests returning 404 on `/`
@@ -1131,6 +1165,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 9. ✅ DONE — Connect guide + map-first board + accessibility pass (see §4.28); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 10. ✅ DONE — Guide motion & branding + live corridor chips + seat-count tick (see §4.29); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 11. ✅ DONE — Roadmap P3 closed (see §4.31); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+12. ✅ DONE — Navigation-First Sprint 1 + 2 (see §4.32–4.33); next: Sprint 3 — waypoint migration + live progress tracker + wizards + share request (see `WORKRIDE-NAVIGATION-FIRST-MERGED.md` §4)
 
 ---
 
@@ -1164,6 +1199,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.19.0` | Connect Guide + Map-First Board + Accessibility Pass | Participant-only live connect guide (`/trips/{trip}/guide` — Leaflet + private `trip.{id}` live driver/waypoint target, walking ETA via `RoutingService` foot profile + haversine × `route_factor` fallback, 50 m arrived, `guide_opened` audit log) · map-first trip board (live trips at coords, scheduled at corridor anchors, color legend, live seat-counter pushes into the map) · accessibility pass (`:focus-visible`, reduced-motion, 44×44 map controls, aria-live guide regions) — gated on `FEATURE_GUIDE` | 424 (1337) | 2026-08-06 |
 | `v0.20.0` | Guide Motion & Branding + Live Corridor Chips + Seat-Count Tick | Connect guide three-state flow (overview quiet straight-line estimate + Start guide → active glass HUD with 150 ms gold number ticks → arrived / missed terminal panels) · branded map pins (forest vehicle + gold "B", blue "You" dot; one/two-shot pulses while moving, never a constant beat) · solid 4 px forest polyline glow · motion tokens + `wr-pulse`/`wr-fade-in`/`wr-scale-in` + `.wr-glass` (all collapse under `prefers-reduced-motion`) · `connectGuideUI` Alpine shell owns the state machine + HUD via callbacks · live corridor chip `wr-pulse` dot (`TripMatchingService::liveCorridors()`) · seat counters carry corridor data + one-shot `wr-seat-tick` on `TripSeatsUpdated` | 428 (1361) | 2026-08-06 |
 | `v0.21.0` | Roadmap P3 closed | Employer CSR report (3.14) — `EmployerReportService` + `/admin/employers/{id}/report` printable · Pay-it-forward statement (3.11) — `/admin/trust/pay-it-forward` + CSV · Forecast ML job (3.9) — `CalculateDemandForecastJob` + `demand_forecasts` (14-day, nightly + manual) · EV lease schema seams (3.8, gated `FEATURE_EV_LEASE`) — `assets.propulsion`, `telemetry.battery_soc`, `lease_agreements`, `charging_stations` · Ride-credit reminders (3.4) — `SendRideCreditRemindersJob` + `RideCreditDueSoon` · Corridor fare config UI (3.6) — `settings` + `SettingsService` + `/admin/settings` (override-first fares, `PricingService::fareFor()` reads them, `corridor_fare_updated` trail) — P3 backlog empty | TBD (full suite) | 2026-08-06 |
+| `v0.22.0` | Navigation-First Sprint 1 + 2 | Destination-first auth landing `/go` ("Where are you going?"): `NavigationService` read-only discovery (45 junctions + workplaces + `RoutingService::geocode` Nominatim free fallback) · web `/go` + API `search|directions|nearby` (`{data: …}`) · hero search (`search.js`, `destination-selected` events) · live corridor chips + never-empty map (`map/common.js` + `navigation.js`) · bottom-sheet ride cards · demand-aware empty state · share referral (`share_code` + `?ref=` session → `bookings.referred_by_user_id` + `booking_referred` audit; driver/self never attributed) · PWA `start_url` → `/go` · header Go + Trips nav · admin grouped sidebar + role switcher + map common + UI primitives | 474 (1546) | 2026-08-06 |
 
 ---
 

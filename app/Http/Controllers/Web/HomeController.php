@@ -13,7 +13,7 @@ class HomeController extends Controller
     public function __invoke()
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return redirect()->route('go');
         }
 
         return view('landing', [

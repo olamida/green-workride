@@ -20,7 +20,7 @@ class PwaController extends Controller
             'name' => 'WorkRide',
             'short_name' => 'WorkRide',
             'description' => 'Community-focused, subsidy-enabled transit intelligence — verified civil servants share rides on fixed corridors.',
-            'start_url' => $appUrl.'/dashboard',
+            'start_url' => $appUrl.'/go',
             'scope' => $appUrl.'/',
             'display' => 'standalone',
             'background_color' => '#F6F9F6',
@@ -50,7 +50,7 @@ class PwaController extends Controller
     {
         $content = <<<'JS'
 const CACHE = 'workride-v1';
-const SHELL = ['/', '/dashboard', '/trips', '/bookings', '/impact', '/road/map', '/manifest.json', '/offline'];
+    const SHELL = ['/', '/go', '/dashboard', '/trips', '/bookings', '/impact', '/road/map', '/manifest.json', '/offline'];
 
 self.addEventListener('install', (event) => {
     event.waitUntil(

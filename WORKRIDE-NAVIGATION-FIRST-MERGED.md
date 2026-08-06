@@ -86,13 +86,14 @@ Icons: ✅ shipped → extend · 🔧 merge doc intent with existing code · ➕
 - ✅ Icons: `menu`, `users`, `map`, `settings`, `truck`.
 - ✅ `NavigationFirstTest` (7) — gate: `pint` + PHPStan L8 (baseline regenerated) + 466 tests green + build.
 
-### Sprint 2 — Navigation Home + Search + Map + Share
-- ➕ `NavigationController` (search|directions|nearby) + `NavigationService` (TripMatching+Geofence+Routing+Demand);
-  search = junctions (45) + workplaces + ➕ `RoutingService::geocode`.
-- ➕ Rider Home rewrite (`Where are you going?` hero, corridor chips w/ live counts, 55–60% map, bottom sheet).
-- 🔧 Map fixes: extend `trips-map.js`/`connect-guide.js` — CartoDB tiles, fitBounds padding, minZoom/maxBounds
-  from config, arrow decorator, 500 m geofence circle, demand-aware empty state (`DemandService::demandSnapshot()`).
-- 🔧 Share: extend existing page with `share_code`, `?ref=`, QR, Web Share; `bookings.referred_by_user_id`.
+### Sprint 2 — Navigation Home + Search + Map + Share ✅
+- ✅ `NavigationController` (web `/go` + API `search|directions|nearby`) + `NavigationService` (TripMatching+Geofence+Routing+Demand);
+  search = junctions (45) + workplaces + ✅ `RoutingService::geocode` (Nominatim, free, never-throw).
+- ✅ Rider Home rewrite (`Where are you going?` hero, corridor chips w/ live counts, map canvas, bottom sheet) at `/go`.
+- ✅ Map fixes: shared `map/common.js` (CartoDB tiles, fitBounds, minZoom/maxBounds from config), never-empty board
+  (CBD fallback), demand-aware empty state (`DemandService::demandSnapshot()`), `?ref=`-aware Web Share.
+- ✅ Share: `share_code` + QR + Web Share + `?ref=` session referral → `bookings.referred_by_user_id` + audit log.
+- ✅ Tests `NavigationTest` (8) — gate: `pint` + PHPStan L8 (baseline regenerated) + 474 tests green + build.
 
 ### Sprint 3 — Live Progress + Timing + Wizards + Share Request
 - ➕ Waypoint migration (`eta_minutes`, `is_major_hub`, `distance_from_origin_km`, `geofence_radius_m`, `reached_at`).

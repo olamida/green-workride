@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Trip extends Model
 {
@@ -21,6 +22,7 @@ class Trip extends Model
         'corridor',
         'origin_text',
         'destination_text',
+        'share_code',
         'current_lat',
         'current_lng',
         'total_seats',
@@ -104,5 +106,25 @@ class Trip extends Model
             ->where('passenger_id', $user->id)
             ->whereIn('status', ['confirmed', 'boarded', 'completed', 'no_show'])
             ->exists();
+    }
+
+    /**
+     * Lazily mint the short public share code ("send this ride to a colleague").
+     * Idempotent — a trip keeps the same code once generated.
+     */
+    public function ensureShareCode(): string
+    {
+        if ($this->share_code) {
+            return $this->share_code;
+        }
+
+        do {
+            $code = Str::upper(Str::random(6));
+        } while (static::where('share_code', $code)->exists());
+
+        $this->share_code = $code;
+        $this->save();
+
+        return $code;
     }
 }

@@ -12,7 +12,7 @@ class PwaControllerTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'application/manifest+json')
             ->assertJsonFragment(['name' => 'WorkRide'])
-            ->assertJsonFragment(['start_url' => url('/dashboard')])
+            ->assertJsonFragment(['start_url' => url('/go')])
             ->assertJsonFragment(['theme_color' => '#2E7D32'])
             ->assertJsonFragment(['display' => 'standalone']);
     }

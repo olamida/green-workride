@@ -42,7 +42,7 @@ class AuthController extends Controller
                 ])->onlyInput('email');
             }
 
-            return redirect()->intended(route('dashboard'));
+            return redirect()->intended(route('go'));
         }
 
         return back()->withErrors([
@@ -88,7 +88,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard');
+        return redirect()->route('go');
     }
 
     public function logout(Request $request)
@@ -130,6 +130,6 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard');
+        return redirect()->route('go');
     }
 }

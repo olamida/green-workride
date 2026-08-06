@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\DemandController;
 use App\Http\Controllers\Api\V1\FleetController;
+use App\Http\Controllers\Api\V1\NavigationController;
 use App\Http\Controllers\Api\V1\P2pTransferController;
 use App\Http\Controllers\Api\V1\RideCreditController;
 use App\Http\Controllers\Api\V1\RoadSensorController;
@@ -27,6 +28,11 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/logout', [AuthController::class, 'logout']);
+
+        // Navigation-first search (guide §9B) — read-only discovery.
+        Route::get('/navigation/search', [NavigationController::class, 'search']);
+        Route::get('/navigation/directions', [NavigationController::class, 'directions']);
+        Route::get('/navigation/nearby', [NavigationController::class, 'nearby']);
 
         Route::get('/wallet', [WalletController::class, 'index']);
         Route::post('/wallet/topup', [WalletController::class, 'topUp']);

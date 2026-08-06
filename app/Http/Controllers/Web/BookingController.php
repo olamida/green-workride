@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Services\BookingService;
@@ -79,8 +80,31 @@ class BookingController extends Controller
             return back()->withErrors($e->errors())->withInput();
         }
 
+        $this->applyReferral($request, $trip, $booking);
+
         return redirect()->route('bookings.index')
             ->with('status', 'Seat confirmed on '.$trip->route_name.' ('.($booking->payment_method->label()).').');
+    }
+
+    /**
+     * Attribute a booking made via a shared ride link to the sharer. The
+     * referral is held in the session (set by the public share page) so it
+     * survives a guest → login round-trip, and is consumed once here.
+     */
+    private function applyReferral(Request $request, Trip $trip, Booking $booking): void
+    {
+        $ref = $request->session()->pull("trip_referral.{$trip->id}");
+
+        if (! $ref || (int) $ref === $trip->driver_id || (int) $ref === $booking->passenger_id) {
+            return;
+        }
+
+        $booking->update(['referred_by_user_id' => (int) $ref]);
+
+        ActivityLog::log($booking->passenger, 'booking_referred', Booking::class, $booking->id, [
+            'trip_id' => $trip->id,
+            'referrer_id' => (int) $ref,
+        ]);
     }
 
     public function cancel(Request $request, Booking $booking)

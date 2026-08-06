@@ -32,7 +32,7 @@ class AuthTest extends TestCase
             'workplace_id' => $workplace->id,
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $response->assertRedirect('/go');
 
         $user = User::where('email', 'ada@example.com')->first();
         $this->assertNotNull($user);
@@ -70,7 +70,7 @@ class AuthTest extends TestCase
         $this->post('/login', [
             'email' => $user->email,
             'password' => 'secret123',
-        ])->assertRedirect('/dashboard');
+        ])->assertRedirect('/go');
 
         $this->assertAuthenticatedAs($user);
 

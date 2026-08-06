@@ -60,6 +60,74 @@ class RoutingService
     }
 
     /**
+     * Free, open-source geocoding fallback (Nominatim / OSM) for the
+     * navigation search box. OSRM has no geocoder, so this is a separate
+     * provider rather than another routing strategy. Always returns a plain
+     * list — never throws — so the caller can fall back to "no results".
+     *
+     * @param  array{lat:float,lng:float}|null  $near  optional centre point for result ordering
+     * @return array<int, array{name:string, lat:float, lng:float, type:string, corridor:?string, passenger_volume_daily:?int}>
+     */
+    public function geocode(string $query, ?array $near = null): array
+    {
+        $base = rtrim((string) config('workride.routing.nominatim_base_url'), '/');
+        $countrycodes = (string) config('workride.routing.geocode_countrycodes', 'ng');
+
+        try {
+            $response = Http::timeout((int) config('workride.routing.osrm_timeout', 5))
+                ->withHeaders([
+                    'User-Agent' => 'WorkRide/1.0 (+https://workride.ng) — open transit research',
+                    'Accept-Language' => 'en',
+                ])
+                ->get($base.'/search', [
+                    'q' => $query,
+                    'format' => 'jsonv2',
+                    'limit' => 5,
+                    'countrycodes' => $countrycodes,
+                ]);
+
+            $response->throw();
+
+            $results = collect((array) $response->json());
+
+            if ($near) {
+                $results = $results->sortBy(fn (array $r) => $this->haversine(
+                    (float) $near['lat'],
+                    (float) $near['lng'],
+                    (float) $r['lat'],
+                    (float) $r['lon'],
+                ))->values();
+            }
+
+            $this->costs->log('nominatim', 'geocode', 0.0, [
+                'query' => $query,
+                'count' => $results->count(),
+            ]);
+
+            return $results->map(fn (array $r) => [
+                'name' => $r['name'] ?? $r['display_name'] ?? $query,
+                'lat' => (float) $r['lat'],
+                'lng' => (float) $r['lon'],
+                'type' => 'geocode',
+                'corridor' => null,
+                'passenger_volume_daily' => null,
+            ])->all();
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    private function haversine(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadius = 6371000.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return $earthRadius * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
+    /**
      * Self-hosted OSRM — free, preferred. Logged with cost 0 for the audit trail.
      */
     private function viaOsrm(array $from, array $to, string $profile = 'driving'): array

@@ -21,14 +21,15 @@
 
         <header class="sticky top-0 z-40 border-b border-ink-200/70 bg-white/80 backdrop-blur-lg">
             <div class="mx-auto flex h-14 max-w-[480px] items-center justify-between gap-4 px-4 sm:px-6 lg:max-w-5xl">
-                <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-2">
+                <a href="{{ route('go') }}" class="flex shrink-0 items-center gap-2">
                     <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-forest-600 font-heading text-base font-bold text-white">W</span>
                     <span class="font-heading text-base font-semibold tracking-tight text-ink-900">Work<span class="text-forest-600">Ride</span></span>
                 </a>
 
-                {{-- Primary destinations — kept deliberately to 5. Everything else
+                {{-- Primary destinations — kept deliberately small. Everything else
                      lives in ⌘K, the profile menu, or the mobile "More" sheet. --}}
                 <nav class="hidden items-center gap-0.5 text-sm lg:flex">
+                    <x-nav-link icon="map-pin" :active="request()->routeIs('go')" href="{{ route('go') }}">Go</x-nav-link>
                     <x-nav-link icon="route" :active="request()->routeIs('trips.*')" href="{{ route('trips.index') }}">Trips</x-nav-link>
                     <x-nav-link icon="ticket" :active="request()->routeIs('bookings.*')" href="{{ route('bookings.index') }}">My Rides</x-nav-link>
                     <x-nav-link icon="gift" :active="request()->routeIs('rewards.*')" href="{{ route('rewards.index') }}">Rewards</x-nav-link>

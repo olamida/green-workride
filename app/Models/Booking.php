@@ -17,6 +17,7 @@ class Booking extends Model
     protected $fillable = [
         'trip_id',
         'passenger_id',
+        'referred_by_user_id',
         'pickup_lat',
         'pickup_lng',
         'status',
@@ -48,6 +49,11 @@ class Booking extends Model
     public function passenger(): BelongsTo
     {
         return $this->belongsTo(User::class, 'passenger_id');
+    }
+
+    public function referrer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'referred_by_user_id');
     }
 
     public function employer(): BelongsTo

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Trip;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 /**
@@ -17,12 +18,23 @@ class SafetyController extends Controller
      * Public, guest-safe share page for a trip ("send this to your colleague").
      * Deliberately minimal: corridor, departure, driver + verification badge,
      * seats and fare — with a sign-in CTA. No live location is streamed.
+     *
+     * A `?ref={userId}` query captures the sharer so a booking made from the
+     * shared link is attributed (stored in the session keyed by trip — it
+     * survives a guest → login round-trip and is consumed on booking).
      */
-    public function share(Trip $trip)
+    public function share(Request $request, Trip $trip)
     {
         abort_unless(in_array($trip->status->value, ['scheduled', 'active'], true), 404, 'This trip is no longer active.');
 
         $trip->load(['driver', 'vehicle']);
+        $trip->ensureShareCode();
+
+        $ref = (int) $request->query('ref');
+
+        if ($ref && $ref !== $trip->driver_id && User::whereKey($ref)->exists()) {
+            $request->session()->put("trip_referral.{$trip->id}", $ref);
+        }
 
         return view('trips.share', compact('trip'));
     }

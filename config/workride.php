@@ -102,7 +102,12 @@ return [
         'nyanya_idu' => ['lat' => 8.9435, 'lng' => 7.5190],
         'lugbe_cbd' => ['lat' => 9.0319, 'lng' => 7.4062],
         'cbd' => ['lat' => 9.0589, 'lng' => 7.4891],
+        'idu' => ['lat' => 8.7490, 'lng' => 7.3580],
     ],
+
+    // Navigation directions: how close a destination point must be to a
+    // corridor's terminal anchor to count as "a ride going that way".
+    'destination_match_radius_m' => env('WORKRIDE_DESTINATION_MATCH_RADIUS_M', 8000),
 
     // CO2 saved per passenger-km (kg).
     'co2_per_passenger_km' => env('WORKRIDE_CO2_PER_PASSENGER_KM', 0.12),
@@ -166,6 +171,11 @@ return [
         'use_mapbox_premium' => (bool) env('USE_MAPBOX_PREMIUM', false),
         'mapbox_access_token' => env('MAPBOX_ACCESS_TOKEN'),
         'mapbox_cost_per_request' => env('MAPBOX_COST_PER_REQUEST', 25),
+        // Free, open-source geocoding fallback (Nominatim / OSM) for the
+        // navigation search box when the local junction+workplace catalog runs
+        // dry. No API key; respectful User-Agent required by their policy.
+        'nominatim_base_url' => env('NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org'),
+        'geocode_countrycodes' => env('NOMINATIM_COUNTRYCODES', 'ng'),
     ],
 
     // Paid external API budget. Every paid call is logged to api_cost_logs and
