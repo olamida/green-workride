@@ -23,7 +23,44 @@ class BookingController extends Controller
             'trips.bookings.passenger',
         ]);
 
-        return view('bookings.index', compact('user'));
+        // My Rides is split into three mental buckets so a rider lands on the
+        // rides that need attention NOW:
+        //   Active   — the vehicle is on the road, or leaving within the
+        //              classic 30-minute "leaving soon" window.
+        //   Upcoming — confirmed/requested seats on future scheduled trips.
+        //   Past     — completed, cancelled or no-show rides (receipts,
+        //              certificates, ratings).
+        $leavingSoon = now()->copy()->addMinutes((int) config('workride.departure_window_minutes', 30));
+
+        $activeBookings = $user->bookings->filter(function ($booking) use ($leavingSoon) {
+            if (! in_array($booking->status->value, ['requested', 'confirmed', 'boarded'], true)) {
+                return false;
+            }
+
+            $trip = $booking->trip;
+
+            return $trip
+                && in_array($trip->status->value, ['scheduled', 'active'], true)
+                && ($trip->status->value === 'active' || $trip->departure_time?->lte($leavingSoon));
+        })->values();
+
+        $upcomingBookings = $user->bookings->filter(function ($booking) use ($leavingSoon) {
+            if (! in_array($booking->status->value, ['requested', 'confirmed', 'boarded'], true)) {
+                return false;
+            }
+
+            $trip = $booking->trip;
+
+            return $trip
+                && $trip->status->value === 'scheduled'
+                && $trip->departure_time?->gt($leavingSoon);
+        })->values();
+
+        $pastBookings = $user->bookings
+            ->reject(fn ($booking) => $activeBookings->contains($booking) || $upcomingBookings->contains($booking))
+            ->values();
+
+        return view('bookings.index', compact('user', 'activeBookings', 'upcomingBookings', 'pastBookings'));
     }
 
     public function book(Request $request, Trip $trip)

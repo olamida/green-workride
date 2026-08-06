@@ -59,18 +59,27 @@
         @foreach (\App\Enums\Corridor::cases() as $option)
             @php
                 $isLive = ! empty($corridorLive[$option->value]);
+                $stats = $corridorStats[$option->value] ?? null;
             @endphp
             <a href="{{ route('trips.index', array_filter(['corridor' => $option->value, 'window' => $window])) }}" @class([
-                'rounded-full px-4 py-2 text-sm font-semibold transition',
+                'inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold transition',
                 'bg-ink-900 text-white' => $corridor?->value === $option->value,
                 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100' => $corridor?->value !== $option->value,
             ]) @if ($isLive) data-corridor-chip="{{ $option->value }}" @endif>
                 <span @class([
-                    'mr-1.5 inline-block h-2 w-2 rounded-full bg-forest-500',
+                    'inline-block h-2 w-2 rounded-full bg-forest-500',
                     'wr-pulse' => $isLive,
                     'opacity-40' => ! $isLive,
                 ]) aria-hidden="true"></span>
                 {{ $option->label() }}
+                @if ($stats && $stats['count'] > 0)
+                    <span class="font-mono text-xs opacity-80">
+                        · {{ $stats['count'] }}
+                        @if ($stats['min_fare'] !== null)
+                            · {{ $stats['min_fare'] === 0 ? 'FREE' : '₦'.number_format($stats['min_fare']) }}
+                        @endif
+                    </span>
+                @endif
                 @if ($isLive)
                     <span class="sr-only"> — live trips leaving soon</span>
                 @endif

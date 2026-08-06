@@ -59,6 +59,7 @@ export function initConnectGuide(element, config, target, callbacks = {}) {
     const onDistance = callbacks.onDistance || (() => {});
     const onArrived = callbacks.onArrived || (() => {});
     const onMissed = callbacks.onMissed || (() => {});
+    const onVoice = callbacks.onVoice || (() => {});
 
     if (target.lat === null || target.lng === null) {
         element.innerHTML =
@@ -88,11 +89,23 @@ export function initConnectGuide(element, config, target, callbacks = {}) {
     let passengerMarker = null;
     let routeLayer = null;
     let lastPassenger = null;
+    let lastAnnouncedM = null; // voice milestone — re-announce every ~100 m
 
     const format = (distanceM, durationS) => ({
         distance: `${Math.round(distanceM)} m`,
         eta: `~${Math.ceil(durationS / 60)} min walk`,
     });
+
+    // Optional voice layer (guide §5.3) — a quiet "still X metres away" nudge
+    // every 100 m, plus arrivals/terminal states. The Alpine shell gates this
+    // on an explicit user toggle; never on by default.
+    const announceDistance = (distanceM) => {
+        const rounded = Math.round(distanceM);
+        if (lastAnnouncedM === null || lastAnnouncedM - rounded >= 100) {
+            lastAnnouncedM = rounded;
+            onVoice(`${rounded} metres away — the vehicle is approaching.`);
+        }
+    };
 
     const ensureRouteVisible = () => {
         if (!routeLayer || !routeLayer.getBounds || !routeLayer.getBounds().isValid()) {
@@ -109,10 +122,12 @@ export function initConnectGuide(element, config, target, callbacks = {}) {
             return;
         }
         onDistance(format(route.distance_m, route.duration_s));
+        announceDistance(route.distance_m);
 
         if (route.distance_m <= config.arrived_radius_m) {
             state = 'arrived';
             onArrived();
+            onVoice('You have arrived. Wave to the driver.');
             map.panTo([target.lat, target.lng], quietPan());
         }
     };
@@ -217,6 +232,7 @@ export function initConnectGuide(element, config, target, callbacks = {}) {
             updatePassenger(lastPassenger);
         }
         onStatus('Walking to the green dot — follow the route.');
+        onVoice('Following the route to the green dot.');
     };
 
     if (navigator.geolocation) {
@@ -254,6 +270,7 @@ export function initConnectGuide(element, config, target, callbacks = {}) {
         }
         state = 'missed';
         onMissed(reason);
+        onVoice('The ride is gone. Find another ride.');
     };
 
     if (window.Echo) {

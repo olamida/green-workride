@@ -50,7 +50,10 @@ class TripBoardController extends Controller
         // Corridors that are moving right now — pulses the corridor chips.
         $corridorLive = $matcher->liveCorridors();
 
-        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip', 'corridorLive'));
+        // Per-corridor availability within the selected window — the chip hero.
+        $corridorStats = $matcher->corridorStats($withinMinutes);
+
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip', 'corridorLive', 'corridorStats'));
     }
 
     public function create()
@@ -119,6 +122,11 @@ class TripBoardController extends Controller
         $myInterest = $trip->interests()->where('user_id', $user->id)->first();
         $interestCount = $trip->interests()->where('status', 'pending')->count();
 
+        // The booking form is shown to anyone who can book — except free
+        // volunteer rides, which are a verified-worker benefit (phone-only
+        // riders would otherwise see a form the service rejects).
+        $canBookForm = $user->canBook() && (! $trip->is_free_volunteer || $user->canBookBenefits());
+
         return view('trips.show', compact(
             'trip',
             'user',
@@ -130,6 +138,7 @@ class TripBoardController extends Controller
             'womenOnlyBlocked',
             'myInterest',
             'interestCount',
+            'canBookForm',
         ));
     }
 

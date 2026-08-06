@@ -109,6 +109,38 @@ class TripMatchingService
     }
 
     /**
+     * Per-corridor availability within a board window: how many trips are
+     * bookable and what the cheapest seat costs. Drives the corridor chip
+     * hero on the board ("Kubwa→CBD · 3 · ₦600") so a rider sees where
+     * supply exists at a glance, without clicking through every corridor.
+     *
+     * @return array<string, array{count:int, min_fare:?int}>
+     */
+    public function corridorStats(int $withinMinutes): array
+    {
+        $rows = Trip::query()
+            ->select('corridor')
+            ->selectRaw('COUNT(*) as trip_count')
+            ->selectRaw('MIN(fare_per_seat) as min_fare')
+            ->whereIn('status', [TripStatus::Scheduled, TripStatus::Active])
+            ->where('available_seats', '>', 0)
+            ->whereBetween('departure_time', [now(), now()->addMinutes($withinMinutes)])
+            ->groupBy('corridor')
+            ->get();
+
+        return $rows->mapWithKeys(function ($row) {
+            $corridor = $row->corridor;
+
+            return [
+                $corridor instanceof Corridor ? $corridor->value : (string) $corridor => [
+                    'count' => (int) $row->trip_count,
+                    'min_fare' => $row->min_fare !== null ? (int) round((float) $row->min_fare) : null,
+                ],
+            ];
+        })->all();
+    }
+
+    /**
      * Distance from the passenger's pickup point to the trip's live location,
      * falling back to the trip origin when no live location has been reported.
      */

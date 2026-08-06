@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips + PHPStan Gate)
+## 2. Current Status (Phase: Foundation / Sprint 9 + Sprint 3.6 + Investor-Guide Adoptions A–F + Sprint 10 + UI Compact & Mobile Pass + Sprint 11 Complete + Fleet Driver App UI + Rich Demo Seeder Suite + Trip Board Planning + Docs Pass + Realtime Board + Trust Reconciliation Report + Connect Guide + Map-First Board + Accessibility Pass + Guide Motion & Branding + Live Corridor Chips + PHPStan Gate + STEP 3 UI/UX Pass — Corridor Stats Hero + Payment Picker + My Rides Segments + Guide From-To & Voice)
 
 | Area | Status |
 |------|--------|
@@ -55,9 +55,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Map-first trip board complete — Leaflet/OSM map canvas above the trip list (live trips pinned at `current_lat/lng`, scheduled pinned at corridor anchors Kubwa/Nyanya/Lugbe/CBD), color legend (green live / gold free volunteer / slate scheduled), tooltips with route · departure · seats · fare, click-to-view cards, live seat-counter updates push into the map via `window.__tripsMap.updateTripSeats()` |
 | Feature modules | ✅ Accessibility pass complete — visible `:focus-visible` outlines (forest, 2px offset), `prefers-reduced-motion` collapse, Leaflet attribution sizing + 44×44 min hit-area for map controls, aria-live distance/ETA/status regions on the connect guide, aria-labeled board map region |
 | Tooling | ✅ PHPStan gate complete — Larastan level 8 over `app/` + generated `phpstan-baseline.neon` (971 snapshot entries); gate green, blocks new regressions, wired into the DoD ritual (`WORKRIDE-DEV-GUIDE.md` §5) |
-| Tests | ✅ 428 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger + connect guide / board map / foot-profile routing + guide states / branded pins / live corridor chips / seat-count ticks)
-
----
+| Tests | ✅ 428 feature tests passing (… + fleet driver app UI + rich demo seeder suite + trip board planning + animation gate + trip interest / realtime board / trust ledger + connect guide / board map / foot-profile routing + guide states / branded pins / live corridor chips / seat-count ticks) |
+| Feature modules | ✅ STEP 3 UI/UX pass complete — corridor chip hero stats (`TripMatchingService::corridorStats` → per-corridor `· N trips · ₦min` on the board chips, live pulse preserved) + calm payment picker on `trips/show` (`x-payment-picker`: 56px tappable rows, checkmark, single Confirm-seat button, submit spinner, press feedback, free-ride label; posts a real `payment_method` for free rides since the controller validates `wallet|cash|subsidy_credit|ride_credit`) + My Rides segmented Active/Upcoming/Past control (`BookingController::index` grouping, `bookings/_booking-card` with Open Guide CTA + Cancel + Receipt + rating form) + connect guide from-to journey framing (`origin_text → boarding point` strip + Walk chip) + opt-in voice announcements (`x-guide-voice-toggle`, Web Speech, off by default, ~100 m distance nudges + arrived/missed messages, reduced-motion safe) + `OPENCODE_PROMPT_REBRAND.md` merged with `suggestion.txt` learnings (from-to/voice, open-source package shortlist, restrained motion principles, step status table) |
 
 ## 3. Environment
 

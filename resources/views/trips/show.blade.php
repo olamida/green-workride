@@ -211,28 +211,37 @@
                         to see and book it.
                     </p>
                 </div>
-            @elseif (! $myBooking && ! $canStart && $trip->driver_id !== $user->id && in_array($trip->status->value, ['scheduled', 'active']) && $trip->available_seats > 0 && $user->canBook())
+            @elseif (! $myBooking && ! $canStart && $trip->driver_id !== $user->id && in_array($trip->status->value, ['scheduled', 'active']) && $trip->available_seats > 0 && $canBookForm)
                 <div class="rounded-2xl border border-forest-200 bg-white p-6">
-                    <h2 class="font-heading font-semibold text-ink-900">Book a seat</h2>
-                    <form method="POST" action="{{ route('bookings.store', $trip) }}" class="mt-4 space-y-4">
-                        @csrf
-                        <div>
-                            <label for="payment_method" class="mb-1 block text-sm font-medium text-ink-700">Pay with</label>
-                            <select id="payment_method" name="payment_method" class="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-200">
-                                <option value="wallet">Wallet (₦{{ number_format((float) $user->wallet?->cash_balance ?? 0, 2) }})</option>
-                                @if ($user->canBookBenefits())
-                                    <option value="subsidy_credit">Subsidy credits (₦{{ number_format((float) $user->wallet?->subsidy_credits ?? 0, 2) }})</option>
-                                @endif
-                                <option value="cash">Cash to driver</option>
-                                @if (config('workride.time_bank.enabled') && $user->verification_level->value >= \App\Enums\VerificationLevel::NinVerified->value)
-                                    <option value="ride_credit">Ride credit — repay by driving</option>
-                                @endif
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full rounded-xl bg-forest-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-forest-700">
-                            Book seat · ₦{{ number_format((float) $trip->fare_per_seat, 0) }}
-                        </button>
-                    </form>
+                    <h2 class="font-heading font-semibold text-ink-900">
+                        @if ($trip->is_free_volunteer)
+                            Ride free
+                        @else
+                            Book a seat
+                        @endif
+                    </h2>
+                    @if (! $trip->is_free_volunteer)
+                        <p class="mt-1 text-sm text-ink-500">
+                            Pay wallet, subsidy, cash or ride-credit. Fixed price {{ $trip->corridor->short() }} — no surge.
+                        </p>
+                    @endif
+                    <x-payment-picker
+                        :action="route('bookings.store', $trip)"
+                        :fare="$trip->fare_per_seat"
+                        :is-free="$trip->is_free_volunteer"
+                        :wallet-balance="$user->wallet ? (float) $user->wallet->cash_balance + (float) $user->wallet->earned_balance : 0"
+                        :subsidy-balance="$user->wallet?->subsidy_credits ?? 0"
+                        :can-subsidy="$user->canBookBenefits()"
+                        :can-ride-credit="config('workride.time_bank.enabled') && $user->verification_level->value >= \App\Enums\VerificationLevel::NinVerified->value" />
+                </div>
+            @elseif (! $myBooking && $user->canBook() && $trip->is_free_volunteer && ! $user->canBookBenefits() && in_array($trip->status->value, ['scheduled', 'active']) && $trip->available_seats > 0)
+                <div class="rounded-2xl border border-gold-200 bg-gold-50/60 p-6">
+                    <h2 class="font-heading font-semibold text-ink-900">Volunteer rides are for verified workers</h2>
+                    <p class="mt-1 text-sm text-ink-700">
+                        Free rides are the supply-bootstrap benefit — complete your
+                        <a href="{{ route('verification.index') }}" class="font-semibold text-forest-700 underline hover:text-forest-900">workplace verification</a>
+                        to ride for free and keep volunteer drivers rewarded.
+                    </p>
                 </div>
             @elseif (! $myBooking && $trip->driver_id !== $user->id && in_array($trip->status->value, ['scheduled', 'active']))
                 <div class="rounded-2xl border border-ink-200 bg-white p-6">

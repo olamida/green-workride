@@ -14,6 +14,8 @@ export default function connectGuideUI() {
         eta: null,
         missedReason: '',
         mapApi: null,
+        voiceEnabled: false,
+        voiceSupported: typeof window !== 'undefined' && 'speechSynthesis' in window,
 
         init() {
             const mapEl = this.$refs.map;
@@ -45,6 +47,7 @@ export default function connectGuideUI() {
                     this.mode = 'missed';
                     this.status = reason;
                 },
+                onVoice: (text) => this.speak(text),
             });
         },
 
@@ -54,6 +57,23 @@ export default function connectGuideUI() {
             }
             this.mode = 'active';
             this.mapApi.startFollow();
+        },
+
+        toggleVoice() {
+            this.voiceEnabled = !this.voiceEnabled;
+            if (!this.voiceEnabled && window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+        },
+
+        // Optional spoken nudges — always opt-in, never on by default.
+        speak(text) {
+            if (!this.voiceEnabled || !this.voiceSupported || !text || !window.speechSynthesis) {
+                return;
+            }
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1;
+            window.speechSynthesis.speak(utterance);
         },
 
         tickNumbers() {

@@ -15,60 +15,88 @@
         </a>
     </div>
 
-    <div class="space-y-6">
-        <section>
-            <h2 class="mb-3 font-heading font-semibold text-ink-900">As passenger</h2>
+    @php
+        $defaultTab = $activeBookings->isNotEmpty() ? 'active' : ($upcomingBookings->isNotEmpty() ? 'upcoming' : 'past');
+    @endphp
+
+    <div x-data="{ tab: '{{ $defaultTab }}' }" class="space-y-6">
+        {{-- Segmented control — land on the rides that need attention NOW. --}}
+        <div class="flex flex-wrap gap-2" role="tablist" aria-label="Filter rides">
+            <button type="button" role="tab" :aria-selected="tab === 'active'" @click="tab = 'active'"
+                    :class="tab === 'active' ? 'bg-ink-900 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100'"
+                    class="rounded-full px-4 py-2 text-sm font-semibold transition">
+                Active
+                @if ($activeBookings->isNotEmpty())
+                    <span :class="tab === 'active' ? 'text-gold-300' : 'text-ink-400'" class="font-mono text-xs">{{ $activeBookings->count() }}</span>
+                @endif
+            </button>
+            <button type="button" role="tab" :aria-selected="tab === 'upcoming'" @click="tab = 'upcoming'"
+                    :class="tab === 'upcoming' ? 'bg-ink-900 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100'"
+                    class="rounded-full px-4 py-2 text-sm font-semibold transition">
+                Upcoming
+                @if ($upcomingBookings->isNotEmpty())
+                    <span :class="tab === 'upcoming' ? 'text-gold-300' : 'text-ink-400'" class="font-mono text-xs">{{ $upcomingBookings->count() }}</span>
+                @endif
+            </button>
+            <button type="button" role="tab" :aria-selected="tab === 'past'" @click="tab = 'past'"
+                    :class="tab === 'past' ? 'bg-ink-900 text-white' : 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100'"
+                    class="rounded-full px-4 py-2 text-sm font-semibold transition">
+                Past
+                @if ($pastBookings->isNotEmpty())
+                    <span :class="tab === 'past' ? 'text-gold-300' : 'text-ink-400'" class="font-mono text-xs">{{ $pastBookings->count() }}</span>
+                @endif
+            </button>
+        </div>
+
+        {{-- Active — on the road now or leaving within the next 30 minutes. --}}
+        <section x-show="tab === 'active'" x-cloak role="tabpanel">
             <div class="space-y-4">
-                @forelse ($user->bookings as $booking)
-                    <div class="rounded-2xl border border-ink-200 bg-white p-5">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <a href="{{ route('trips.show', $booking->trip) }}" class="font-heading font-semibold text-ink-900 hover:text-forest-700">
-                                    {{ $booking->trip?->route_name }}
-                                </a>
-                                <p class="mt-1 text-sm text-ink-500">
-                                    {{ $booking->trip?->origin_text }} → {{ $booking->trip?->destination_text }}
-                                </p>
-                                <p class="mt-2 text-xs text-ink-500">
-                                    {{ $booking->trip?->departure_time?->format('D, M j · g:i A') }}
-                                    · {{ $booking->payment_method->label() }}
-                                    · ₦{{ number_format((float) $booking->fare_paid, 2) }}
-                                </p>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <x-badge :status="$booking->status->value" />
-                                @if (in_array($booking->status->value, ['confirmed', 'requested'], true))
-                                    <form method="POST" action="{{ route('bookings.cancel', $booking) }}">
-                                        @csrf
-                                        <button class="rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">
-                                            Cancel
-                                        </button>
-                                    </form>
-                                @endif
-                                @if ((float) $booking->fare_paid > 0)
-                                    <a href="{{ route('receipts.booking', $booking) }}" class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 transition hover:bg-paper">
-                                        Receipt
-                                    </a>
-                                @endif
-                            </div>
-                        </div>
-                        @if ($booking->status->value === 'completed' && $booking->trip?->status?->value === 'completed' && ! $booking->ratingBy($user->id))
-                            <div class="mt-4 border-t border-ink-100 pt-4">
-                                <x-rating-form
-                                    :action="route('ratings.store', $booking)"
-                                    title="Rate your driver — {{ $booking->trip?->driver?->name }}"
-                                    cta="Submit rating" />
-                            </div>
-                        @endif
-                    </div>
+                @forelse ($activeBookings as $booking)
+                    @include('bookings._booking-card', ['booking' => $booking, 'user' => $user])
                 @empty
                     <div class="rounded-2xl border border-dashed border-ink-300 bg-white p-8 text-center">
-                        <p class="text-sm text-ink-500">No bookings yet. Find a corridor trip on the board.</p>
+                        <p class="font-heading font-semibold text-ink-900">No rides leaving soon</p>
+                        <p class="mt-1 text-sm text-ink-500">Nothing is on the road right now. Head to the board and grab a seat.</p>
+                        <a href="{{ route('trips.index') }}" class="mt-4 inline-flex rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
+                            Find a ride
+                        </a>
                     </div>
                 @endforelse
             </div>
         </section>
 
+        {{-- Upcoming — confirmed seats on future scheduled trips. --}}
+        <section x-show="tab === 'upcoming'" x-cloak role="tabpanel">
+            <div class="space-y-4">
+                @forelse ($upcomingBookings as $booking)
+                    @include('bookings._booking-card', ['booking' => $booking, 'user' => $user])
+                @empty
+                    <div class="rounded-2xl border border-dashed border-ink-300 bg-white p-8 text-center">
+                        <p class="font-heading font-semibold text-ink-900">Nothing planned ahead yet</p>
+                        <p class="mt-1 text-sm text-ink-500">Book a day-ahead seat so you don't scramble at 6:45am.</p>
+                        <a href="{{ route('trips.index') }}" class="mt-4 inline-flex rounded-xl border border-forest-600 px-4 py-2 text-sm font-semibold text-forest-700 transition hover:bg-forest-50">
+                            Plan ahead
+                        </a>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+
+        {{-- Past — completed, cancelled or no-show rides. --}}
+        <section x-show="tab === 'past'" x-cloak role="tabpanel">
+            <div class="space-y-4">
+                @forelse ($pastBookings as $booking)
+                    @include('bookings._booking-card', ['booking' => $booking, 'user' => $user])
+                @empty
+                    <div class="rounded-2xl border border-dashed border-ink-300 bg-white p-8 text-center">
+                        <p class="font-heading font-semibold text-ink-900">No past rides yet</p>
+                        <p class="mt-1 text-sm text-ink-500">Completed rides land here with receipts and ratings.</p>
+                    </div>
+                @endforelse
+            </div>
+        </section>
+
+        {{-- Driver trips — kept below the passenger timeline. --}}
         <section>
             <h2 class="mb-3 font-heading font-semibold text-ink-900">As driver</h2>
             <div class="space-y-4">
