@@ -8,6 +8,7 @@ use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Enums\VerificationLevel;
 use App\Models\BusSchedule;
+use App\Models\GtfsRoute;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vehicle;
@@ -26,7 +27,7 @@ class SchedulingTest extends TestCase
         config(['workride.scheduling.enabled' => true]);
     }
 
-    private function schedule(): BusSchedule
+    private function schedule(?Corridor $corridor = null): BusSchedule
     {
         $driver = User::factory()->create([
             'role' => UserRole::Driver,
@@ -35,7 +36,12 @@ class SchedulingTest extends TestCase
 
         $vehicle = Vehicle::factory()->create(['user_id' => $driver->id]);
 
+        $route = GtfsRoute::factory()
+            ->forCorridor($corridor ?? Corridor::KubwaCbd)
+            ->create();
+
         return BusSchedule::factory()->create([
+            'route_id' => $route->id,
             'driver_id' => $driver->id,
             'vehicle_id' => $vehicle->id,
             'departure_time' => '06:30',
