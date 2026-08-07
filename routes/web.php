@@ -191,9 +191,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/{booking}/no-show', [BookingController::class, 'noShow'])->name('no-show');
         Route::post('/{booking}/approve', [BookingController::class, 'approve'])->name('approve');
         Route::post('/{booking}/decline', [BookingController::class, 'decline'])->name('decline');
+        Route::post('/{booking}/confirm-soft-hold', [BookingController::class, 'confirmSoftHold'])->name('confirm-soft-hold');
     });
     Route::post('/trips/{trip}/book', [BookingController::class, 'book'])->name('bookings.store');
     Route::post('/trips/{trip}/request', [BookingController::class, 'request'])->name('bookings.request');
+    Route::post('/trips/{trip}/soft-hold', [BookingController::class, 'softHold'])->name('bookings.soft-hold');
 
     Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::get('/', [AdminController::class, 'index'])->name('dashboard');

@@ -79,6 +79,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware('verified.worker')->group(function () {
             Route::get('/bookings', [BookingController::class, 'index']);
             Route::post('/trips/{trip}/bookings', [BookingController::class, 'store']);
+            Route::post('/trips/{trip}/soft-hold', [BookingController::class, 'softHold']);
+            Route::post('/bookings/{booking}/confirm-soft-hold', [BookingController::class, 'confirmSoftHold']);
             Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
             Route::post('/bookings/{booking}/board', [BookingController::class, 'board']);
             Route::post('/bookings/{booking}/no-show', [BookingController::class, 'noShow']);

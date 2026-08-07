@@ -133,6 +133,213 @@ class BookingService
     }
 
     /**
+     * Soft reservation (P3): reserve a seat for a few minutes while the rider
+     * confirms payment or walks to the stop. Mirrors book() — same atomic
+     * trip lock, wallet hold, employer coverage and seat decrement — but the
+     * booking is created as SoftHold with a `soft_hold_expires_at` deadline.
+     * Ride credits are excluded: they mint an owed seat immediately, which a
+     * hold that later expires would need extra cleanup to unwind.
+     *
+     * The rider confirms with confirmSoftHold(); ReleaseExpiredSoftHoldsJob
+     * auto-releases expired holds (refund + seat back) every minute.
+     */
+    public function softHold(Trip $trip, User $passenger, array $data = []): Booking
+    {
+        $this->assertSoftHoldEnabled();
+
+        if ($trip->driver_id === $passenger->id) {
+            throw ValidationException::withMessages(['trip' => 'You cannot book your own trip.']);
+        }
+
+        $benefitsEligible = $passenger->canBookBenefits();
+
+        if ($trip->women_only && ! $benefitsEligible) {
+            throw ValidationException::withMessages(['trip' => 'Women-only rides are reserved for verified workers.']);
+        }
+
+        if ($trip->women_only && $passenger->gender !== 'female') {
+            throw ValidationException::withMessages(['trip' => 'This is a women-only ride.']);
+        }
+
+        if ($trip->is_free_volunteer && ! $benefitsEligible) {
+            throw ValidationException::withMessages(['trip' => 'Volunteer rides are reserved for verified workers.']);
+        }
+
+        try {
+            return DB::transaction(function () use ($trip, $passenger, $data, $benefitsEligible) {
+                $trip = Trip::whereKey($trip->id)->lockForUpdate()->firstOrFail();
+
+                if (! in_array($trip->status, [TripStatus::Scheduled, TripStatus::Active], true)) {
+                    throw ValidationException::withMessages(['trip' => 'This trip is no longer available.']);
+                }
+
+                if ($trip->departure_time->isPast()) {
+                    throw ValidationException::withMessages(['trip' => 'This trip has already departed.']);
+                }
+
+                if ($trip->available_seats < 1) {
+                    throw ValidationException::withMessages(['trip' => 'This trip is full.']);
+                }
+
+                if ($trip->bookings()->where('passenger_id', $passenger->id)->exists()) {
+                    throw ValidationException::withMessages(['trip' => 'You already have a booking on this trip.']);
+                }
+
+                $paymentMethod = $this->resolvePaymentMethod($trip, $data, $benefitsEligible);
+
+                if ($paymentMethod === PaymentMethod::RideCredit) {
+                    throw ValidationException::withMessages([
+                        'payment_method' => 'Ride-credit seats book directly — hold a seat with wallet, cash or subsidy.',
+                    ]);
+                }
+
+                $fare = $trip->fare_per_seat;
+                [$employerContribution, $employerCoverage, $employer] = $benefitsEligible
+                    ? $this->employers->bestCoverage($trip, $passenger, (float) $fare)
+                    : [0.0, null, null];
+
+                $booking = $trip->bookings()->create([
+                    'passenger_id' => $passenger->id,
+                    'pickup_lat' => $data['pickup_lat'] ?? null,
+                    'pickup_lng' => $data['pickup_lng'] ?? null,
+                    'status' => BookingStatus::SoftHold,
+                    'soft_hold_expires_at' => now()->addMinutes((int) config('workride.soft_hold.ttl_minutes', 3)),
+                    'fare_paid' => $fare,
+                    'employer_id' => $employer?->id,
+                    'employer_contribution' => $employerContribution,
+                    'employer_coverage' => $employerCoverage?->value,
+                    'payment_method' => $paymentMethod,
+                ]);
+
+                if ($this->needsHold($trip, $paymentMethod)) {
+                    $this->wallet->holdForBooking($booking);
+                }
+
+                $trip->decrement('available_seats');
+                $trip->refresh();
+
+                event(TripSeatsUpdated::forTrip($trip));
+
+                return $booking;
+            });
+        } catch (QueryException $exception) {
+            if ($exception->getCode() === 23000) {
+                throw ValidationException::withMessages(['trip' => 'You already have a booking on this trip.']);
+            }
+
+            throw $exception;
+        }
+    }
+
+    /**
+     * The rider confirms a soft-held seat within its expiry window. No new
+     * hold is created — the wallet/subsidy hold already made at softHold()
+     * is the committed money, exactly like a book(). Expired holds must be
+     * released (ReleaseExpiredSoftHoldsJob) and booked again.
+     */
+    public function confirmSoftHold(Booking $booking, User $passenger): Booking
+    {
+        $this->assertSoftHoldEnabled();
+
+        if ($booking->passenger_id !== $passenger->id && ! $passenger->isAdmin()) {
+            throw ValidationException::withMessages(['booking' => 'Only the seat holder can confirm this booking.']);
+        }
+
+        return DB::transaction(function () use ($booking) {
+            $booking = Booking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
+            $trip = Trip::whereKey($booking->trip_id)->lockForUpdate()->firstOrFail();
+
+            if ($booking->status !== BookingStatus::SoftHold) {
+                throw ValidationException::withMessages(['booking' => 'Only a held seat can be confirmed.']);
+            }
+
+            if (! $booking->soft_hold_expires_at || $booking->soft_hold_expires_at->isPast()) {
+                throw ValidationException::withMessages(['booking' => 'This soft hold has expired — release and book again.']);
+            }
+
+            if (! in_array($trip->status, [TripStatus::Scheduled, TripStatus::Active], true)) {
+                throw ValidationException::withMessages(['trip' => 'This trip is no longer available.']);
+            }
+
+            $booking->update([
+                'status' => BookingStatus::Confirmed,
+                'soft_hold_expires_at' => null,
+            ]);
+
+            // The reserved seat is now a real committed seat.
+            TripInterest::where('trip_id', $trip->id)
+                ->where('user_id', $booking->passenger_id)
+                ->update(['status' => TripInterestStatus::Matched, 'matched_at' => now()]);
+
+            $fresh = $booking->fresh();
+            event(new BookingConfirmed($fresh->load('passenger')));
+            event(TripSeatsUpdated::forTrip($trip));
+
+            return $fresh;
+        });
+    }
+
+    /**
+     * Release every expired soft hold: refund the wallet hold (idempotent by
+     * reference), return the seat, revert any trip interest and broadcast the
+     * seat change so the live board refreshes. Re-checks the status under the
+     * row lock so a concurrent confirm/release can never double-refund.
+     */
+    public function releaseExpiredSoftHolds(int $limit = 50): int
+    {
+        if (! config('workride.soft_hold.enabled')) {
+            return 0;
+        }
+
+        $expired = Booking::query()
+            ->where('status', BookingStatus::SoftHold)
+            ->where('soft_hold_expires_at', '<', now())
+            ->orderBy('soft_hold_expires_at')
+            ->limit($limit)
+            ->get();
+
+        $released = 0;
+
+        foreach ($expired as $stale) {
+            DB::transaction(function () use ($stale, &$released) {
+                $booking = Booking::whereKey($stale->id)->lockForUpdate()->first();
+                $trip = Trip::whereKey($booking->trip_id)->lockForUpdate()->first();
+
+                // A concurrent confirm/release may have won before our lock.
+                if ($booking->status !== BookingStatus::SoftHold) {
+                    return;
+                }
+
+                if (! $booking->soft_hold_expires_at || ! $booking->soft_hold_expires_at->isPast()) {
+                    return;
+                }
+
+                $booking->update(['status' => BookingStatus::Cancelled, 'soft_hold_expires_at' => null]);
+
+                if ($this->needsHold($trip, $booking->payment_method)) {
+                    $this->wallet->releaseHold($booking);
+                }
+
+                $this->employerLedger->refund($booking);
+
+                $trip->increment('available_seats');
+                $trip->refresh();
+
+                TripInterest::where('trip_id', $trip->id)
+                    ->where('user_id', $booking->passenger_id)
+                    ->update(['status' => TripInterestStatus::Pending, 'matched_at' => null]);
+
+                event(new BookingCancelled($booking->fresh()));
+                event(TripSeatsUpdated::forTrip($trip));
+
+                $released++;
+            });
+        }
+
+        return $released;
+    }
+
+    /**
      * Share-request (Sprint 3 §3.4): a rider asks to join a shared trip
      * without committing money. No seat is held and no wallet move happens —
      * the driver's approve()/decline() decides. Reuses/updates an existing
@@ -465,6 +672,13 @@ class BookingService
     {
         if ($booking->trip->driver_id !== $user->id) {
             throw ValidationException::withMessages(['booking' => 'Only the trip driver can perform this action.']);
+        }
+    }
+
+    private function assertSoftHoldEnabled(): void
+    {
+        if (! config('workride.soft_hold.enabled')) {
+            throw ValidationException::withMessages(['trip' => 'Soft seat reservations are disabled.']);
         }
     }
 }

@@ -3,6 +3,7 @@
 @php
     $styles = [
         'pending' => 'border-gold-200 bg-gold-50 text-gold-800',
+        'soft_hold' => 'border-gold-300 bg-gold-100 text-gold-900',
         'pending_manual_review' => 'border-gold-300 bg-gold-100 text-gold-900',
         'approved' => 'border-forest-200 bg-forest-50 text-forest-700',
         'rejected' => 'border-red-200 bg-red-50 text-red-700',
@@ -16,6 +17,7 @@
     ];
     $labels = [
         'pending_manual_review' => 'Needs review',
+        'soft_hold' => 'Seat held',
     ];
     $label = $label ?? ($labels[$status] ?? ucfirst($status));
 @endphp

@@ -1087,6 +1087,12 @@ parameters:
 			path: app/Http/Controllers/Api/V1/BookingController.php
 
 		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/V1/BookingController.php
+
+		-
 			message: '#^Method App\\Http\\Controllers\\Api\\V1\\BookingController\:\:board\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -1148,6 +1154,18 @@ parameters:
 
 		-
 			message: '#^Parameter \#2 \$passenger of method App\\Services\\BookingService\:\:book\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/BookingController.php
+
+		-
+			message: '#^Parameter \#2 \$passenger of method App\\Services\\BookingService\:\:confirmSoftHold\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Api/V1/BookingController.php
+
+		-
+			message: '#^Parameter \#2 \$passenger of method App\\Services\\BookingService\:\:softHold\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Api/V1/BookingController.php
@@ -1862,6 +1880,12 @@ parameters:
 
 		-
 			message: '#^Parameter \#2 \$passenger of method App\\Services\\BookingService\:\:book\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/BookingController.php
+
+		-
+			message: '#^Parameter \#2 \$passenger of method App\\Services\\BookingService\:\:confirmSoftHold\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Web/BookingController.php
@@ -4563,7 +4587,7 @@ parameters:
 		-
 			message: '#^Call to function in_array\(\) with arguments string, array\{App\\Enums\\TripStatus\:\:Scheduled, App\\Enums\\TripStatus\:\:Active\} and true will always evaluate to false\.$#'
 			identifier: function.impossibleType
-			count: 2
+			count: 3
 			path: app/Services/BookingService.php
 
 		-
@@ -4576,6 +4600,18 @@ parameters:
 			message: '#^Cannot access property \$driver_id on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
 			identifier: property.nonObject
 			count: 2
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Cannot access property \$status on App\\Models\\Booking\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Cannot access property \$trip_id on App\\Models\\Booking\|null\.$#'
+			identifier: property.nonObject
+			count: 1
 			path: app/Services/BookingService.php
 
 		-
@@ -4615,6 +4651,12 @@ parameters:
 			path: app/Services/BookingService.php
 
 		-
+			message: '#^Method App\\Services\\BookingService\:\:confirmSoftHold\(\) should return App\\Models\\Booking but returns null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
 			message: '#^Method App\\Services\\BookingService\:\:requestToJoin\(\) has parameter \$data with no value type specified in iterable type array\.$#'
 			identifier: missingType.iterableValue
 			count: 1
@@ -4635,6 +4677,18 @@ parameters:
 		-
 			message: '#^Method App\\Services\\BookingService\:\:resolvePaymentMethod\(\) is unused\.$#'
 			identifier: method.unused
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Method App\\Services\\BookingService\:\:softHold\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Method App\\Services\\BookingService\:\:softHold\(\) should return App\\Models\\Booking but returns null\.$#'
+			identifier: return.type
 			count: 1
 			path: app/Services/BookingService.php
 
@@ -4671,7 +4725,7 @@ parameters:
 		-
 			message: '#^Result of static method Illuminate\\Database\\Connection\:\:transaction\(\) \(void\) is used\.$#'
 			identifier: staticMethod.void
-			count: 2
+			count: 4
 			path: app/Services/BookingService.php
 
 		-
@@ -4682,6 +4736,12 @@ parameters:
 
 		-
 			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\BookingStatus\:\:Requested will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 2
+			path: app/Services/BookingService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\BookingStatus\:\:SoftHold will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 2
 			path: app/Services/BookingService.php
@@ -4701,7 +4761,7 @@ parameters:
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
-			count: 6
+			count: 9
 			path: app/Services/BookingService.php
 
 		-

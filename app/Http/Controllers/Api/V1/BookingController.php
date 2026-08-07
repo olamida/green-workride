@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Services\BookingService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -38,6 +39,33 @@ class BookingController extends Controller
             'message' => 'Seat booked.',
             'booking' => $this->payload($booking),
         ], 201);
+    }
+
+    public function softHold(Request $request, Trip $trip): JsonResponse
+    {
+        $data = $request->validate([
+            'payment_method' => ['nullable', Rule::in(['wallet', 'cash', 'subsidy_credit'])],
+            'pickup_lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'pickup_lng' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        $booking = $this->bookings->softHold($trip, $request->user(), $data);
+
+        return response()->json([
+            'message' => 'Seat held for '.config('workride.soft_hold.ttl_minutes', 3).' minutes.',
+            'booking' => $this->payload($booking),
+            'soft_hold_expires_at' => $booking->soft_hold_expires_at?->toIso8601String(),
+        ], 201);
+    }
+
+    public function confirmSoftHold(Request $request, Booking $booking): JsonResponse
+    {
+        $booking = $this->bookings->confirmSoftHold($booking, $request->user());
+
+        return response()->json([
+            'message' => 'Seat confirmed.',
+            'booking' => $this->payload($booking),
+        ]);
     }
 
     public function cancel(Request $request, Booking $booking)

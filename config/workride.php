@@ -369,4 +369,17 @@ return [
         // UserArrivedAtPickup + the arrival notification.
         'arrived_radius_m' => env('WORKRIDE_PUSH_ARRIVED_RADIUS_M', 500),
     ],
+
+    // Soft seat reservations (guide §6 Workflow 1 polish): a rider can hold a
+    // seat for a few minutes while they confirm payment or walk to the stop.
+    // The seat and any wallet hold are auto-released by
+    // ReleaseExpiredSoftHoldsJob if the rider never confirms. Off by default.
+    'soft_hold' => [
+        'enabled' => (bool) env('FEATURE_SOFT_HOLD', false),
+        // How long a held seat stays reserved before auto-release.
+        'ttl_minutes' => env('WORKRIDE_SOFT_HOLD_TTL_MINUTES', 3),
+        // Max bookings the release job processes per run (a batch limit so the
+        // every-minute schedule never thrashes on a backlog of expired holds).
+        'release_batch_size' => env('WORKRIDE_SOFT_HOLD_RELEASE_BATCH', 50),
+    ],
 ];

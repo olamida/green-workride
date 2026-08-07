@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\Booking;
 use App\Models\Trip;
 use App\Services\BookingService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -34,7 +35,7 @@ class BookingController extends Controller
         $leavingSoon = now()->copy()->addMinutes((int) config('workride.departure_window_minutes', 30));
 
         $activeBookings = $user->bookings->filter(function ($booking) use ($leavingSoon) {
-            if (! in_array($booking->status->value, ['requested', 'confirmed', 'boarded'], true)) {
+            if (! in_array($booking->status->value, ['requested', 'soft_hold', 'confirmed', 'boarded'], true)) {
                 return false;
             }
 
@@ -46,7 +47,7 @@ class BookingController extends Controller
         })->values();
 
         $upcomingBookings = $user->bookings->filter(function ($booking) use ($leavingSoon) {
-            if (! in_array($booking->status->value, ['requested', 'confirmed', 'boarded'], true)) {
+            if (! in_array($booking->status->value, ['requested', 'soft_hold', 'confirmed', 'boarded'], true)) {
                 return false;
             }
 
@@ -84,6 +85,42 @@ class BookingController extends Controller
 
         return redirect()->route('bookings.index')
             ->with('status', 'Seat confirmed on '.$trip->route_name.' ('.($booking->payment_method->label()).').');
+    }
+
+    /**
+     * Soft reservation (P3): reserve a seat for a few minutes while the rider
+     * confirms payment. The rider then confirms from My Rides before the
+     * ReleaseExpiredSoftHoldsJob auto-releases the hold.
+     */
+    public function softHold(Request $request, Trip $trip): RedirectResponse
+    {
+        abort_unless($request->user()?->canBook() === true, 403, 'Workplace verification (Level 1) is required to book rides.');
+
+        $data = $request->validate([
+            'payment_method' => ['nullable', Rule::in(['wallet', 'cash', 'subsidy_credit'])],
+            'pickup_lat' => ['nullable', 'numeric', 'between:-90,90'],
+            'pickup_lng' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        try {
+            $booking = $this->bookings->softHold($trip, $request->user(), $data);
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors())->withInput();
+        }
+
+        return redirect()->route('bookings.index')
+            ->with('status', 'Seat held for '.config('workride.soft_hold.ttl_minutes', 3).' minutes — confirm from My Rides.');
+    }
+
+    public function confirmSoftHold(Request $request, Booking $booking): RedirectResponse
+    {
+        try {
+            $this->bookings->confirmSoftHold($booking, $request->user());
+        } catch (ValidationException $e) {
+            return back()->withErrors($e->errors());
+        }
+
+        return redirect()->route('bookings.index')->with('status', 'Seat confirmed.');
     }
 
     /**

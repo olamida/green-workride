@@ -3,7 +3,8 @@
     $canOpenGuide = $trip
         && in_array($trip->status->value, ['scheduled', 'active'], true)
         && in_array($booking->status->value, ['confirmed', 'boarded'], true);
-    $canCancel = in_array($booking->status->value, ['confirmed', 'requested'], true);
+    $canCancel = in_array($booking->status->value, ['confirmed', 'requested', 'soft_hold'], true);
+    $isSoftHold = $booking->status->value === 'soft_hold';
 @endphp
 <div class="rounded-2xl border border-ink-200 bg-white p-5">
     <div class="flex flex-wrap items-start justify-between gap-3">
@@ -35,6 +36,14 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
                     </svg>
                 </a>
+            @endif
+            @if ($isSoftHold)
+                <form method="POST" action="{{ route('bookings.confirm-soft-hold', $booking) }}">
+                    @csrf
+                    <button class="rounded-lg bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">
+                        Confirm seat
+                    </button>
+                </form>
             @endif
             @if ($canCancel)
                 <form method="POST" action="{{ route('bookings.cancel', $booking) }}">

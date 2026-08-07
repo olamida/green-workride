@@ -312,6 +312,19 @@
                         :subsidy-balance="$user->wallet?->subsidy_credits ?? 0"
                         :can-subsidy="$user->canBookBenefits()"
                         :can-ride-credit="config('workride.time_bank.enabled') && $user->verification_level->value >= \App\Enums\VerificationLevel::NinVerified->value" />
+                    @if (config('workride.soft_hold.enabled'))
+                        <form method="POST" action="{{ route('bookings.soft-hold', $trip) }}" class="mt-4 border-t border-ink-100 pt-4">
+                            @csrf
+                            <p class="text-xs text-ink-500">
+                                Not sure yet? Reserve this seat for {{ config('workride.soft_hold.ttl_minutes', 3) }} minutes —
+                                nothing is charged until you confirm from My Rides.
+                            </p>
+                            <button type="submit"
+                                    class="mt-2 w-full rounded-xl border border-gold-400 px-4 py-2.5 text-sm font-semibold text-gold-800 transition hover:bg-gold-50">
+                                Hold my seat · {{ config('workride.soft_hold.ttl_minutes', 3) }} min
+                            </button>
+                        </form>
+                    @endif
                 </div>
             @elseif (! $myBooking && $user->canBook() && $trip->is_free_volunteer && ! $user->canBookBenefits() && in_array($trip->status->value, ['scheduled', 'active']) && $trip->available_seats > 0)
                 <div class="rounded-2xl border border-gold-200 bg-gold-50/60 p-6">

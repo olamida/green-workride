@@ -22,6 +22,7 @@ class Booking extends Model
         'pickup_lat',
         'pickup_lng',
         'status',
+        'soft_hold_expires_at',
         'fare_paid',
         'employer_contribution',
         'employer_coverage',
@@ -40,6 +41,7 @@ class Booking extends Model
             'employer_coverage' => EmployerCoverageType::class,
             'status' => BookingStatus::class,
             'payment_method' => PaymentMethod::class,
+            'soft_hold_expires_at' => 'datetime',
             'arrival_notified_at' => 'datetime',
         ];
     }

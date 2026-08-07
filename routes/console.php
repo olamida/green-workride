@@ -3,6 +3,7 @@
 use App\Jobs\CalculateDemandForecastJob;
 use App\Jobs\DeleteExpiredSelfiesJob;
 use App\Jobs\GenerateRecurringTripsJob;
+use App\Jobs\ReleaseExpiredSoftHoldsJob;
 use App\Jobs\SendRideCreditRemindersJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -30,3 +31,9 @@ Schedule::job(new GenerateRecurringTripsJob)->dailyAt('05:00');
 Schedule::job(new SendRideCreditRemindersJob(
     (int) config('workride.time_bank.remind_within_days', 3),
 ))->dailyAt('08:00');
+
+// Every minute (only when the feature is on): release soft-held seats whose
+// reservation window elapsed — refund the hold, return the seat to the trip.
+Schedule::job(new ReleaseExpiredSoftHoldsJob)
+    ->everyMinute()
+    ->when(fn () => config('workride.soft_hold.enabled'));
