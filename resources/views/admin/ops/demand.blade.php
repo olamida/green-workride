@@ -15,6 +15,25 @@
         </a>
     </div>
 
+    @if ($promptEnabled)
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-gold-300 bg-gold-50/70 p-5">
+            <div>
+                <h2 class="font-heading text-sm font-semibold text-ink-900">Demand → supply nudges</h2>
+                <p class="mt-0.5 text-sm text-ink-600">
+                    For every corridor where waiting people exceed the trigger ({{ config('workride.driver_prompts.min_passengers', 10) }}+)
+                    and supply is short, prompt up to {{ config('workride.driver_prompts.prompt_limit', 5) }} verified drivers to publish.
+                    Idempotent — a driver is nudged once per corridor per day.
+                </p>
+            </div>
+            <form method="POST" action="{{ route('admin.ops.nudge') }}">
+                @csrf
+                <button type="submit" class="rounded-xl bg-gold-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-gold-700">
+                    Nudge drivers now
+                </button>
+            </form>
+        </div>
+    @endif
+
     <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-2xl border border-ink-200 bg-white p-5">
             <p class="text-xs font-medium uppercase tracking-wider text-ink-400">People counted</p>

@@ -382,4 +382,38 @@ return [
         // every-minute schedule never thrashes on a backlog of expired holds).
         'release_batch_size' => env('WORKRIDE_SOFT_HOLD_RELEASE_BATCH', 50),
     ],
+
+    // Driver trip templates (guide §11 driver tooling): save a corridor/time/
+    // vehicle once and republish with one tap. Templates only pre-fill and
+    // route through TripService::publish — fixed anti-surge fares and the
+    // atomic seat lock are never bypassed. On by default (like scheduling):
+    // it is the driver's own convenience, no money or gates involved.
+    'trip_templates' => [
+        'enabled' => (bool) env('FEATURE_TRIP_TEMPLATES', true),
+        // "Publish this week" horizon: companion trips materialised for the
+        // template's weekdays over the next N days (repeat-group machinery).
+        'horizon_days' => env('WORKRIDE_TRIP_TEMPLATE_HORIZON_DAYS', 14),
+    ],
+
+    // Driver demand prompts (gallery "service planning" Phase 3): when live
+    // demand outstrips supply on a corridor, qualified drivers are nudged to
+    // publish. Off by default — prompting is a push-heavy outbound channel.
+    'driver_prompts' => [
+        'enabled' => (bool) env('FEATURE_DRIVER_PROMPTS', false),
+        // Pending rider check-ins within the last N hours count as live demand.
+        'window_hours' => env('WORKRIDE_DRIVER_PROMPT_WINDOW_HOURS', 2),
+        // Trigger when demand is at least this many people...
+        'min_passengers' => env('WORKRIDE_DRIVER_PROMPT_MIN_PASSENGERS', 10),
+        // ...and supply (seats on scheduled/active trips in the window) is
+        // below demand divided by this divisor (predicted/3 per the spec).
+        'supply_divisor' => env('WORKRIDE_DRIVER_PROMPT_SUPPLY_DIVISOR', 3),
+        // How far ahead scheduled/active trips count as supply for a corridor.
+        'supply_window_hours' => env('WORKRIDE_DRIVER_PROMPT_SUPPLY_WINDOW_HOURS', 3),
+        // Drivers who drove this corridor within the last N days are
+        // "qualified" (affinity) and listed first for prompting.
+        'affinity_days' => env('WORKRIDE_DRIVER_PROMPT_AFFINITY_DAYS', 14),
+        // Max drivers prompted per corridor evaluation (the "Nudge 5 drivers"
+        // button). Rate limit stays at 1 push / driver / day / corridor.
+        'prompt_limit' => env('WORKRIDE_DRIVER_PROMPT_LIMIT', 5),
+    ],
 ];

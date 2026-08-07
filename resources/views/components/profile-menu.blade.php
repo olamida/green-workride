@@ -51,6 +51,11 @@
                     <x-icon name="route" class="h-4 w-4 text-ink-400" /> My fleet
                 </a>
             @endif
+            @if (config('workride.trip_templates.enabled'))
+                <a href="{{ route('templates.index') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
+                    <x-icon name="clock" class="h-4 w-4 text-ink-400" /> My commutes
+                </a>
+            @endif
             <a href="{{ route('profile.edit') }}" class="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-700 transition hover:bg-forest-50 hover:text-forest-800">
                 <x-icon name="shield" class="h-4 w-4 text-ink-400" /> Profile & safety
             </a>

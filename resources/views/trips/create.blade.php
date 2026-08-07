@@ -32,6 +32,29 @@
             </div>
         @endif
 
+        @if (config('workride.trip_templates.enabled') && $templates->isNotEmpty())
+            <div class="mb-6 rounded-2xl border border-ink-200 bg-white p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="font-heading text-sm font-semibold text-ink-900">Saved commutes</h2>
+                    <a href="{{ route('templates.index') }}" class="text-xs font-semibold text-forest-600 hover:underline">Manage all →</a>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    @foreach ($templates as $template)
+                        <form method="POST" action="{{ route('templates.publish', $template) }}" class="inline">
+                            @csrf
+                            <button type="submit" @disabled(! $template->is_active)
+                                    class="group flex items-center gap-2 rounded-xl border border-forest-200 bg-forest-50/60 px-3 py-2 text-xs font-semibold text-ink-900 transition hover:border-forest-400 disabled:cursor-not-allowed disabled:opacity-50"
+                                    title="{{ $template->name }} — {{ $template->routeTitle() }} · {{ $template->departure_time }}">
+                                <span class="rounded-full bg-forest-600 px-1.5 py-0.5 text-[10px] font-bold text-white">{{ $template->corridor?->short() }}</span>
+                                <span class="max-w-[160px] truncate">{{ $template->name }}</span>
+                                <span class="font-mono text-forest-700 group-hover:underline">publish →</span>
+                            </button>
+                        </form>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         @if ($errors->any())
             <div class="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <ul class="list-inside list-disc space-y-1">
@@ -230,6 +253,17 @@
                     <button type="submit" class="w-full rounded-xl bg-forest-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-forest-700">
                         Publish trip
                     </button>
+
+                    @if (config('workride.trip_templates.enabled'))
+                        <label class="mt-3 flex items-center gap-3 rounded-xl border border-ink-100 bg-paper p-4">
+                            <input type="checkbox" name="save_template" value="1" @checked(old('save_template'))
+                                   class="h-5 w-5 rounded border-ink-300 text-forest-600 focus:ring-forest-500">
+                            <span>
+                                <span class="block text-sm font-semibold text-ink-900">Save this trip as a template</span>
+                                <span class="block text-xs text-ink-500">Republish this commute any morning with one tap — same corridor, time and vehicle.</span>
+                            </span>
+                        </label>
+                    @endif
                 </div>
             </div>
 

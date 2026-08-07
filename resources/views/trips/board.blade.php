@@ -59,6 +59,53 @@
         </ol>
     </div>
 
+    @if (config('workride.driver_prompts.enabled') && auth()->user()->canDriveVolunteer() && $driverPrompts->isNotEmpty())
+        @php
+            $openPrompts = $driverPrompts->filter(fn ($prompt) => $prompt->status === \App\Enums\DriverPromptStatus::Prompted)->take(2);
+        @endphp
+        @if ($openPrompts->isNotEmpty())
+            <div class="mb-6 rounded-2xl border border-gold-300 bg-gold-50/70 p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="font-heading text-sm font-semibold text-ink-900">Demand wants you</h2>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-800">
+                        <span class="h-1.5 w-1.5 rounded-full bg-gold-600 wr-pulse"></span> live signal
+                    </span>
+                </div>
+                <div class="mt-3 space-y-3">
+                    @foreach ($openPrompts as $prompt)
+                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold-200 bg-white px-4 py-3">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold text-ink-900">
+                                    {{ $prompt->corridor?->label() }}
+                                    <span class="ml-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">
+                                        {{ $prompt->people_count }} people waiting
+                                    </span>
+                                </p>
+                                <p class="mt-0.5 text-xs text-ink-500">
+                                    Commuters checked in around {{ $prompt->corridor?->short() }} in the last few hours — supply is short.
+                                </p>
+                            </div>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <form method="POST" action="{{ route('prompts.accept', $prompt) }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="rounded-xl bg-forest-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-forest-700">
+                                        Publish on this corridor →
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ route('prompts.dismiss', $prompt) }}" class="inline">
+                                    @csrf
+                                    <button type="submit" class="rounded-xl px-3 py-2 text-xs font-medium text-ink-500 transition hover:bg-ink-100">
+                                        Not today
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+    @endif
+
     <div class="mb-6 flex flex-wrap gap-3">
         <a href="{{ route('trips.index', array_filter(['corridor' => $corridor?->value, 'window' => $window === 'any' ? null : $window])) }}" @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',

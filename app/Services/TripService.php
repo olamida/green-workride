@@ -44,7 +44,11 @@ class TripService
         private NotificationService $notifications,
     ) {}
 
-    public function publish(User $driver, array $data): Trip
+    /**
+     * @param  int|null  $repeatHorizonDays  Cap the repeat companion window.
+     *                                       Defaults to `scheduling.repeat_horizon_days`.
+     */
+    public function publish(User $driver, array $data, ?int $repeatHorizonDays = null): Trip
     {
         if (! $driver->canBookBenefits()) {
             throw ValidationException::withMessages(['trip' => 'Publishing trips requires formal verification (Level 1+).']);
@@ -95,7 +99,7 @@ class TripService
             ]);
         }
 
-        $this->publishRepeatCompanions($trip, $data, $corridor, $isFreeVolunteer, $womenOnly, $totalSeats);
+        $this->publishRepeatCompanions($trip, $data, $corridor, $isFreeVolunteer, $womenOnly, $totalSeats, $repeatHorizonDays);
 
         event(new TripPublished($trip));
 
@@ -129,6 +133,7 @@ class TripService
         bool $isFreeVolunteer,
         bool $womenOnly,
         int $totalSeats,
+        ?int $horizonDays = null,
     ): void {
         $repeatGroup = $trip->repeat_group;
 
@@ -137,7 +142,7 @@ class TripService
         }
 
         $days = collect($data['repeat_days'])->map(fn ($day) => strtolower((string) $day))->all();
-        $horizonDays = (int) config('workride.scheduling.repeat_horizon_days', 14);
+        $horizonDays = $horizonDays ?? (int) config('workride.scheduling.repeat_horizon_days', 14);
         $time = $trip->departure_time?->format('H:i') ?? '07:00';
 
         $waypoints = $trip->waypoints()->orderBy('sequence')->get()->map(fn ($wp) => [

@@ -2017,6 +2017,18 @@ parameters:
 			path: app/Http/Controllers/Web/DriverFleetController.php
 
 		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/DriverPromptController.php
+
+		-
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/DriverPromptController.php
+
+		-
 			message: '#^Cannot call method load\(\) on App\\Models\\User\|null\.$#'
 			identifier: method.nonObject
 			count: 1
@@ -2827,7 +2839,19 @@ parameters:
 			path: app/Http/Controllers/Web/TripBoardController.php
 
 		-
+			message: '#^Parameter \#1 \$driver of method App\\Services\\DriverPromptService\:\:activeFor\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/TripBoardController.php
+
+		-
 			message: '#^Parameter \#1 \$driver of method App\\Services\\TripService\:\:publish\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/TripBoardController.php
+
+		-
+			message: '#^Parameter \#1 \$driver of method App\\Services\\TripTemplateService\:\:forDriver\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Web/TripBoardController.php
@@ -2867,6 +2891,30 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Web/TripBoardController.php
+
+		-
+			message: '#^Parameter \#1 \$driver of method App\\Services\\TripTemplateService\:\:forDriver\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/TripTemplateController.php
+
+		-
+			message: '#^Parameter \#1 \$driver of method App\\Services\\TripTemplateService\:\:store\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/TripTemplateController.php
+
+		-
+			message: '#^Parameter \#2 \$driver of method App\\Services\\TripTemplateService\:\:assertOwner\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 2
+			path: app/Http/Controllers/Web/TripTemplateController.php
+
+		-
+			message: '#^Parameter \#2 \$driver of method App\\Services\\TripTemplateService\:\:destroy\(\) expects App\\Models\\User, App\\Models\\User\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Http/Controllers/Web/TripTemplateController.php
 
 		-
 			message: '#^Cannot call method load\(\) on App\\Models\\User\|null\.$#'
@@ -3413,6 +3461,24 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/DemandSurvey.php
+
+		-
+			message: '#^Method App\\Models\\DriverPrompt\:\:driver\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/DriverPrompt.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\DriverPromptStatus\:\:Accepted will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Models/DriverPrompt.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\DriverPromptStatus\:\:Dismissed will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Models/DriverPrompt.php
 
 		-
 			message: '#^Class App\\Models\\DriverScore uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
@@ -4207,6 +4273,48 @@ parameters:
 			path: app/Models/TripInterest.php
 
 		-
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Models/TripTemplate.php
+
+		-
+			message: '#^Class App\\Models\\TripTemplate uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/TripTemplate.php
+
+		-
+			message: '#^Method App\\Models\\TripTemplate\:\:driver\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/TripTemplate.php
+
+		-
+			message: '#^Method App\\Models\\TripTemplate\:\:vehicle\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/TripTemplate.php
+
+		-
+			message: '#^Parameter \#2 \$array of function array_map expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/TripTemplate.php
+
+		-
+			message: '#^Parameter \#2 \.\.\.\$arrays of function array_diff expects array, string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/TripTemplate.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/TripTemplate.php
+
+		-
 			message: '#^Class App\\Models\\TripWaypoint uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
 			identifier: missingType.generics
 			count: 1
@@ -4925,6 +5033,18 @@ parameters:
 			identifier: missingType.iterableValue
 			count: 1
 			path: app/Services/DemandService.php
+
+		-
+			message: '#^Result of \|\| is always false\.$#'
+			identifier: booleanOr.alwaysFalse
+			count: 1
+			path: app/Services/DriverPromptService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between float and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 2
+			path: app/Services/DriverPromptService.php
 
 		-
 			message: '#^Method App\\Services\\EmployerLedgerService\:\:bookingMeta\(\) has parameter \$extra with no value type specified in iterable type array\.$#'
@@ -6623,6 +6743,42 @@ parameters:
 			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/TripService.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Services/TripTemplateService.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/TripTemplateService.php
+
+		-
+			message: '#^Cannot call method short\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/TripTemplateService.php
+
+		-
+			message: '#^Parameter \#1 \$array \(array\{\}\|string\) to function array_values is empty, call has no effect\.$#'
+			identifier: arrayValues.empty
+			count: 1
+			path: app/Services/TripTemplateService.php
+
+		-
+			message: '#^Parameter \#1 \$array of function array_values expects array, array\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TripTemplateService.php
+
+		-
+			message: '#^Parameter \#1 \$driver of method App\\Services\\TripService\:\:publish\(\) expects App\\Models\\User, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TripTemplateService.php
 
 		-
 			message: '#^Method App\\Services\\TrustService\:\:credit\(\) has parameter \$meta with no value type specified in iterable type array\.$#'

@@ -26,6 +26,7 @@ use App\Http\Controllers\Web\CommodityController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DemandController;
 use App\Http\Controllers\Web\DriverFleetController;
+use App\Http\Controllers\Web\DriverPromptController;
 use App\Http\Controllers\Web\EmployerRequestController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\GuideController;
@@ -44,6 +45,7 @@ use App\Http\Controllers\Web\RoadMapController;
 use App\Http\Controllers\Web\SafetyController;
 use App\Http\Controllers\Web\ShopController;
 use App\Http\Controllers\Web\TripBoardController;
+use App\Http\Controllers\Web\TripTemplateController;
 use App\Http\Controllers\Web\VerificationController;
 use App\Http\Controllers\Web\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -163,6 +165,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/{asset}/faults', [DriverFleetController::class, 'storeFault'])->name('faults');
     });
 
+    // Driver trip templates (guide §11) — save a commute once, one-tap republish.
+    Route::prefix('templates')->name('templates.')->group(function () {
+        Route::get('/', [TripTemplateController::class, 'index'])->name('index');
+        Route::post('/', [TripTemplateController::class, 'store'])->name('store');
+        Route::post('/{template}/publish', [TripTemplateController::class, 'publish'])->name('publish');
+        Route::post('/{template}/publish-week', [TripTemplateController::class, 'publishWeek'])->name('publish-week');
+        Route::delete('/{template}', [TripTemplateController::class, 'destroy'])->name('destroy');
+    });
+
+    // Driver demand prompts (gallery "service planning" Phase 3) — accept/dismiss.
+    Route::prefix('prompts')->name('prompts.')->group(function () {
+        Route::post('/{prompt}/accept', [DriverPromptController::class, 'accept'])->name('accept');
+        Route::post('/{prompt}/dismiss', [DriverPromptController::class, 'dismiss'])->name('dismiss');
+    });
+
     Route::prefix('receipts')->name('receipts.')->group(function () {
         Route::get('/booking/{booking}', [ReceiptController::class, 'booking'])->name('booking');
         Route::get('/earnings/{booking}', [ReceiptController::class, 'earnings'])->name('earnings');
@@ -227,6 +244,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/business/export/subsidy', [BusinessController::class, 'exportSubsidy'])->name('business.export.subsidy');
 
         Route::get('/ops/demand', [OpsController::class, 'index'])->name('ops.demand');
+        Route::post('/ops/demand/nudge', [OpsController::class, 'nudge'])->name('ops.nudge');
 
         Route::get('/fleet', [FleetController::class, 'index'])->name('fleet.index');
         Route::post('/fleet/{asset}/inspect', [FleetController::class, 'recordInspection'])->name('fleet.inspect');

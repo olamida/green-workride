@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-07 (v0.26.0 — Matching Intelligence + Demand-Supply Signal + Soft Reservations)
+> Last updated: 2026-08-08 (v0.27.0 — Driver Trip Templates + Demand Prompts + week-horizon fix)
 
 ---
 
@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / … v0.26.0 — Matching Intelligence + Demand-Supply Signal + Soft Reservations)
+## 2. Current Status (Phase: Foundation / … v0.27.0 — Driver Trip Templates + Demand Prompts + week-horizon fix)
 
 | Area | Status |
 |------|--------|
@@ -69,6 +69,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Tests | ✅ 523 feature tests passing (… + FcmPushTest: push-token API gate/register/idempotent/invalid-platform/forget/auth-required, FcmService once-per-device + disabled no-op, arrival nudge within-radius + idempotent, outside-radius skip, non-active-trip skip, cancelled-booking skip) |
 | Feature modules | ✅ v0.26.0 complete — Matching Intelligence + Demand-Supply Signal + Soft Reservations. P1: weighted 0-100 match score (`score_weights`: proximity 40 / timing 25 / rating 15 / verification 10 / seat-fill 10) + readable `score_reasons` on board/API/live corridor chips (`TripMatchingService::scoreTrip()`, feeds `upcoming()` ordering; proximity only applies when a pickup point is known). P2: `DemandService::hotspots()` fuses 24h junction counts + pending rider check-ins (1 km attribution) into per-junction tallies — board "How to book" strip + `/trips` + `/go` empty states list top junctions; Level 1+ riders get a "Be the driver" CTA pre-selecting the corridor, phone-only riders see a matching message instead of a 403. P3: Soft reservations — `BookingStatus::SoftHold` + `bookings.soft_hold_expires_at`, `BookingService::softHold()` (mirrors `book()`'s atomic trip lock / wallet hold / employer coverage / seat decrement; ride-credit excluded; 3-min `ttl_minutes`), `confirmSoftHold()` (under row lock, expired holds rejected), `releaseExpiredSoftHolds()` + `ReleaseExpiredSoftHoldsJob` (every minute: refund via `WalletService::releaseHold`, seat back, trip-interest revert, `TripSeatsUpdated`); web + API controllers/routes, hold form on `trips/show`, confirm/countdown in My Rides; feature-gated `FEATURE_SOFT_HOLD` (off by default) |
 | Tests | ✅ 548 feature tests passing (… + matching score: scored trips + reasons on board/API, proximity-only-with-pickup + DemandHotspotsTest (8): strip hotspot, CTA gating driver vs phone-only, empty-state CTA + corridor route, /go hotspot, create prefill/fallback/invalid query + SoftHoldTest (15): feature-gate on/off, wallet hold + seat decrement + `soft_hold_expires_at`, duplicate rejected, own-trip rejected, ride-credit rejected, cash/subsidy no-hold, full-trip rejected (web session errors + API 422), confirm confirmed + seat stays reserved, expiry rejected, expired-hold release refunds + frees seat + reverts interest + broadcasts, unexpired skipped, disabled skipped, web + API payload/status) |
+| Feature modules | ✅ v0.27.0 complete — Driver trip templates (guide §11 driver tooling) + demand-driven driver prompts (gallery "service planning" Phase 3). Templates: `trip_templates` table (corridor/time/vehicle/seats/waypoints/days, `is_active`, `times_used`), `TripTemplateService` (`store`, `forDriver`, `saveFromTrip` — "save this commute" from a just-published trip, `publish` one-tap, `publishWeek` repeat-group week, `assertOwner`), `TripTemplate::nextDeparture` (today-or-tomorrow run day), `TripTemplateController` (index/store/publish/publish-week/destroy, gated `FEATURE_TRIP_TEMPLATES`), rider `templates/index` page + "Saved commutes" chips on `trips/create` + "Save this trip as a template" checkbox + profile-menu link. Prompts: `driver_prompts` table (unique per-driver-day-corridor `reference` = schema-enforced 1-push/day limit), `DriverPromptService` (`demandForCorridor` pending check-ins → nearest junction within 1 km, `supplyForCorridor` seats in window, `triggersFor` demand ≥ min_passengers AND supply < demand/divisor, `qualifiedDrivers` affinity-first, `promptForCorridor` idempotent create + `DriverDemandPrompt` notification, `nudgeAll`, `activeFor`), `CalculateDriverPromptsJob` (every 30 min, gated `FEATURE_DRIVER_PROMPTS`), `DriverPromptController` accept/dismiss (accept → publish form pre-selected corridor), board "Demand wants you" panel, Control Tower `admin.ops.nudge` button, `TripService::publish` gained optional `?int $repeatHorizonDays` threaded into `publishRepeatCompanions` |
+| Tests | ✅ 576 feature tests passing (… + DriverToolingTest (28): template CRUD + ownership, save-from-trip, one-tap publish uses fixed fare, publish-week materialises Mon-Fri repeat group, no-upcoming-run-day rejection, paused-template rejection, prompt trigger math + affinity + idempotent per-driver-day-corridor + supply-covers-demand no-op + accept/dismiss + admin nudge + board panel render) |
 
 ## 3. Environment
 
@@ -1133,6 +1135,136 @@ tracker §2 rows D–F marked done, session log updated · `v0.26.0` tagged + pu
 
 ---
 
+### 4.38 v0.27.0 — Driver Trip Templates + Demand-Driven Driver Prompts (COMPLETE)
+
+Adopted from the tracker §3 deferred backlog (itself from `input section.txt` "driver trip templates" +
+the gallery "service planning" Phase 3 demand→supply nudges): a driver saves a recurring commute once
+and republishes it with one tap; and when live demand outstrips supply on a corridor, qualified drivers
+are nudged to publish. Both extend existing systems — templates route through `TripService::publish`
+(fixed anti-surge fares + atomic seat lock intact), prompts reuse the `demand_requests`/`junctions`
+signal already feeding `DemandService::hotspots()`.
+
+**Schema (2 migrations):**
+- `2026_08_07_150000_create_trip_templates_table` — `driver_id` FK cascade, `name`, `corridor` (20),
+  `route_name`/`origin_text`/`destination_text` (255, nullable), `departure_time` (5), `days` json,
+  `vehicle_id` FK nullOnDelete, `total_seats` (default 4), `fare_per_seat` decimal(15,2) nullable (display
+  only — the published trip always carries `PricingService`'s fare), `is_free_volunteer`, `women_only`,
+  `waypoints` json, `is_active`, `times_used` (default 0), `last_used_at`; indexes `driver_id` and
+  `[driver_id, is_active]`.
+- `2026_08_07_150001_create_driver_prompts_table` — `driver_id` FK cascade, `corridor` (20),
+  `people_count` (default 0), `time_band` (30), `status` (default `prompted`), **`reference` unique**
+  (`PROMPT-{driverId}-{Ymd}-{corridor}` — the schema-enforced 1-push-per-driver-per-day-per-corridor
+  rate limit), `notified_at`, `accepted_at`; indexes `driver_id`, `[driver_id, status]`,
+  `[status, created_at]`.
+
+**Enums + models:**
+- `DriverPromptStatus` (`Prompted`/`Accepted`/`Dismissed` + `label()`).
+- `TripTemplate` — `HasFactory`; casts (`corridor` enum, `days`/`waypoints` array, `departure_time`
+  string, decimals/booleans/datetime); `driver()`/`vehicle()` relations; `corridorLabel()`,
+  `routeTitle()` ("Origin → Destination" with corridor fallback), `daysLabel()` ("Mon–Fri" /
+  "Weekends" / "Every day" / "·"-joined), `runsOn(date)` (empty list = every day), **`nextDeparture()`
+  narrowed to today-or-tomorrow** (today's time if ahead and a run day, else tomorrow; null otherwise —
+  next-week runs use "publish this week"), `markUsed(at)`.
+- `DriverPrompt` — casts (`corridor` enum, `people_count` int, `status` enum, datetimes); `driver()`;
+  idempotent `accept()`/`dismiss()` (status flip + `accepted_at`).
+
+**Services:**
+- `TripTemplateService` (constructor-injected `TripService`) — `store()` (corridor/name default, empty
+  `days` allowed), `forDriver()` (owner's templates, active-first, `last_used_at` desc), **`saveFromTrip()`
+  — "save this commute": `updateOrCreate` on `[driver_id, route_name]` from a just-published trip**,
+  `publish()` one-tap (→ `publishFromTemplate`, `markUsed`), **`publishWeek()`** (repeat-group week:
+  primary = `nextDeparture()`, horizon = `min(config('trip_templates.horizon_days', 14),
+  max(0, 7 - primary->dayOfWeek))` so it never bleeds into next week, returns count of `Trip` rows in the
+  repeat group), `destroy()` + `assertOwner()` (ValidationException "Only the template owner can do this.").
+  `publishFromTemplate()` gates `is_active`, missing run day, and blank origin/destination, then calls
+  `TripService::publish($driver, $data, $horizonDays)` — `fare_per_seat`/`total_seats` are pre-fill hints
+  never trusted.
+- `DriverPromptService` (`GeofenceService` + `NotificationService`) — `referenceFor()`;
+  `qualifiedDrivers()` (verified L3, not banned, no active trip; corridor-affinity first — completed a
+  trip on this corridor within `affinity_days`, fallback any verified idle driver, limit 5);
+  `demandForCorridor()` (pending check-ins in `window_hours` attributed to nearest junction within 1 km,
+  grouped by junction corridor — mirrors `DemandService::hotspots()` attribution);
+  `supplyForCorridor()` (sum `available_seats` on scheduled/active trips in `supply_window_hours`);
+  `triggersFor()` (demand ≥ `min_passengers` AND supply < demand / `supply_divisor`);
+  `promptForCorridor()` — **gates on `triggersFor()` (no-op when supply covers demand)**, then
+  `updateOrCreate` per qualified driver keyed on reference; newly created rows stamp `notified_at` + send
+  `DriverDemandPrompt`; `nudgeAll()` (per-corridor demand/supply/prompted summary — the Control Tower
+  button); `activeFor()` (driver's last 24 h prompts, limit 5 — the board panel).
+
+**Job + schedule:** `CalculateDriverPromptsJob` (ShouldQueue; no-ops when feature off) registered
+`->everyThirtyMinutes()->when(fn () => config('workride.driver_prompts.enabled'))` in `routes/console.php`.
+
+**`TripService::publish` change:** the signature gained `?int $repeatHorizonDays = null` threaded into
+`publishRepeatCompanions()` (defaults to `config('workride.scheduling.repeat_horizon_days', 14)`) so
+template publish-week can cap the repeat companion window per call.
+
+**Controllers + routes:**
+- `Web\TripTemplateController` (gated `FEATURE_TRIP_TEMPLATES`, on by default) — `index` (off-notice when
+  disabled), `store`, `publish` (+ `assertOwner`), `publishWeek` (+ `assertOwner`), `destroy`; routes
+  `templates.*` in the auth group.
+- `Web\DriverPromptController` — `accept` (owner-only, redirects to `trips.create` pre-selected to the
+  prompt's corridor) / `dismiss` (owner-only); routes `prompts.*`.
+- `Admin\OpsController::nudge()` — "Nudge drivers now" button → `nudgeAll()`, flash "Nudged N drivers
+  across M corridor(s)" or "No corridor triggered the demand threshold right now"; route
+  `admin.ops.nudge`.
+- `TripBoardController` now injects `TripTemplateService` + `DriverPromptService`: `index()` passes
+  `$driverPrompts` (board "Demand wants you" panel), `create()` passes `$templates` (Saved commutes
+  chips) and `store()` honours `save_template`/`template_name` (→ `saveFromTrip`).
+
+**Views:**
+- `templates/index.blade.php` — "My commutes": new-commute form (name/corridor/departure/seats/origin/
+  destination/runs-on checkboxes/free-volunteer), template cards (`data-template-card`, corridor/free/
+  women-only/paused badges, route title, fixed-fare display, departure · daysLabel · seats · vehicle ·
+  times_used, "Publish today" / "Publish this week" / Delete, next-run line), feature-off notice + empty
+  state.
+- `trips/board.blade.php` — "Demand wants you" panel (gold, live-pulse badge, first 2 open prompts,
+  "Publish on this corridor →" / "Not today") for verified drivers when prompts are enabled + open.
+- `trips/create.blade.php` — "Saved commutes" chips (one-tap publish) + "Save this trip as a template"
+  checkbox under the publish button.
+- `components/profile-menu.blade.php` — "My commutes" link (gated).
+- `admin/ops/demand.blade.php` — demand→supply nudge card (gated on `$promptEnabled`) with the Nudge
+  button.
+
+**Config (`.env.example` documented):** `workride.trip_templates.*` (`enabled` = `FEATURE_TRIP_TEMPLATES`
+default true, `horizon_days` = `WORKRIDE_TRIP_TEMPLATE_HORIZON_DAYS` 14) and
+`workride.driver_prompts.*` (`enabled` = `FEATURE_DRIVER_PROMPTS` default false, `window_hours` 2,
+`min_passengers` 10, `supply_divisor` 3, `supply_window_hours` 3, `affinity_days` 14, `prompt_limit` 5).
+
+**Bugs found & fixed during hardening (DriverToolingTest failures):**
+- `nextDeparture()` looked 8 days out, so the "no upcoming run day" rejection never fired for a
+  Saturday-only template checked on Monday (it found next Saturday) — narrowed to today-or-tomorrow
+  (guide §11's "publish for the next run" is a near-term tap; next week goes through publish-week).
+- `publish()`/`publishWeek()` lacked ownership checks — a signed-in driver could republish another
+  driver's template. Added `TripTemplateService::assertOwner()` (ValidationException) called from both
+  controller actions (the API/`destroy` path already used it).
+- `publishWeek()` let a Monday-published week bleed 7+ days past the config horizon and could leap into
+  the following week — horizon is now capped at `min(horizon_days, 7 - dayOfWeek)` so a Monday publish
+  materialises Mon–Fri at most.
+- `promptForCorridor()` created prompts even when supply covered demand (the trigger math lives in
+  `triggersFor()` but the create loop never consulted it) — gated the whole loop on `triggersFor()`;
+  `nudgeAll()` likewise only prompts triggering corridors.
+- The supply-covers-demand test set `Carbon::setTestNow('2026-08-03 07:00:00')` *after* building the trip,
+  so `departure_time`/`available_seats` fell outside the supply window and the test's expectation was
+  wrong — moved `setTestNow` before trip creation.
+- PHPStan L8: baseline regenerated per the §4.30 ritual (+156 entries, all the documented Eloquent-
+  inference classes: enum-cast `identical.alwaysFalse`, `property.nonObject` on `first()`, `argument.type`
+  on `$request->user()` into service `User` params, `missingType.iterableValue`). No new errors masked.
+
+**Tests (`tests/Feature/DriverToolingTest.php`, 28 new — 576 total, 1886 assertions):** template CRUD +
+ownership (store renders card, destroy foreign-template 403), save-from-trip one-tap republish uses the
+fixed `PricingService` fare (not the stored hint), publish-week materialises the Mon–Fri repeat group with
+`repeat_group` count, no-upcoming-run-day rejection (narrowed `nextDeparture`), paused-template rejection,
+prompt trigger math (demand ≥ min AND supply < demand/divisor), corridor-affinity qualification first,
+idempotent per-driver-day-corridor reference (re-run never double-nudges), supply-covers-demand no-op,
+accept → publish form pre-selected corridor + Dismissed, admin nudge button, board "Demand wants you" panel
+render + omission.
+
+**DoD:** `pint --test` clean · PHPStan L8 gate green (baseline regenerated; genuine bugs fixed in code) ·
+`npm run build` clean · `php artisan test` green (**576 / 1886**) · tracker §3 v0.27.0 rows marked done ·
+`v0.27.0` tagged + pushed per guide §19.
+
+---
+
 ## 5. Issues Resolved
 
 ### Feature tests returning 404 on `/`
@@ -1365,6 +1497,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Recurring Supply Backbone | `bus_schedules` + `SchedulingService` (idempotent materialise, next-departures merge) + nightly job + admin Schedule Control Tower + board "Next departures" panel | ✅ Complete (v0.24.0) |
 | FCM Push | `device_tokens` + `FcmService` + `NotificationService` (`toFcm()`) + `UserArrivedAtPickup` 500m nudge + push-token API + PWA SW push handlers (roadmap P3.2) | ✅ Complete (v0.25.0) |
 | Matching Intelligence + Demand-Supply Signal + Soft Reservations | Weighted 0-100 match score + reasons on board/API · demand hotspots + "Be the driver" CTA · soft reservations (`BookingStatus::SoftHold`, 3-min hold, `ReleaseExpiredSoftHoldsJob`) gated `FEATURE_SOFT_HOLD` | ✅ Complete (v0.26.0) |
+| Driver Trip Templates + Demand-Driven Driver Prompts | Driver trip templates (save a commute once, one-tap republish, publish-week repeat group; gated `FEATURE_TRIP_TEMPLATES`) · demand prompts ("N people want corridor X" → qualified drivers nudged when demand outstrips supply; gated `FEATURE_DRIVER_PROMPTS`) | ✅ Complete (v0.27.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -1383,6 +1516,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 14. ✅ DONE — Recurring supply backbone (see §4.35) — `bus_schedules` + `SchedulingService` + nightly job + admin Schedule Control Tower + board "Next departures" panel; remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 15. ✅ DONE — FCM push (see §4.36) — `device_tokens` + `FcmService` + `NotificationService` + `UserArrivedAtPickup` nudge + push-token API + PWA SW push handlers; roadmap P3.2 marked done (P3 backlog empty); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 16. ✅ DONE — v0.26.0 (see §4.37) — weighted matching score + reasons, demand hotspots + "Be the driver" CTA, soft reservations (`FEATURE_SOFT_HOLD`, 3-min hold + `ReleaseExpiredSoftHoldsJob`); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2); next: v0.27.0 driver trip templates + driver prompts (tracker §3)
+17. ✅ DONE — v0.27.0 (see §4.38) — driver trip templates (one-tap republish, publish-week repeat group, gated `FEATURE_TRIP_TEMPLATES`) + demand-driven driver prompts (qualified drivers nudged when demand outstrips supply, gated `FEATURE_DRIVER_PROMPTS`); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -1421,6 +1555,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.24.0` | Recurring Supply Backbone (guide §6 Workflow 5) | `bus_schedules` table + `BusSchedule` model (Citymapper-style "every 15 min Mon–Fri 06:30–09:00", days-of-week JSON, pause/resume) · `SchedulingService` — `materializeDay` (idempotent `SCHED-{id}-{Y-m-d}-{Hi}` ref, skips past/paused/off-weekday/off-feature, GTFS regen on new slots), `nextDepartures` (materialised trips + un-materialised slots deduped by `schedule_id|Y-m-d H:i`, corridor + limit), `departuresBetween` · `GenerateRecurringTripsJob` nightly 05:00 (today + tomorrow) · admin `ScheduleController` CRUD + pause/resume + manual materialise (portable `CASE` ordering — SQLite-safe) + `/admin/schedules` + sidebar · board "Next departures / Guaranteed recurring slots" panel via `TripBoardController::index()` → `$nextDepartures` · `GtfsRouteFactory` + `BusScheduleFactory` · PHPStan baseline regenerated (Eloquent inference noise only; unused `GeofenceService` dep removed, impossible `?array` returns typed out, `@param array<string,mixed>` added) | 512 (1675) | 2026-08-07 |
 | `v0.25.0` | FCM Push (roadmap P3.2) | `device_tokens` + `bookings.arrival_notified_at` · `DeviceToken` + `User::deviceTokens()` · `FcmService` (legacy HTTP send, feature-gated `FEATURE_PUSH`) · `NotificationService` (any notification's `toFcm()` → FCM) · `UserArrivedAtPickup` broadcast (private `trip.{id}`) + `UserArrivedAtPickupNotification` (database + log + FCM) · `TripService::notifyArrivingPassengers()` from `updateLocation` (idempotent `arrival_notified_at`, `push.arrived_radius_m` 500) · `POST/DELETE /api/v1/push/tokens` · PWA SW `push`/`notificationclick` deep-link → `/trips/{id}` · `.env.example` keys · PHPStan baseline regenerated (single-element `in_array` → `!==` guard; 4 stale `updateLocation` ignores dropped) | 523 (1701) | 2026-08-07 |
 | `v0.26.0` | Matching Intelligence + Demand-Supply Signal + Soft Reservations | P1 weighted 0-100 match score (`score_weights` proximity 40 / timing 25 / rating 15 / verification 10 / seat-fill 10) + readable `score_reasons` on board/API/live corridor chips (`scoreTrip()` feeds `upcoming()`, proximity only with a pickup point) · P2 `DemandService::hotspots()` (24h junction counts + pending check-ins, 1 km attribution) on board strip + `/trips`/`/go` empty states + "Be the driver" CTA (Level 1+, pre-selects corridor; phone-only riders get a wait message) · P3 soft reservations gated `FEATURE_SOFT_HOLD` — `BookingStatus::SoftHold` + `bookings.soft_hold_expires_at`, `BookingService::softHold()` (atomic lock + wallet hold + employer coverage + seat decrement, ride-credit excluded, 3-min hold) / `confirmSoftHold()` (row-locked) / `releaseExpiredSoftHolds()` + `ReleaseExpiredSoftHoldsJob` (every minute: refund via `WalletService::releaseHold`, seat back, interest revert, live `TripSeatsUpdated`), web + API routes, hold form + confirm/countdown UI · PHPStan baseline regenerated (controller return types + `?->canBook()` fixed in code) | 548 (1800) | 2026-08-07 |
+| `v0.27.0` | Driver Trip Templates + Demand-Driven Driver Prompts | Driver trip templates (guide §11, gated `FEATURE_TRIP_TEMPLATES` on by default): `trip_templates` table + `TripTemplate`/`TripTemplateService` (`store`/`forDriver`/`saveFromTrip` "save this commute"/`publish` one-tap/`publishWeek` repeat-group week/`assertOwner`; `nextDeparture()` narrowed to today-or-tomorrow; publish still routes through `TripService::publish` so fixed fares + seat lock hold) + rider `templates/index` page + "Saved commutes" chips on `trips/create` + save-checkbox + profile-menu link · Demand-driven driver prompts (gallery "service planning" Phase 3, gated `FEATURE_DRIVER_PROMPTS` off by default): `driver_prompts` table (unique `PROMPT-{driver}-{Ymd}-{corridor}` reference = 1-push/driver/day/corridor) + `DriverPrompt`/`DriverPromptService` (`demandForCorridor` nearest-junction attribution / `supplyForCorridor` / `triggersFor` demand ≥ min AND supply < demand/divisor / `qualifiedDrivers` affinity-first / `promptForCorridor` gated on triggers / `nudgeAll` / `activeFor`) + `CalculateDriverPromptsJob` (every 30 min) + accept/dismiss controller + board "Demand wants you" panel + Control Tower `admin.ops.nudge` · `TripService::publish` gained `?int $repeatHorizonDays` · PHPStan baseline regenerated (+156 entries; 5 genuine hardening bugs fixed in code — assertOwner, nextDeparture narrow, week-scoped horizon, prompt trigger gate, test time-move) | 576 (1886) | 2026-08-08 |
 
 ---
 

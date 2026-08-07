@@ -9,10 +9,12 @@ use App\Http\Controllers\Controller;
 use App\Models\DriverScore;
 use App\Models\Trip;
 use App\Services\DemandService;
+use App\Services\DriverPromptService;
 use App\Services\RatingService;
 use App\Services\SchedulingService;
 use App\Services\TripMatchingService;
 use App\Services\TripService;
+use App\Services\TripTemplateService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +24,8 @@ class TripBoardController extends Controller
     public function __construct(
         private TripService $trips,
         private RatingService $ratings,
+        private TripTemplateService $templates,
+        private DriverPromptService $prompts,
     ) {}
 
     public function index(Request $request, TripMatchingService $matcher, DemandService $demand, SchedulingService $scheduling)
@@ -61,7 +65,11 @@ class TripBoardController extends Controller
         // trips merged with the closest unmaterialised schedule slots.
         $nextDepartures = $scheduling->nextDepartures($corridor, 6);
 
-        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'hotspots', 'nextTrip', 'corridorLive', 'corridorStats', 'nextDepartures'));
+        // Demand-supply signal for drivers (gallery "service planning" Phase 3):
+        // open prompts tell a verified driver which corridor Ops wants supply on.
+        $driverPrompts = $this->prompts->activeFor($request->user());
+
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'hotspots', 'nextTrip', 'corridorLive', 'corridorStats', 'nextDepartures', 'driverPrompts'));
     }
 
     public function create(Request $request)
@@ -76,6 +84,10 @@ class TripBoardController extends Controller
         // "Be the driver" CTA pre-fills the corridor from the demand hotspot.
         $preselectedCorridor = Corridor::tryFrom((string) $request->query('corridor', '')) ?? Corridor::KubwaCbd;
 
+        // Saved one-tap commutes (guide §11): republish without re-typing the
+        // route. Also shown as "save this trip as a template" after publishing.
+        $templates = $this->templates->forDriver($user);
+
         // Fleet gate preview: the driver's single assigned asset + today's
         // inspection status so they know whether publishing is blocked.
         $asset = null;
@@ -89,7 +101,7 @@ class TripBoardController extends Controller
                 : null;
         }
 
-        return view('trips.create', compact('vehicles', 'corridors', 'asset', 'todayInspection', 'preselectedCorridor'));
+        return view('trips.create', compact('vehicles', 'corridors', 'asset', 'todayInspection', 'preselectedCorridor', 'templates'));
     }
 
     public function store(Request $request)
@@ -109,6 +121,12 @@ class TripBoardController extends Controller
             $trip = $this->trips->publish($user, $data);
         } catch (ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();
+        }
+
+        // "Save this commute" — persist the route as a one-tap template so the
+        // same trip can be republished tomorrow without re-typing anything.
+        if ($request->boolean('save_template')) {
+            $this->templates->saveFromTrip($trip, (string) $request->input('template_name', ''));
         }
 
         return redirect()->route('trips.show', $trip)
@@ -272,6 +290,8 @@ class TripBoardController extends Controller
             'waypoints.*.label' => ['required_with:waypoints', 'string', 'max:255'],
             'waypoints.*.lat' => ['required_with:waypoints', 'numeric', 'between:-90,90'],
             'waypoints.*.lng' => ['required_with:waypoints', 'numeric', 'between:-180,180'],
+            'save_template' => ['sometimes', 'boolean'],
+            'template_name' => ['nullable', 'string', 'max:120'],
         ];
     }
 }
