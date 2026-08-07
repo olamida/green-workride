@@ -4,7 +4,7 @@
 > stalls, the next session reads ONLY this file to resume: current work package,
 > exact status of every activity, the merged plan, and the next action.
 > Companion to `DEVELOPMENT-LOG.md` (permanent history) and `WORKRIDE-ROADMAP.md` (gaps).
-> Last updated: 2026-08-07 — Session: **v0.26.0 Matching Intelligence + Demand-Supply Signal**
+> Last updated: 2026-08-08 — Session: **v0.27.0 Driver Trip Templates + Demand Prompts**
 
 ---
 
@@ -56,7 +56,6 @@ Deferred to `v0.27.0` (tracked below, not this pass): driver trip templates + dr
 ## 2. Current Work Package — v0.26.0 (session 2026-08-07)
 
 > State legend: `[ ]` pending · `[~]` in progress · `[x]` done · `[!]` blocked
-
 | Activity | Status | Gate ("done when") |
 |----------|--------|--------------------|
 | A. Fix `Unknown column schedule_ref` 500 on live MySQL | `[x]` | `php artisan migrate --force` applied 5 pending migrations; tinker query on `trips` runs without error |
@@ -67,7 +66,7 @@ Deferred to `v0.27.0` (tracked below, not this pass): driver trip templates + dr
 | F. **P3 Soft reservations** | `[x]` | `BookingStatus::SoftHold`; `BookingService::softHold()`; `ReleaseExpiredSoftHoldsJob` (feature-gated `FEATURE_SOFT_HOLD`); tests green |
 | G. DoD + commit + tag | `[x]` | pint → phpstan → test → build all green; one commit per package; `v0.26.0` tag; `DEVELOPMENT-LOG.md` updated |
 
-▶ **NEXT ACTION:** package v0.26.0 is complete — 548 tests / 1800 assertions green, DoD ritual run, `v0.26.0` tagged and pushed per guide §19. Next session: start **v0.27.0** (driver trip templates + driver prompts) from §3.
+▶ **NEXT ACTION:** package v0.26.0 is complete — 548 tests / 1800 assertions green, DoD ritual run, `v0.26.0` tagged and pushed per guide §19. **v0.27.0 is also complete** (see §5.1 — 576 tests / 1886 assertions, tag `v0.27.0` pushed). Next session: work the **gallery-consolidated remaining-task list** (v6.0 matching/polish/offline + service-planning/live-journey + rebrand) per the session's implementation list.
 
 ---
 
@@ -75,7 +74,7 @@ Deferred to `v0.27.0` (tracked below, not this pass): driver trip templates + dr
 
 | Next | Feature | Depends on | Notes |
 |------|---------|-----------|-------|
-| v0.27.0 | Driver trip templates + driver prompts | P1 (score feeds prompt relevance) | `trip_templates` table, reuse `PricingService`; notify driver "N people want corridor X" |
+| v0.27.0 | Driver trip templates + driver prompts | P1 (score feeds prompt relevance) | `trip_templates` table, reuse `PricingService`; notify driver "N people want corridor X" | ✅ DONE 2026-08-08 — see §5 + `DEVELOPMENT-LOG.md` §4.38 |
 | v0.27.0 | `garki_wuse` 4th corridor | enum/pricing/GTFS/filter audit | Only if a 4th corridor is actually approved |
 | later | Junction column upgrade (volume/hub/state/avg-wait) | — | Seed SQL exists in gallery; needs migration |
 | P4 | AR/voice/haptics, insurance, union shares, FERMA MOU | — | roadmap P4 |
@@ -102,3 +101,12 @@ Deferred to `v0.27.0` (tracked below, not this pass): driver trip templates + dr
 - **P3 (this session)** — soft reservations end-to-end: `BookingStatus::SoftHold` + `soft_hold_expires_at` migration, `BookingService::softHold()` (mirrors `book()`'s atomic lock/hold/employer coverage/seat decrement, ride-credit excluded, 3-min `ttl_minutes` hold), `confirmSoftHold()` (under row lock; expired → error), `releaseExpiredSoftHolds()` + `ReleaseExpiredSoftHoldsJob` (every minute, refund via `WalletService::releaseHold`, seat back, interest revert, live `TripSeatsUpdated`); web + API controllers/routes, hold form on `trips/show`, confirm/countdown in My Rides; feature-gated `FEATURE_SOFT_HOLD` (off by default); 15 tests.
 - DoD for P3: `pint --test` clean · PHPStan L8 green (baseline regenerated; controller return types + `?->canBook()` fixed in code) · `npm run build` clean · **548 tests / 1800 assertions green** · `migrate:fresh --seed` ~62s · `gtfs:generate` valid (171 stops, 3 routes, 32 trips).
 - Committed P1/P2/P3 + tag `v0.26.0`, pushed per guide §19. `DEVELOPMENT-LOG.md` updated with §4.37 + version-history row.
+
+## 5.1 Session Log (2026-08-08) — v0.27.0
+
+- Implemented the §3 deferred v0.27.0 package: **driver trip templates** (guide §11 driver tooling) + **demand-driven driver prompts** (gallery "service planning" Phase 3).
+- Templates: `trip_templates` table + `TripTemplate` model (`nextDeparture` today-or-tomorrow, `runsOn`, `daysLabel`, `routeTitle`, `markUsed`, `HasFactory`), `TripTemplateService` (`store`/`forDriver`/`saveFromTrip`/"save this commute"/`publish` one-tap/`publishWeek` repeat-group/`assertOwner`), `TripTemplateController` (index/store/publish/publish-week/destroy), rider `templates/index` page, "Saved commutes" chips + save checkbox on `trips/create`, profile-menu link. Gated `FEATURE_TRIP_TEMPLATES` (on by default).
+- Prompts: `driver_prompts` table (unique `PROMPT-{driver}-{Ymd}-{corridor}` reference = 1-push/day/corridor), `DriverPrompt` model (`accept`/`dismiss`), `DriverPromptService` (`demandForCorridor` nearest-junction attribution, `supplyForCorridor`, `triggersFor` demand ≥ min AND supply < demand/divisor, `qualifiedDrivers` affinity-first, `promptForCorridor` gated on triggers, `nudgeAll`, `activeFor`), `CalculateDriverPromptsJob` (every 30 min), `DriverPromptController` accept/dismiss, board "Demand wants you" panel, Control Tower `admin.ops.nudge`. Gated `FEATURE_DRIVER_PROMPTS` (off by default). `TripService::publish` gained `?int $repeatHorizonDays`.
+- **5 hardening bugs fixed in tests:** `nextDeparture` narrowed to today-or-tomorrow (Sat-only on Monday correctly rejected) · `assertOwner` on publish/publishWeek · publishWeek horizon capped `min(horizon_days, 7-dayOfWeek)` (Monday → Mon-Fri, never bleeds next week) · `promptForCorridor` gated on `triggersFor()` (supply-covers-demand no-op) · test `setTestNow` moved before trip build.
+- DoD: `pint --test` clean · PHPStan L8 green (baseline +156 entries, Eloquent-inference classes only) · `npm run build` clean · **576 tests / 1886 assertions green**.
+- Committed `656423f` + tag `v0.27.0`, pushed to GitHub per guide §19. `DEVELOPMENT-LOG.md` §4.38 + version-history row updated.
