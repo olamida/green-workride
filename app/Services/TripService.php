@@ -13,6 +13,7 @@ use App\Events\TripCompleted;
 use App\Events\TripLocationUpdated;
 use App\Events\TripPublished;
 use App\Events\TripStarted;
+use App\Events\UserArrivedAtPickup;
 use App\Events\WaypointReached;
 use App\Jobs\CalculateImpactJob;
 use App\Jobs\GenerateGtfsFeedJob;
@@ -22,6 +23,7 @@ use App\Models\TripInterest;
 use App\Models\TripWaypoint;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Notifications\UserArrivedAtPickupNotification;
 use App\Notifications\WaypointReachedNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -39,6 +41,7 @@ class TripService
         private FleetService $fleet,
         private StakeholderService $stakeholders,
         private RoutingService $routing,
+        private NotificationService $notifications,
     ) {}
 
     public function publish(User $driver, array $data): Trip
@@ -250,13 +253,70 @@ class TripService
 
         $trip->update(['current_lat' => $lat, 'current_lng' => $lng]);
 
-        $trip = $trip->fresh();
+        $trip->refresh();
 
         $this->markReachedWaypoints($trip);
+
+        $this->notifyArrivingPassengers($trip);
 
         broadcast(new TripLocationUpdated($trip, $this->calculateProgress($trip)));
 
         return $trip;
+    }
+
+    /**
+     * Passenger "500m away" nudges (guide §6 Workflow 1, roadmap P3.2).
+     *
+     * Called on every live location update while the trip is active. For each
+     * confirmed/boarded passenger who has not already been nudged, and whose
+     * pickup point is within workride.push.arrived_radius_m of the driver, we
+     * stamp arrival_notified_at (idempotent), fire the UserArrivedAtPickup
+     * broadcast, and send the arrival notification (database + log, plus FCM
+     * push when configured) through NotificationService.
+     */
+    public function notifyArrivingPassengers(Trip $trip): void
+    {
+        if ($trip->status !== TripStatus::Active) {
+            return;
+        }
+
+        $currentLat = $trip->current_lat;
+        $currentLng = $trip->current_lng;
+
+        if ($currentLat === null || $currentLng === null) {
+            return;
+        }
+
+        $radiusM = (float) config('workride.push.arrived_radius_m', 500);
+
+        $bookings = $trip->bookings()
+            ->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Boarded])
+            ->whereNull('arrival_notified_at')
+            ->whereNotNull('pickup_lat')
+            ->whereNotNull('pickup_lng')
+            ->get();
+
+        foreach ($bookings as $booking) {
+            $distanceM = $this->geofence->haversine(
+                (float) $currentLat,
+                (float) $currentLng,
+                (float) $booking->pickup_lat,
+                (float) $booking->pickup_lng,
+            );
+
+            if ($distanceM > $radiusM) {
+                continue;
+            }
+
+            $booking->update(['arrival_notified_at' => now()]);
+
+            event(new UserArrivedAtPickup($trip->fresh(), $booking->fresh(), $distanceM));
+
+            $this->notifications->send(
+                $booking->passenger,
+                new UserArrivedAtPickupNotification($trip->fresh(), $booking->fresh(), $distanceM),
+            );
+        }
     }
 
     /**

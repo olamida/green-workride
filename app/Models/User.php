@@ -80,6 +80,14 @@ class User extends Authenticatable
         return $this->hasMany(PhoneOtp::class);
     }
 
+    /**
+     * @return HasMany<DeviceToken, $this>
+     */
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function vehicles(): HasMany
     {
         return $this->hasMany(Vehicle::class);

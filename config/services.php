@@ -79,4 +79,11 @@ return [
         'from' => env('TWILIO_FROM'),
     ],
 
+    // FCM push (roadmap P3.2) — legacy HTTP send API. Needs FEATURE_PUSH=true
+    // plus a Firebase Cloud Messaging legacy server key to be active.
+    'fcm' => [
+        'server_key' => env('FCM_SERVER_KEY'),
+        'endpoint' => env('FCM_ENDPOINT', 'https://fcm.googleapis.com/fcm/send'),
+    ],
+
 ];

@@ -100,6 +100,49 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
+
+// FCM push (roadmap P3.2): the "500m away" nudge arrives here even when the
+// tab is closed. payload.data carries trip_id/booking_id so the notification
+// click can deep-link straight to the ride.
+self.addEventListener('push', (event) => {
+    if (!event.data) return;
+
+    let payload;
+    try {
+        payload = event.data.json();
+    } catch (e) {
+        payload = { title: 'WorkRide', body: event.data.text(), data: {} };
+    }
+
+    const options = {
+        body: payload.body || 'Your ride is almost here.',
+        icon: '/pwa/icon-192.png',
+        badge: '/pwa/icon-192.png',
+        data: payload.data || {},
+    };
+
+    event.waitUntil(self.registration.showNotification(payload.title || 'WorkRide', options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const data = event.notification.data || {};
+    const url = data.trip_id ? '/trips/' + data.trip_id : '/go';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            for (const client of windowClients) {
+                if ('focus' in client) {
+                    client.focus();
+                    client.navigate(url);
+                    return;
+                }
+            }
+            return clients.openWindow(url);
+        })
+    );
+});
 JS;
 
         return response($content, 200, [

@@ -6367,12 +6367,6 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
-			message: '#^Method App\\Services\\TripService\:\:updateLocation\(\) should return App\\Models\\Trip but returns App\\Models\\Trip\|null\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Services/TripService.php
-
-		-
 			message: '#^Method App\\Services\\TripService\:\:walkMinutes\(\) never returns null so it can be removed from the return type\.$#'
 			identifier: return.unusedType
 			count: 1
@@ -6397,25 +6391,7 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
-			message: '#^Parameter \#1 \$trip of class App\\Events\\TripLocationUpdated constructor expects App\\Models\\Trip, App\\Models\\Trip\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/TripService.php
-
-		-
 			message: '#^Parameter \#1 \$trip of class App\\Events\\TripPublished constructor expects App\\Models\\Trip, Illuminate\\Database\\Eloquent\\Model given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/TripService.php
-
-		-
-			message: '#^Parameter \#1 \$trip of method App\\Services\\TripService\:\:calculateProgress\(\) expects App\\Models\\Trip, App\\Models\\Trip\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/TripService.php
-
-		-
-			message: '#^Parameter \#1 \$trip of method App\\Services\\TripService\:\:markReachedWaypoints\(\) expects App\\Models\\Trip, App\\Models\\Trip\|null given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Services/TripService.php
@@ -6457,6 +6433,12 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Property App\\Services\\TripService\:\:\$notifications is never read, only written\.$#'
+			identifier: property.onlyWritten
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Property App\\Services\\TripService\:\:\$rideCredits is never read, only written\.$#'
 			identifier: property.onlyWritten
 			count: 1
@@ -6483,7 +6465,7 @@ parameters:
 		-
 			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\TripStatus\:\:Active will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
-			count: 2
+			count: 3
 			path: app/Services/TripService.php
 
 		-
@@ -6513,7 +6495,7 @@ parameters:
 		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
-			count: 3
+			count: 4
 			path: app/Services/TripService.php
 
 		-

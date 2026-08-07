@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-07
+> Last updated: 2026-08-07 (v0.25.0 — FCM push)
 
 ---
 
@@ -65,6 +65,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Feature modules | ✅ Navigation-First Sprint 3 complete — Live junction progress (waypoint `reached_at` auto-stamped on crossing the arrival geofence, `calculateProgress` passed/current/upcoming, `WaypointReached` broadcast + change-control trail) · timing strip (scheduled "Leaves in N min"; active "Next: · ETA · Delayed") · 4-step publish wizard (`progressWizard`) + booking wizard hint · share request (public "Request to join this ride" → Requested booking, no seat/hold, approve holds like a wallet booking, decline is a pure flip) · missing shared `notifications` table created |
 | Feature modules | ✅ Recurring supply backbone complete (guide §6 Workflow 5) — `bus_schedules` table + `BusSchedule` model (Citymapper-style "every 15 min Mon–Fri 06:30–09:00"), `SchedulingService` (`materializeDay` idempotent per `SCHED-{id}-{Y-m-d}-{Hi}` ref, `nextDepartures` board panel merging materialised trips + un-materialised slots deduped by `schedule_id|Y-m-d H:i`, `departuresBetween`, GTFS regen on new slots), `GenerateRecurringTripsJob` nightly 05:00 (today + tomorrow) + manual "Materialise" in the Control Tower, admin `ScheduleController` (CRUD + pause/resume + materialise; portable `CASE` ordering so SQLite tests pass), board "Next departures / Guaranteed recurring slots" panel wired via `TripBoardController::index()` → `$nextDepartures`, `GtfsRouteFactory` + `BusScheduleFactory` |
 | Tests | ✅ 512 feature tests passing (… + scheduling: materialise creates a Trip per slot with 2 waypoints, idempotent re-run, past-slot skip, weekday/paused/feature-off skips, nextDepartures merge/dedupe/corridor filter/disabled, frequency window, null end_time single departure, deterministic reference, admin CRUD/toggle/materialise/destroy + validation, board panel render/omission) |
+| Feature modules | ✅ FCM push complete (roadmap P3.2) — `device_tokens` + `bookings.arrival_notified_at` migrations, `DeviceToken` + `User::deviceTokens`, `FcmService` (legacy HTTP send API, feature-gated `FEATURE_PUSH`), `NotificationService` (routes any notification's `toFcm()` payload through FCM), `UserArrivedAtPickup` event + `UserArrivedAtPickupNotification` (database + log + FCM), `TripService::notifyArrivingPassengers()` fired from `updateLocation` (idempotent `arrival_notified_at` stamp within `push.arrived_radius_m`), `POST/DELETE /api/v1/push/tokens` (`PushTokenController`, 403 when disabled), PWA service worker `push` + `notificationclick` deep-links to the ride — the guide §6 Workflow 1 "500m away" nudge reaches a closed browser |
+| Tests | ✅ 523 feature tests passing (… + FcmPushTest: push-token API gate/register/idempotent/invalid-platform/forget/auth-required, FcmService once-per-device + disabled no-op, arrival nudge within-radius + idempotent, outside-radius skip, non-active-trip skip, cancelled-booking skip) |
 
 ## 3. Environment
 
@@ -999,6 +1001,51 @@ The declarative supply backbone from guide §6 Workflow 5 (Citymapper-style "eve
 
 ---
 
+### 4.36 FCM Push — "500m away" Passenger Nudges on a Closed Browser (COMPLETE)
+
+Closes roadmap P3.2 (the last open Priority-3 guide feature): the §6 Workflow 1 nudge
+("Driver is 500m away — please wait") now reaches a closed browser via Firebase Cloud
+Messaging, layered on the existing private-channel live board. Feature-gated: everything
+no-ops until `FEATURE_PUSH=true` AND a server key is configured.
+
+**Schema (2 migrations):**
+- `create_device_tokens_table` — `user_id` FK cascade, `token` (unique, 500), `platform` (web/android/ios, default web), `last_used_at`; indexed `user_id`. One user may own several endpoints (web + phone).
+- `add_arrival_notified_at_to_bookings_table` — nullable `arrival_notified_at` on `bookings`; the idempotency stamp that stops repeat nudges.
+
+**Model + relation:** `App\Models\DeviceToken` (`PushPlatform` enum cast); `User::deviceTokens()` HasMany.
+
+**`FcmService` (`app/Services/FcmService.php`)** — thin client for the FCM legacy HTTP send API (same defensive pattern as `PaystackService`):
+- `isConfigured()` — `workride.push.enabled` && `services.fcm.server_key` present.
+- `sendToUser(User, title, body, data)` — one POST per owned device token; returns how many accepted. `sendToToken()` treats `success > 0` as accepted.
+- `register()` / `unregister()` — idempotent `updateOrCreate` on `[user_id, token]` (refresh `last_used_at`), delete-forget.
+- Unreachable FCM → synthetic 503 response (never throws); disabled → silent no-op returning 0.
+
+**`NotificationService` (`app/Services/NotificationService.php`)** — the FCM extension point: sends via the notification's declared channels (database + log = the change-control trail) *then*, when push is configured and the notification exposes `toFcm()`, delivers that payload via `FcmService::sendToUser()`. No FcmService sprinkling across flows.
+
+**Event + notification:**
+- `UserArrivedAtPickup` — `ShouldBroadcast` on the existing private `trip.{id}` channel (`isParticipant` already authorized), `broadcastAs('UserArrivedAtPickup')`, payload trip/booking/passenger/distance.
+- `UserArrivedAtPickupNotification` — channels `database` + `log` (title "Your ride is almost here", driver + distance m + trip URL) with a `toFcm()` payload (`trip_id`/`booking_id`/`url` as string data) consumed by `NotificationService`.
+
+**`TripService::notifyArrivingPassengers(Trip)`** — called from `updateLocation()` on every live update while the trip is Active:
+- Queries confirmed/boarded bookings with a pickup point, `arrival_notified_at` null; Haversine distance from the driver ≤ `workride.push.arrived_radius_m` (default 500) fires the nudge.
+- Stamps `arrival_notified_at` (idempotent — second update at the same point never re-nudges), `event(new UserArrivedAtPickup(...))`, then sends the notification through `NotificationService` (database + log + FCM).
+
+**API (`/api/v1`, Sanctum):** `POST /push/tokens` (`token` + optional `platform` via `Rule::enum`, 201) and `DELETE /push/tokens` (`token`, `{ok:true}`); both 403 when push is disabled, 401 unauthenticated.
+
+**PWA service worker (`PwaController::serviceWorker()`):** `push` handler parses `event.data.json()` (fallback text payload), shows the notification with icon/badge; `notificationclick` closes it, focuses an existing window and navigates to `/trips/{trip_id}` (or `/go` when no trip data), else opens the URL.
+
+**Config:** `config/services.php` → `fcm` block (`server_key`, `endpoint` default `https://fcm.googleapis.com/fcm/send`); `config/workride.php` → `push.enabled` (`FEATURE_PUSH`, default false) + `push.arrived_radius_m` (`WORKRIDE_PUSH_ARRIVED_RADIUS_M`, 500); `.env.example` documents the four keys.
+
+**Bugs found & fixed during hardening:**
+- The first full-suite run hit a ViteFonts race: `npm run build` was launched in parallel with `php artisan test`, and the build rewrite of `public/build/manifest.json` mid-run made `AdminTest` 500 on `Unable to locate font CSS file from manifest` — the DoD order is build **before** test (or never in parallel); the re-run was green.
+- PHPStan flagged `TripService::notifyArrivingPassengers()`: the single-element `in_array($trip->status, [TripStatus::Active], true)` was read as `string` (Larastan's enum-cast inference — the §4.35 "enum-cast `identical.alwaysFalse`" class), which made the whole body look unreachable (cascading `property.onlyWritten` on the new `$notifications` dependency). Rewrote the guard as `$trip->status !== TripStatus::Active` (matching `markReachedWaypoints`) and regenerated `phpstan-baseline.neon` per the §4.30 ritual (also dropped the four stale `updateLocation` `Trip|null` ignores that the `$trip->refresh()` refactor had made unmatched).
+
+**Tests (`tests/Feature/FcmPushTest.php`, 11 new — 523 total, 1701 assertions):** push-token API 403-when-disabled / register + idempotent / invalid platform 422 / forget / auth-required; `FcmService` one POST per device + once-per-token payload + disabled no-op; arrival nudge within radius stamps + fires event + sends notification, second update idempotent (assertSentToTimes 1), outside-radius skip, non-active-trip skip, cancelled-booking skip.
+
+**DoD:** `pint --test` clean · `php artisan test` green (523/1701) · `npm run build` clean · PHPStan L8 gate green (baseline regenerated) · roadmap P3.2 marked done (P3 backlog empty).
+
+---
+
 ## 5. Issues Resolved
 
 ### Feature tests returning 404 on `/`
@@ -1232,6 +1279,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 12. ✅ DONE — Navigation-First Sprint 1 + 2 (see §4.32–4.33); next: Sprint 3 — waypoint migration + live progress tracker + wizards + share request (see `WORKRIDE-NAVIGATION-FIRST-MERGED.md` §4)
 13. ✅ DONE — Navigation-First Sprint 3 (see §4.34); next: remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 14. ✅ DONE — Recurring supply backbone (see §4.35) — `bus_schedules` + `SchedulingService` + nightly job + admin Schedule Control Tower + board "Next departures" panel; remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+15. ✅ DONE — FCM push (see §4.36) — `device_tokens` + `FcmService` + `NotificationService` + `UserArrivedAtPickup` nudge + push-token API + PWA SW push handlers; roadmap P3.2 marked done (P3 backlog empty); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -1268,6 +1316,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.22.0` | Navigation-First Sprint 1 + 2 | Destination-first auth landing `/go` ("Where are you going?"): `NavigationService` read-only discovery (45 junctions + workplaces + `RoutingService::geocode` Nominatim free fallback) · web `/go` + API `search|directions|nearby` (`{data: …}`) · hero search (`search.js`, `destination-selected` events) · live corridor chips + never-empty map (`map/common.js` + `navigation.js`) · bottom-sheet ride cards · demand-aware empty state · share referral (`share_code` + `?ref=` session → `bookings.referred_by_user_id` + `booking_referred` audit; driver/self never attributed) · PWA `start_url` → `/go` · header Go + Trips nav · admin grouped sidebar + role switcher + map common + UI primitives | 474 (1546) | 2026-08-06 |
 | `v0.23.0` | Navigation-First Sprint 3 | Live junction progress — `trip_waypoints` timing/geofence columns + idempotent JSON→relational backfill (`eta_minutes`, `is_major_hub`, `distance_from_origin_km`, `geofence_radius_m`, `reached_at`) · `TripService::calculateProgress` passed/current/upcoming + auto `markReachedWaypoints` on location update (`WaypointReached` broadcast + `waypoint_reached` audit trail) · timing strip (Leaves in / Next / ETA / Delayed) · `trips/create` 4-step `progressWizard` + booking wizard hint · share request (public "Request to join this ride" → Requested booking with `share_code`, no seat/hold; approve holds like a wallet booking, decline is a pure flip; `BookingRequested`/`RequestApproved`/`RequestDeclined`/`WaypointReachedNotification` DB+log notifications) · shared `notifications` table created (was missing) · `workride.waypoint.*` config | 489 (1616) | 2026-08-06 |
 | `v0.24.0` | Recurring Supply Backbone (guide §6 Workflow 5) | `bus_schedules` table + `BusSchedule` model (Citymapper-style "every 15 min Mon–Fri 06:30–09:00", days-of-week JSON, pause/resume) · `SchedulingService` — `materializeDay` (idempotent `SCHED-{id}-{Y-m-d}-{Hi}` ref, skips past/paused/off-weekday/off-feature, GTFS regen on new slots), `nextDepartures` (materialised trips + un-materialised slots deduped by `schedule_id|Y-m-d H:i`, corridor + limit), `departuresBetween` · `GenerateRecurringTripsJob` nightly 05:00 (today + tomorrow) · admin `ScheduleController` CRUD + pause/resume + manual materialise (portable `CASE` ordering — SQLite-safe) + `/admin/schedules` + sidebar · board "Next departures / Guaranteed recurring slots" panel via `TripBoardController::index()` → `$nextDepartures` · `GtfsRouteFactory` + `BusScheduleFactory` · PHPStan baseline regenerated (Eloquent inference noise only; unused `GeofenceService` dep removed, impossible `?array` returns typed out, `@param array<string,mixed>` added) | 512 (1675) | 2026-08-07 |
+| `v0.25.0` | FCM Push (roadmap P3.2) | `device_tokens` + `bookings.arrival_notified_at` · `DeviceToken` + `User::deviceTokens()` · `FcmService` (legacy HTTP send, feature-gated `FEATURE_PUSH`) · `NotificationService` (any notification's `toFcm()` → FCM) · `UserArrivedAtPickup` broadcast (private `trip.{id}`) + `UserArrivedAtPickupNotification` (database + log + FCM) · `TripService::notifyArrivingPassengers()` from `updateLocation` (idempotent `arrival_notified_at`, `push.arrived_radius_m` 500) · `POST/DELETE /api/v1/push/tokens` · PWA SW `push`/`notificationclick` deep-link → `/trips/{id}` · `.env.example` keys · PHPStan baseline regenerated (single-element `in_array` → `!==` guard; 4 stale `updateLocation` ignores dropped) | 523 (1701) | 2026-08-07 |
 
 ---
 

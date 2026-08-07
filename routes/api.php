@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\DemandController;
 use App\Http\Controllers\Api\V1\FleetController;
 use App\Http\Controllers\Api\V1\NavigationController;
 use App\Http\Controllers\Api\V1\P2pTransferController;
+use App\Http\Controllers\Api\V1\PushTokenController;
 use App\Http\Controllers\Api\V1\RideCreditController;
 use App\Http\Controllers\Api\V1\RoadSensorController;
 use App\Http\Controllers\Api\V1\SmileWebhookController;
@@ -52,6 +53,10 @@ Route::prefix('v1')->group(function () {
         Route::post('/verifications/tier1', [VerificationController::class, 'tier1']);
         Route::post('/verifications/tier2', [VerificationController::class, 'tier2']);
         Route::post('/verifications/tier3', [VerificationController::class, 'tier3']);
+
+        // FCM device-token registration (roadmap P3.2) — "500m away" nudges.
+        Route::post('/push/tokens', [PushTokenController::class, 'store']);
+        Route::delete('/push/tokens', [PushTokenController::class, 'destroy']);
 
         Route::post('/road-events', [RoadSensorController::class, 'store']);
 

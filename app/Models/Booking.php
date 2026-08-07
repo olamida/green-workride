@@ -27,6 +27,7 @@ class Booking extends Model
         'employer_coverage',
         'employer_id',
         'payment_method',
+        'arrival_notified_at',
     ];
 
     protected function casts(): array
@@ -39,6 +40,7 @@ class Booking extends Model
             'employer_coverage' => EmployerCoverageType::class,
             'status' => BookingStatus::class,
             'payment_method' => PaymentMethod::class,
+            'arrival_notified_at' => 'datetime',
         ];
     }
 

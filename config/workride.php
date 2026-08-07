@@ -345,4 +345,14 @@ return [
         // How far ahead the board's "Next departures" panel looks.
         'lookahead_hours' => env('WORKRIDE_SCHEDULE_LOOKAHEAD_HOURS', 48),
     ],
+
+    // FCM push notifications (roadmap P3.2) — "500m away" passenger nudges.
+    // Off by default: FcmService + NotificationService become silent no-ops
+    // until FEATURE_PUSH=true AND a server key is configured (services.fcm).
+    'push' => [
+        'enabled' => (bool) env('FEATURE_PUSH', false),
+        // Driver within this many metres of a passenger's pickup point fires
+        // UserArrivedAtPickup + the arrival notification.
+        'arrived_radius_m' => env('WORKRIDE_PUSH_ARRIVED_RADIUS_M', 500),
+    ],
 ];
