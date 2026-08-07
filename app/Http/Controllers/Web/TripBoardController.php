@@ -48,6 +48,7 @@ class TripBoardController extends Controller
         // Demand-aware board (section 9B): pending check-ins become the empty
         // state's "N people want this journey" signal + the guide's live strip.
         $demandSnapshot = $demand->demandSnapshot();
+        $hotspots = $demand->hotspots();
         $nextTrip = $trips->first();
 
         // Corridors that are moving right now — pulses the corridor chips.
@@ -60,10 +61,10 @@ class TripBoardController extends Controller
         // trips merged with the closest unmaterialised schedule slots.
         $nextDepartures = $scheduling->nextDepartures($corridor, 6);
 
-        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip', 'corridorLive', 'corridorStats', 'nextDepartures'));
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'hotspots', 'nextTrip', 'corridorLive', 'corridorStats', 'nextDepartures'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $user = auth()->user();
 
@@ -71,6 +72,9 @@ class TripBoardController extends Controller
 
         $vehicles = $user->vehicles()->get();
         $corridors = Corridor::cases();
+
+        // "Be the driver" CTA pre-fills the corridor from the demand hotspot.
+        $preselectedCorridor = Corridor::tryFrom((string) $request->query('corridor', '')) ?? Corridor::KubwaCbd;
 
         // Fleet gate preview: the driver's single assigned asset + today's
         // inspection status so they know whether publishing is blocked.
@@ -85,7 +89,7 @@ class TripBoardController extends Controller
                 : null;
         }
 
-        return view('trips.create', compact('vehicles', 'corridors', 'asset', 'todayInspection'));
+        return view('trips.create', compact('vehicles', 'corridors', 'asset', 'todayInspection', 'preselectedCorridor'));
     }
 
     public function store(Request $request)

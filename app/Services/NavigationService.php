@@ -183,6 +183,7 @@ class NavigationService
                 ->values()
                 ->all(),
             'demand' => $this->demand->demandSnapshot(),
+            'hotspots' => $this->demand->hotspots(),
         ];
     }
 

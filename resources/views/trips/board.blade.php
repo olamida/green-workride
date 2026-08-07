@@ -33,6 +33,15 @@
                     (towards {{ implode(', ', $demandSnapshot['top_destinations']) }})
                 @endif — we’re matching. <a href="{{ route('demand.index') }}" class="font-semibold text-forest-700 underline hover:text-forest-900">Check in</a> so Ops knows where to send a bus.
             </p>
+        @elseif (count($hotspots))
+            <p class="mt-1 text-sm text-forest-800">
+                <strong>Live demand at {{ collect($hotspots)->take(3)->implode('name', ' · ') }}</strong>
+                @if (auth()->user()->canDriveVolunteer())
+                    — <a href="{{ route('trips.create', ['corridor' => $hotspots[0]['corridor'] ?? '']) }}" class="font-semibold text-forest-700 underline hover:text-forest-900">be the driver</a> on that corridor.
+                @else
+                    — we’re matching a driver.
+                @endif
+            </p>
         @endif
         <ol class="mt-3 grid gap-3 text-sm text-ink-700 sm:grid-cols-3">
             <li class="flex gap-3">
@@ -266,6 +275,8 @@
                         @else
                             try another corridor or widen the time window above.
                         @endif
+                    @elseif (count($hotspots))
+                        Verified drivers can turn this demand into rides.
                     @else
                         @if ($window === 'now')
                             Nothing is leaving in the next 30 minutes. Try <a href="{{ route('trips.index', array_filter(['corridor' => $corridor?->value, 'window' => 'any'])) }}" class="font-semibold text-forest-600 hover:underline">Anytime (48h)</a> to plan a seat a day ahead.
@@ -274,6 +285,29 @@
                         @endif
                     @endif
                 </p>
+
+                @if (count($hotspots))
+                    <ul class="mx-auto mt-4 max-w-md space-y-2 text-left">
+                        @foreach (collect($hotspots)->take(3) as $hotspot)
+                            <li class="flex items-center justify-between gap-3 rounded-xl border border-ink-100 bg-forest-50/40 px-4 py-2.5 text-sm">
+                                <span class="min-w-0">
+                                    <span class="block truncate font-semibold text-ink-900">{{ $hotspot['name'] }}</span>
+                                    <span class="block text-xs text-ink-500">
+                                        {{ $hotspot['people'] }} people waiting
+                                        @if ($hotspot['corridor'])
+                                            · {{ $hotspot['corridor'] }}
+                                        @endif
+                                    </span>
+                                </span>
+                                @if (auth()->user()->canDriveVolunteer())
+                                    <a href="{{ route('trips.create', ['corridor' => $hotspot['corridor'] ?? '']) }}" class="shrink-0 rounded-full bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">
+                                        Be the driver →
+                                    </a>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
                 <div class="mt-4 flex flex-wrap items-center justify-center gap-3">
                     @if (auth()->user()->canDriveVolunteer())
                         <a href="{{ route('trips.create') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">

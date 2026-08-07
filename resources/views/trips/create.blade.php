@@ -49,7 +49,7 @@
                   initial: 'corridor',
                   lat: '{{ old('current_lat') }}',
                   lng: '{{ old('current_lng') }}',
-                  corridor: '{{ old('corridor', 'kubwa_cbd') }}',
+                  corridor: '{{ old('corridor', $preselectedCorridor->value) }}',
                   isFreeVolunteer: {{ old('is_free_volunteer') ? 'true' : 'false' }},
                   repeat: {{ old('repeat') ? 'true' : 'false' }},
                   corridorLabels: @json(collect($corridors)->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all()),

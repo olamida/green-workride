@@ -224,6 +224,28 @@
                             The matcher keeps scanning. Check another corridor, or be the first to publish on this route.
                         @endif
                     </p>
+                    @if (count($hotspots ?? []))
+                        <ul class="mx-auto mt-4 max-w-md space-y-2 text-left">
+                            @foreach (collect($hotspots)->take(3) as $hotspot)
+                                <li class="flex items-center justify-between gap-3 rounded-xl border border-ink-100 bg-forest-50/40 px-4 py-2.5 text-sm">
+                                    <span class="min-w-0">
+                                        <span class="block truncate font-semibold text-ink-900">{{ $hotspot['name'] }}</span>
+                                        <span class="block text-xs text-ink-500">
+                                            {{ $hotspot['people'] }} people waiting
+                                            @if ($hotspot['corridor'])
+                                                · {{ $hotspot['corridor'] }}
+                                            @endif
+                                        </span>
+                                    </span>
+                                    @if (auth()->user()->canDriveVolunteer())
+                                        <a href="{{ route('trips.create', ['corridor' => $hotspot['corridor'] ?? '']) }}" class="shrink-0 rounded-full bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">
+                                            Be the driver →
+                                        </a>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                     <div class="mt-4 flex flex-wrap items-center justify-center gap-3">
                         @if (auth()->user()->canDriveVolunteer())
                             <a href="{{ route('trips.create') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">Publish a trip</a>

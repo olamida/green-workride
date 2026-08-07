@@ -225,4 +225,74 @@ class DemandService
     {
         return $this->geofence->haversine($lat1, $lng1, $lat2, $lng2);
     }
+
+    /**
+     * Live demand hotspots (guide §9B): the junctions where people are actually
+     * waiting RIGHT NOW. Two signals fuse into one heatmap — recent manual
+     * junction counts (last 24h) + pending rider check-ins (last 24h) attributed
+     * to the nearest junction within $radiusM. Sorted by total people, capped at
+     * $limit. Drives the board's demand→supply loop: a verified driver sees
+     * "Nyanya Under-Bridge · 14 people · Be the driver".
+     *
+     * @return array<int, array{
+     *     junction_id:int, name:string, corridor:?string, zone:?string,
+     *     lat:?float, lng:?float, people:int, survey_count:int, checkin_count:int
+     * }>
+     */
+    public function hotspots(int $limit = 5, int $radiusM = 1000): array
+    {
+        $junctions = Junction::where('is_active', true)->get();
+
+        // Manual counts recorded in the last 24 hours, summed per junction.
+        $surveyTotals = DemandSurvey::query()
+            ->where('created_at', '>=', now()->subDay())
+            ->selectRaw('junction_id, SUM(count) as total')
+            ->groupBy('junction_id')
+            ->pluck('total', 'junction_id');
+
+        // Pending check-ins in the last 24h, attributed to the nearest junction.
+        $checkins = DemandRequest::query()
+            ->where('status', DemandRequestStatus::Pending)
+            ->where('requested_at', '>=', now()->subDay())
+            ->get();
+
+        $checkinByJunction = [];
+
+        foreach ($checkins as $checkin) {
+            $nearest = $junctions->first(function (Junction $junction) use ($checkin, $radiusM) {
+                if ($junction->lat === null || $junction->lng === null) {
+                    return false;
+                }
+
+                return $this->haversine(
+                    (float) $checkin->pickup_lat,
+                    (float) $checkin->pickup_lng,
+                    (float) $junction->lat,
+                    (float) $junction->lng,
+                ) <= $radiusM;
+            });
+
+            if ($nearest) {
+                $checkinByJunction[$nearest->id] = ($checkinByJunction[$nearest->id] ?? 0) + (int) $checkin->passengers_count;
+            }
+        }
+
+        return $junctions
+            ->map(fn (Junction $junction) => [
+                'junction_id' => $junction->id,
+                'name' => $junction->name,
+                'corridor' => $junction->corridor,
+                'zone' => $junction->zone,
+                'lat' => $junction->lat !== null ? (float) $junction->lat : null,
+                'lng' => $junction->lng !== null ? (float) $junction->lng : null,
+                'people' => (int) ($surveyTotals[$junction->id] ?? 0) + (int) ($checkinByJunction[$junction->id] ?? 0),
+                'survey_count' => (int) ($surveyTotals[$junction->id] ?? 0),
+                'checkin_count' => (int) ($checkinByJunction[$junction->id] ?? 0),
+            ])
+            ->filter(fn (array $hotspot) => $hotspot['people'] > 0)
+            ->sortByDesc('people')
+            ->values()
+            ->take($limit)
+            ->all();
+    }
 }
