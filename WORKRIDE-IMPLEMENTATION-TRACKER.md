@@ -4,7 +4,7 @@
 > stalls, the next session reads ONLY this file to resume: current work package,
 > exact status of every activity, the merged plan, and the next action.
 > Companion to `DEVELOPMENT-LOG.md` (permanent history) and `WORKRIDE-ROADMAP.md` (gaps).
-> Last updated: 2026-08-08 — Session: **v0.27.0 Driver Trip Templates + Demand Prompts**
+> Last updated: 2026-08-08 — Session: **v0.28.0 Junction Intel**
 
 ---
 
@@ -66,7 +66,7 @@ Deferred to `v0.27.0` (tracked below, not this pass): driver trip templates + dr
 | F. **P3 Soft reservations** | `[x]` | `BookingStatus::SoftHold`; `BookingService::softHold()`; `ReleaseExpiredSoftHoldsJob` (feature-gated `FEATURE_SOFT_HOLD`); tests green |
 | G. DoD + commit + tag | `[x]` | pint → phpstan → test → build all green; one commit per package; `v0.26.0` tag; `DEVELOPMENT-LOG.md` updated |
 
-▶ **NEXT ACTION:** package v0.26.0 is complete — 548 tests / 1800 assertions green, DoD ritual run, `v0.26.0` tagged and pushed per guide §19. **v0.27.0 is also complete** (see §5.1 — 576 tests / 1886 assertions, tag `v0.27.0` pushed). Next session: work the **gallery-consolidated remaining-task list** (v6.0 matching/polish/offline + service-planning/live-journey + rebrand) per the session's implementation list.
+▶ **NEXT ACTION:** package v0.28.0 complete — 581 tests / 1907 assertions green, DoD ritual run, `v0.28.0` tagged and pushed per guide §19. Next session: work the **gallery-consolidated remaining-task list** (v6.0 matching/polish/offline + service-planning/live-journey + rebrand) per the session's implementation list.
 
 ---
 
@@ -76,7 +76,7 @@ Deferred to `v0.27.0` (tracked below, not this pass): driver trip templates + dr
 |------|---------|-----------|-------|
 | v0.27.0 | Driver trip templates + driver prompts | P1 (score feeds prompt relevance) | `trip_templates` table, reuse `PricingService`; notify driver "N people want corridor X" | ✅ DONE 2026-08-08 — see §5 + `DEVELOPMENT-LOG.md` §4.38 |
 | v0.27.0 | `garki_wuse` 4th corridor | enum/pricing/GTFS/filter audit | Only if a 4th corridor is actually approved |
-| later | Junction column upgrade (volume/hub/state/avg-wait) | — | Seed SQL exists in gallery; needs migration |
+| later | Junction column upgrade (volume/hub/state/avg-wait) | — | ✅ DONE 2026-08-08 — v0.28.0, see §5.2 |
 | P4 | AR/voice/haptics, insurance, union shares, FERMA MOU | — | roadmap P4 |
 
 ---
@@ -110,3 +110,11 @@ Deferred to `v0.27.0` (tracked below, not this pass): driver trip templates + dr
 - **5 hardening bugs fixed in tests:** `nextDeparture` narrowed to today-or-tomorrow (Sat-only on Monday correctly rejected) · `assertOwner` on publish/publishWeek · publishWeek horizon capped `min(horizon_days, 7-dayOfWeek)` (Monday → Mon-Fri, never bleeds next week) · `promptForCorridor` gated on `triggersFor()` (supply-covers-demand no-op) · test `setTestNow` moved before trip build.
 - DoD: `pint --test` clean · PHPStan L8 green (baseline +156 entries, Eloquent-inference classes only) · `npm run build` clean · **576 tests / 1886 assertions green**.
 - Committed `656423f` + tag `v0.27.0`, pushed to GitHub per guide §19. `DEVELOPMENT-LOG.md` §4.38 + version-history row updated.
+
+## 5.2 Session Log (2026-08-08) — v0.28.0 Junction Intel
+
+- Implemented the §3 "Junction column upgrade" backlog row (gallery `WORKRIDE-45-JUNCTIONS-SEED.sql`, the columns deferred at the v0.26.0 merge): `junctions` gains `passenger_volume_daily`, `is_major_hub`, `state`, `avg_wait_time_mins`.
+- Migration `2026_08_08_120006_add_junction_intel_columns_to_junctions_table.php` · `Junction` model fillables + casts (integer/boolean/integer) · `JunctionSeeder` rewritten to 51 intel-carrying rows (volumes 500–5000, 13 major hubs, FCT/Niger/Nasarawa states, wait 10–35 min) — the authoritative seed, running after `DemoOpsSeeder` so overlaps win.
+- Wired consumers: `NavigationService::search()` falls back to seeded `passenger_volume_daily` when no surveys exist yet (real `totalCounted()` wins once recorded — the "1,500+ daily" search copy now works on a fresh seed); `DemandService::junctionCounts()` returns the intel keys; Control Tower `/admin/ops/demand` junction table gains a **Major hub · ~N min** badge column.
+- Tests: `tests/Feature/JunctionIntelTest.php` (5) — seeder writes intel columns, search seeded-volume fallback, survey totals win, junctionCounts intel keys, admin hub badge renders.
+- DoD: `pint` clean · PHPStan L8 green (baseline unchanged) · `npm run build` clean · **581 tests / 1907 assertions green** · `migrate:fresh --seed` (52 junctions incl. intel) · commit + tag `v0.28.0`, pushed per guide §19. `DEVELOPMENT-LOG.md` §4.39 + version-history row updated.

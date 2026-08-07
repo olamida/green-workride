@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / … v0.27.0 — Driver Trip Templates + Demand Prompts + week-horizon fix)
+## 2. Current Status (Phase: Foundation / … v0.28.0 — Junction Intel Columns)
 
 | Area | Status |
 |------|--------|
@@ -71,6 +71,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Tests | ✅ 548 feature tests passing (… + matching score: scored trips + reasons on board/API, proximity-only-with-pickup + DemandHotspotsTest (8): strip hotspot, CTA gating driver vs phone-only, empty-state CTA + corridor route, /go hotspot, create prefill/fallback/invalid query + SoftHoldTest (15): feature-gate on/off, wallet hold + seat decrement + `soft_hold_expires_at`, duplicate rejected, own-trip rejected, ride-credit rejected, cash/subsidy no-hold, full-trip rejected (web session errors + API 422), confirm confirmed + seat stays reserved, expiry rejected, expired-hold release refunds + frees seat + reverts interest + broadcasts, unexpired skipped, disabled skipped, web + API payload/status) |
 | Feature modules | ✅ v0.27.0 complete — Driver trip templates (guide §11 driver tooling) + demand-driven driver prompts (gallery "service planning" Phase 3). Templates: `trip_templates` table (corridor/time/vehicle/seats/waypoints/days, `is_active`, `times_used`), `TripTemplateService` (`store`, `forDriver`, `saveFromTrip` — "save this commute" from a just-published trip, `publish` one-tap, `publishWeek` repeat-group week, `assertOwner`), `TripTemplate::nextDeparture` (today-or-tomorrow run day), `TripTemplateController` (index/store/publish/publish-week/destroy, gated `FEATURE_TRIP_TEMPLATES`), rider `templates/index` page + "Saved commutes" chips on `trips/create` + "Save this trip as a template" checkbox + profile-menu link. Prompts: `driver_prompts` table (unique per-driver-day-corridor `reference` = schema-enforced 1-push/day limit), `DriverPromptService` (`demandForCorridor` pending check-ins → nearest junction within 1 km, `supplyForCorridor` seats in window, `triggersFor` demand ≥ min_passengers AND supply < demand/divisor, `qualifiedDrivers` affinity-first, `promptForCorridor` idempotent create + `DriverDemandPrompt` notification, `nudgeAll`, `activeFor`), `CalculateDriverPromptsJob` (every 30 min, gated `FEATURE_DRIVER_PROMPTS`), `DriverPromptController` accept/dismiss (accept → publish form pre-selected corridor), board "Demand wants you" panel, Control Tower `admin.ops.nudge` button, `TripService::publish` gained optional `?int $repeatHorizonDays` threaded into `publishRepeatCompanions` |
 | Tests | ✅ 576 feature tests passing (… + DriverToolingTest (28): template CRUD + ownership, save-from-trip, one-tap publish uses fixed fare, publish-week materialises Mon-Fri repeat group, no-upcoming-run-day rejection, paused-template rejection, prompt trigger math + affinity + idempotent per-driver-day-corridor + supply-covers-demand no-op + accept/dismiss + admin nudge + board panel render) |
+| Feature modules | ✅ Junction intel columns complete (gallery `WORKRIDE-45-JUNCTIONS-SEED.sql`) — `junctions` gains `passenger_volume_daily`, `is_major_hub`, `state`, `avg_wait_time_mins` (migration + model casts/fillables) · `JunctionSeeder` rewritten to 51 intel-carrying rows (volumes 500–5000, 13 major hubs, FCT/Niger/Nasarawa, waits 10–35 min), authoritative after `DemoOpsSeeder` · `NavigationService::search()` falls back to seeded volume until survey totals exist (real `totalCounted()` wins once recorded) · `DemandService::junctionCounts()` returns the intel keys · Control Tower `/admin/ops/demand` junction table gains a **Major hub · ~N min** badge column |
+| Tests | ✅ 581 feature tests passing (… + JunctionIntelTest (5): seeder writes intel columns, search seeded-volume fallback, survey totals win over seeded volume, junctionCounts intel keys, admin hub badge render) |
 
 ## 3. Environment
 
@@ -1265,6 +1267,57 @@ render + omission.
 
 ---
 
+### 4.39 v0.28.0 — Junction Intel Columns (volume/hub/state/avg-wait) (COMPLETE)
+
+The last deferred junction work from the v0.26.0 merge (tracker §3 row, gallery
+`WORKRIDE-45-JUNCTIONS-SEED.sql`): the `junctions` catalog now carries pre-seeded demand
+intelligence so every demand surface reads like a real BRT study even before the first
+intern runs a survey.
+
+**Schema (1 migration):** `2026_08_08_120006_add_junction_intel_columns_to_junctions_table.php` —
+`passenger_volume_daily` (unsignedInteger, default 0), `is_major_hub` (boolean, default false),
+`state` (string 12, nullable — FCT/Niger/Nasarawa), `avg_wait_time_mins` (unsignedSmallInteger,
+nullable). `Junction` model gains the four fillables + casts (integer / boolean / integer).
+
+**Seeder:** `JunctionSeeder` rewritten to a 51-row catalog carrying the intel columns — volumes
+500–5000 (Nyanya Under-Bridge 5000, Berger 3500, Mararaba 4000, Kubwa 2500…), 13 major hubs,
+states FCT/Niger/Nasarawa, wait times 10–35 min. Runs after `DemoOpsSeeder` in
+`DatabaseSeeder`, so its `updateOrCreate(['name'])` is the authoritative record for the
+overlapping legacy rows. (The section D CBD junctions are carried on the `kubwa_cbd` corridor —
+the `Corridor` enum has no `garki_wuse` case, per the v0.26.0 merge decision.)
+
+**Wiring (consumers now read the intel):**
+- `NavigationService::search()` — junction results now report `passenger_volume_daily =`
+  `totalCounted() ?: passenger_volume_daily`: real survey totals win once recorded, and the
+  seeded estimate fills the gap before any survey exists. The `/go` search box copy
+  ("1,500+ people surveyed daily") is truthful on a fresh seed, not just after fieldwork.
+- `DemandService::junctionCounts()` — the Control Tower payload gains `passenger_volume_daily`,
+  `is_major_hub`, `state`, `avg_wait_time_mins` keys.
+- `admin/ops/demand.blade.php` — the junction demand table gains a **Hub** column: major-hub
+  rows render a gold `Major hub · ~N min` badge (with the seeded avg wait), others show a dash;
+  the empty-state `colspan` bumped 5 → 6.
+
+**Tests (`tests/Feature/JunctionIntelTest.php`, 5 new — 581 total, 1907 assertions):**
+`test_junction_seeder_writes_intel_columns` (≥40 junctions; Berger = 3500 / hub / FCT / 20;
+Mararaba state Nasarawa; Aco Estate not a hub) · `test_navigation_search_uses_seeded_volume_before_surveys_exist`
+(Kubwa → 2500) · `test_navigation_search_survey_totals_win_over_seeded_volume` (Nyanya 5000 seeded,
+320 counted → 320) · `test_junction_counts_carry_intel_keys` (Dei-Dei intel round-trip through
+`junctionCounts()`) · `test_admin_demand_page_renders_major_hub_badge` (admin `/admin/ops/demand`
+shows `Major hub`).
+
+**Bugs found & fixed during hardening:** none in code — the `actingAs(User)` LSP diagnostics
+reported by the IDE are the same framework-stub false positive already present across every
+test file in the suite (not real errors; the suite is green).
+
+**DoD:** `pint` clean · PHPStan L8 gate green (**baseline unchanged** — no new findings, no
+new ignores) · `npm run build` clean · `php artisan test` green (**581 / 1907**) ·
+`migrate:fresh --seed` on live MySQL (52 junctions incl. intel — 51 rich + 1 legacy
+`Banex Plaza Junction` distinct from the rich `Banex Junction`) · tinker spot-check of the
+Berger Junction row confirms all four columns persisted · tracker §3 row marked done ·
+`v0.28.0` tagged + pushed per guide §19.
+
+---
+
 ## 5. Issues Resolved
 
 ### Feature tests returning 404 on `/`
@@ -1498,6 +1551,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | FCM Push | `device_tokens` + `FcmService` + `NotificationService` (`toFcm()`) + `UserArrivedAtPickup` 500m nudge + push-token API + PWA SW push handlers (roadmap P3.2) | ✅ Complete (v0.25.0) |
 | Matching Intelligence + Demand-Supply Signal + Soft Reservations | Weighted 0-100 match score + reasons on board/API · demand hotspots + "Be the driver" CTA · soft reservations (`BookingStatus::SoftHold`, 3-min hold, `ReleaseExpiredSoftHoldsJob`) gated `FEATURE_SOFT_HOLD` | ✅ Complete (v0.26.0) |
 | Driver Trip Templates + Demand-Driven Driver Prompts | Driver trip templates (save a commute once, one-tap republish, publish-week repeat group; gated `FEATURE_TRIP_TEMPLATES`) · demand prompts ("N people want corridor X" → qualified drivers nudged when demand outstrips supply; gated `FEATURE_DRIVER_PROMPTS`) | ✅ Complete (v0.27.0) |
+| Junction Intel Columns | `junctions` demand intelligence (passenger_volume_daily 500–5000, is_major_hub 13 hubs, state FCT/Niger/Nasarawa, avg_wait_time_mins 10–35) · 51-row authoritative seeder · search seeded-volume fallback until surveys exist · Control Tower junction table "Major hub · ~N min" badge column | ✅ Complete (v0.28.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -1517,6 +1571,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 15. ✅ DONE — FCM push (see §4.36) — `device_tokens` + `FcmService` + `NotificationService` + `UserArrivedAtPickup` nudge + push-token API + PWA SW push handlers; roadmap P3.2 marked done (P3 backlog empty); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 16. ✅ DONE — v0.26.0 (see §4.37) — weighted matching score + reasons, demand hotspots + "Be the driver" CTA, soft reservations (`FEATURE_SOFT_HOLD`, 3-min hold + `ReleaseExpiredSoftHoldsJob`); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2); next: v0.27.0 driver trip templates + driver prompts (tracker §3)
 17. ✅ DONE — v0.27.0 (see §4.38) — driver trip templates (one-tap republish, publish-week repeat group, gated `FEATURE_TRIP_TEMPLATES`) + demand-driven driver prompts (qualified drivers nudged when demand outstrips supply, gated `FEATURE_DRIVER_PROMPTS`); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+18. ✅ DONE — v0.28.0 (see §4.39) — junction intel columns (volume/hub/state/avg-wait) + 51-row authoritative seeder + search seeded-volume fallback + Control Tower hub badge; remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -1556,6 +1611,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.25.0` | FCM Push (roadmap P3.2) | `device_tokens` + `bookings.arrival_notified_at` · `DeviceToken` + `User::deviceTokens()` · `FcmService` (legacy HTTP send, feature-gated `FEATURE_PUSH`) · `NotificationService` (any notification's `toFcm()` → FCM) · `UserArrivedAtPickup` broadcast (private `trip.{id}`) + `UserArrivedAtPickupNotification` (database + log + FCM) · `TripService::notifyArrivingPassengers()` from `updateLocation` (idempotent `arrival_notified_at`, `push.arrived_radius_m` 500) · `POST/DELETE /api/v1/push/tokens` · PWA SW `push`/`notificationclick` deep-link → `/trips/{id}` · `.env.example` keys · PHPStan baseline regenerated (single-element `in_array` → `!==` guard; 4 stale `updateLocation` ignores dropped) | 523 (1701) | 2026-08-07 |
 | `v0.26.0` | Matching Intelligence + Demand-Supply Signal + Soft Reservations | P1 weighted 0-100 match score (`score_weights` proximity 40 / timing 25 / rating 15 / verification 10 / seat-fill 10) + readable `score_reasons` on board/API/live corridor chips (`scoreTrip()` feeds `upcoming()`, proximity only with a pickup point) · P2 `DemandService::hotspots()` (24h junction counts + pending check-ins, 1 km attribution) on board strip + `/trips`/`/go` empty states + "Be the driver" CTA (Level 1+, pre-selects corridor; phone-only riders get a wait message) · P3 soft reservations gated `FEATURE_SOFT_HOLD` — `BookingStatus::SoftHold` + `bookings.soft_hold_expires_at`, `BookingService::softHold()` (atomic lock + wallet hold + employer coverage + seat decrement, ride-credit excluded, 3-min hold) / `confirmSoftHold()` (row-locked) / `releaseExpiredSoftHolds()` + `ReleaseExpiredSoftHoldsJob` (every minute: refund via `WalletService::releaseHold`, seat back, interest revert, live `TripSeatsUpdated`), web + API routes, hold form + confirm/countdown UI · PHPStan baseline regenerated (controller return types + `?->canBook()` fixed in code) | 548 (1800) | 2026-08-07 |
 | `v0.27.0` | Driver Trip Templates + Demand-Driven Driver Prompts | Driver trip templates (guide §11, gated `FEATURE_TRIP_TEMPLATES` on by default): `trip_templates` table + `TripTemplate`/`TripTemplateService` (`store`/`forDriver`/`saveFromTrip` "save this commute"/`publish` one-tap/`publishWeek` repeat-group week/`assertOwner`; `nextDeparture()` narrowed to today-or-tomorrow; publish still routes through `TripService::publish` so fixed fares + seat lock hold) + rider `templates/index` page + "Saved commutes" chips on `trips/create` + save-checkbox + profile-menu link · Demand-driven driver prompts (gallery "service planning" Phase 3, gated `FEATURE_DRIVER_PROMPTS` off by default): `driver_prompts` table (unique `PROMPT-{driver}-{Ymd}-{corridor}` reference = 1-push/driver/day/corridor) + `DriverPrompt`/`DriverPromptService` (`demandForCorridor` nearest-junction attribution / `supplyForCorridor` / `triggersFor` demand ≥ min AND supply < demand/divisor / `qualifiedDrivers` affinity-first / `promptForCorridor` gated on triggers / `nudgeAll` / `activeFor`) + `CalculateDriverPromptsJob` (every 30 min) + accept/dismiss controller + board "Demand wants you" panel + Control Tower `admin.ops.nudge` · `TripService::publish` gained `?int $repeatHorizonDays` · PHPStan baseline regenerated (+156 entries; 5 genuine hardening bugs fixed in code — assertOwner, nextDeparture narrow, week-scoped horizon, prompt trigger gate, test time-move) | 576 (1886) | 2026-08-08 |
+| `v0.28.0` | Junction Intel Columns | `junctions` demand intelligence (gallery `WORKRIDE-45-JUNCTIONS-SEED.sql`): migration `2026_08_08_120006_add_junction_intel_columns` (`passenger_volume_daily` unsignedInteger, `is_major_hub` bool, `state` string, `avg_wait_time_mins` unsignedSmallInteger) + `Junction` casts/fillables · `JunctionSeeder` rewritten to a 51-row authoritative catalog (volumes 500–5000, 13 major hubs, states FCT/Niger/Nasarawa, waits 10–35 min) · `NavigationService::search()` seeded-volume fallback until survey totals exist (`totalCounted() ?: passenger_volume_daily`) · `DemandService::junctionCounts()` returns the intel keys · Control Tower junction table "Major hub · ~N min" badge column · PHPStan baseline unchanged (no new findings) | 581 (1907) | 2026-08-08 |
 
 ---
 

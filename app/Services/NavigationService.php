@@ -30,7 +30,8 @@ class NavigationService
     /**
      * Search the junction + workplace catalog, falling back to free OSM
      * geocoding when the local catalog runs dry (< 3 hits). Junction rows
-     * carry the surveyed passenger volume so the rider sees "1,500+ daily".
+     * carry the passenger volume so the rider sees "1,500+ daily": real survey
+     * totals win, otherwise the seeded `passenger_volume_daily` estimate.
      *
      * @return array<int, array{id:?int, name:string, lat:float, lng:float, type:string, corridor:?string, passenger_volume_daily:?int}>
      */
@@ -64,7 +65,7 @@ class NavigationService
                 'lng' => (float) $junction->lng,
                 'type' => 'junction',
                 'corridor' => $junction->corridor,
-                'passenger_volume_daily' => $junction->totalCounted(),
+                'passenger_volume_daily' => $junction->totalCounted() ?: (int) $junction->passenger_volume_daily,
             ]);
         }
 

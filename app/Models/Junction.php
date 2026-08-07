@@ -22,6 +22,10 @@ class Junction extends Model
         'zone',
         'is_active',
         'notes',
+        'passenger_volume_daily',
+        'is_major_hub',
+        'state',
+        'avg_wait_time_mins',
     ];
 
     protected function casts(): array
@@ -30,6 +34,9 @@ class Junction extends Model
             'lat' => 'decimal:7',
             'lng' => 'decimal:7',
             'is_active' => 'boolean',
+            'passenger_volume_daily' => 'integer',
+            'is_major_hub' => 'boolean',
+            'avg_wait_time_mins' => 'integer',
         ];
     }
 

@@ -63,6 +63,7 @@
                     <tr class="bg-paper text-left text-xs font-medium uppercase tracking-wider text-ink-400">
                         <th class="px-5 py-3">Junction</th>
                         <th class="px-5 py-3">Corridor</th>
+                        <th class="px-5 py-3">Hub</th>
                         <th class="px-5 py-3">Surveys</th>
                         <th class="px-5 py-3">People counted</th>
                         <th class="px-5 py-3">Top destinations</th>
@@ -76,6 +77,18 @@
                                 <p class="text-xs text-ink-500">{{ $junction['zone'] }}</p>
                             </td>
                             <td class="px-5 py-4 text-xs text-ink-700">{{ str_replace('_', ' ', $junction['corridor']) }}</td>
+                            <td class="px-5 py-4">
+                                @if ($junction['is_major_hub'])
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-semibold text-gold-800">
+                                        Major hub
+                                        @if ($junction['avg_wait_time_mins'])
+                                            · ~{{ $junction['avg_wait_time_mins'] }} min
+                                        @endif
+                                    </span>
+                                @else
+                                    <span class="text-xs text-ink-400">—</span>
+                                @endif
+                            </td>
                             <td class="px-5 py-4 font-mono text-sm text-ink-700">{{ $junction['surveys'] }}</td>
                             <td class="px-5 py-4">
                                 <span class="inline-flex rounded-full bg-forest-50 px-2.5 py-1 font-mono text-sm font-semibold text-forest-700">
@@ -92,7 +105,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-5 py-12 text-center text-sm text-ink-500">
+                            <td colspan="6" class="px-5 py-12 text-center text-sm text-ink-500">
                                 No junction counts yet. Put 3 interns at Berger, Banex and Kubwa Junction — day 1 demand.
                             </td>
                         </tr>

@@ -66,6 +66,10 @@ class DemandService
                 'lng' => $j->lng,
                 'count' => $j->totalCounted(),
                 'surveys' => $j->surveys_count,
+                'passenger_volume_daily' => (int) $j->passenger_volume_daily,
+                'is_major_hub' => (bool) $j->is_major_hub,
+                'state' => $j->state,
+                'avg_wait_time_mins' => $j->avg_wait_time_mins,
                 'destinations' => $j->surveys
                     ->groupBy('destination_text')
                     ->mapWithKeys(fn ($rows, $dest) => [$dest => (int) $rows->sum('count')])
