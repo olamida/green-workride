@@ -1,3 +1,401 @@
+Here’s a practical, implementation-focused answer based on WorkRide’s current state (Laravel 13, Blade + Tailwind + Alpine, Reverb, Leaflet, corridor model, atomic bookings, GTFS, Road Intelligence, Time-Bank, dual-app).
+
+1. How to Implement 3D Map Tilt
+Reality check
+Leaflet (what you have now) is fundamentally 2D. It cannot do true camera pitch/tilt.
+For a Google Maps–style slightly tilted “looking down the road” view you need a WebGL vector renderer.
+Recommended path
+
+
+
+StageWhat to doWhyNowKeep Leaflet + fix empty zoom, add labels + route arrowsFast, low risk, already in productionNextAdd MapLibre GL JS behind a feature flag for the Connect Guide + main Trips mapNative pitch (35–55°), sharp vector road labels, brandable styles, free tilesLaterNative shell (Capacitor) can use MapLibre Native or platform mapsBest performance + haptics
+Concrete implementation steps (MapLibre)
+
+InstallBashnpm install maplibre-gl
+Free vector tiles (no API key required for basic use)
+OpenFreeMap (https://tiles.openfreemap.org/styles/liberty)
+or Protomaps / self-hosted PMTiles
+
+Basic map with tiltJavaScriptconst map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/liberty', // or your own style
+  center: [7.49, 9.05], // Abuja
+  zoom: 14,
+  pitch: 45,          // gentle tilt (35–55° is safe for phones)
+  bearing: 0,
+  maxPitch: 60,       // prevent extreme angles on low-end devices
+  antialias: true
+});
+During Connect Guide
+Overview → pitch 0–20° (flat, clear context)
+Start Guide → ease to pitch 40–50° + follow user
+Arrived → ease back to lower pitch
+Always respect prefers-reduced-motion (set pitch 0 instantly)
+
+Route + arrows + labels
+Add the OSRM route as a GeoJSON source + line layer (Forest Green).
+Use symbol layers or a simple arrow image for direction.
+Vector tiles already give sharp road names.
+
+Feature flagPHP// config/workride.php
+'FEATURE_MAPLIBRE' => env('FEATURE_MAPLIBRE', false),Fall back to Leaflet when the flag is off or WebGL is unavailable.
+Performance guardrails
+Moderate pitch only.
+Throttle location updates.
+Test on mid-range Android + 3G.
+Keep the rest of the Rider PWA on Alpine + Blade.
+
+
+This gives you a meaningfully better map than pure top-down Leaflet without breaking the lightweight PWA goal.
+
+2. Ride-Sharing / Matching Algorithm — What to Explore & Improve
+WorkRide already has a solid foundation (TripMatchingService, 30-min near-term matcher, 48 h board, corridor chips, demand signals). You do not need a brand-new black-box algorithm. You need to make the existing one smarter and more visible.
+High-value enhancements
+
+
+
+
+AreaSuggestionImpactMatching scoreWeighted score: corridor match + time window + remaining seats + driver verification level + historical reliability + women-only preference + road condition (IRI)Better quality matchesLive seat urgencyBoost trips that are “leaving soon” (≤ 15 min) and still have seatsFills vehicles that are about to departDemand → Supply loopWhen many people check-in at a junction for the same destination, surface a strong “Be the driver” or “Join this forming group” promptTurns demand into tripsShare-to-joinPrivate link on an active booking so a colleague can request the same vehicleClassic shared-ride behaviourSoft reservationsAllow a short hold (2–3 min) while the passenger confirms payment / walks to the pointReduces race conditionsDetour toleranceSmall configurable detour budget (e.g. +8–12 min) so a driver can pick up someone slightly off the pure corridorMore matches without breaking fixed-fare simplicityFairnessAvoid always giving the same drivers the best matches; light rotation or “new driver boost”Trust & retention
+Keep the core rules:
+
+Board shows 48 h ahead.
+Matcher only books inside the 30-min window.
+Atomic seat lock + wallet hold.
+
+
+3. What Else Is Necessary / High-Value (Current-State Gap Analysis)
+Looking at the app as it stands and the award-grade ambition, here are the most important things to add, edit, or strengthen (priority order).
+Must-have / High leverage
+
+Navigation-first Home
+Large “Where are you going?” search as the first screen. Corridor chips become shortcuts, not the primary entry.
+Map quality
+Leaflet fixes (no empty zoom, labels, arrows) → MapLibre tilt for Connect Guide.
+Live junction progress tracker
+Shared stepper visible to passenger, driver and admin as the vehicle passes named junctions.
+Share-to-join link
+Let someone already on a trip invite a colleague.
+Timing everywhere
+Time to pickup
+Time remaining until departure
+ETA to each junction
+Walking time in the Connect Guide
+Clear, live, and consistent.
+
+Admin mobile + grouped sidebar
+Package the sidebar (Operations / People / Intelligence / Business / System), make it collapsible, and usable on a phone. Admin can still be laptop-primary, but must work on mobile for testing and light ops.
+Progress wizards / steppers
+Booking, Publish Trip, Verification upgrades.
+Ride / Bus scheduling UX
+Learn from world-class patterns (Transit, Citymapper, Uber Scheduled, FlixBus-style):
+Clear “Leave now” vs “Leave later”
+Calendar / time-band selection for board
+Vehicle capacity & inspection status visible
+Recurring trip templates for drivers (optional)
+Soft “interest” for office staff buses that feeds the same matching pool
+
+
+Important polish & trust
+
+Empty states that create supply
+“12 people want Kubwa→CBD at 07:00 — be the driver.”
+Stronger live seat counter
+Reverb-driven, with the subtle tick animation we defined.
+Women-only preference
+Visible, opt-in, never a hard filter that hides supply.
+SOS + Share Trip
+One-tap, audited, works offline-ish.
+Impact & certificates
+Already present — make them more prominent and one-tap downloadable.
+Offline resilience
+Cached corridor board + last known trip status.
+
+Nice-to-have / Later
+
+Recurring schedules & driver templates
+Multi-stop / flexible GTFS-Flex style trips
+In-app chat reliability improvements
+Richer fleet maintenance calendar
+Public API / road-intelligence commercial endpoints
+Native mobile shell with Live Activities & haptics
+Full Hausa / Yoruba / Igbo localisation
+
+Things to avoid or defer
+
+Full city-wide turn-by-turn car navigation (you are not competing with Google Maps for driving).
+Heavy 3D / AR.
+Complex dynamic pricing.
+Replacing the atomic wallet / seat logic.
+
+
+4. Suggested Implementation Sequence
+
+Navigation-first Home + Search + Results
+Leaflet map fixes (immediate UX win)
+Timing labels everywhere + live junction progress tracker
+Share-to-join
+Admin sidebar grouping + mobile responsiveness
+Progress steppers on key flows
+MapLibre feature-flagged tilt for Connect Guide
+Matching score improvements & demand→supply prompts
+Scheduling UX polish (Leave now / Leave later, templates)
+
+
+Bottom line
+
+3D tilt → MapLibre GL JS with moderate pitch + free vector tiles, feature-flagged.
+Ride-sharing algorithm → enhance the existing matcher with better scoring, live urgency, demand loops and share-to-join rather than replacing it.
+Highest-value remaining work → navigation-first entry, clear timing, live junction progress, share-to-join, admin mobile/grouping, and map quality.
+
+
+
+
+Markdown# WorkRide — Complete Implementation Prompt
+### Navigation-First + MapLibre Tilt + Matching + Admin Mobile + Live Progress
+### Single Source of Truth for AI Code Generator (opencode / Laravel Boost / Cursor)
+
+You are a world-class Laravel 13 + Tailwind + Alpine + Reverb engineer and accessibility specialist.  
+Your mission is to implement the full set of upgrades below so WorkRide becomes a true navigation-first, award-grade mobility product while strictly protecting every existing invariant.
+
+**Do not invent parallel systems.** Extend the current codebase.  
+All previous non-negotiables still apply (NIN hashing, decimal money + optimistic locking, feature flags, 48 h board / 30 min matcher, guest-safe layouts, single design-system.css, services own logic, tests must stay green, Conventional Commits, no Google Maps JS as primary).
+
+Reference documents already in the repo:
+- WORKRIDE-APP-GUIDE.md
+- WORKRIDE-DEV-GUIDE.md
+- WORKRIDE-DESIGN-REVIEWS.md
+- DEVELOPMENT-LOG.md
+- Previous UI rebrand prompts
+
+---
+
+## 0. Non-Negotiables (Repeat)
+
+1. Never store raw NIN.
+2. Money = decimal(15,2) + SELECT FOR UPDATE + optimistic locking + idempotency.
+3. Feature flags (`FEATURE_*`) for every new major capability.
+4. Board = 48 h, Matcher = 30 min near-term.
+5. Design tokens only in `resources/css/design-system.css`.
+6. Services own business logic.
+7. `vendor/bin/pint` + `php artisan test` + `npm run build` after every meaningful change. Update DEVELOPMENT-LOG.md.
+8. Keep critical-path JS reasonable. Prefer progressive enhancement.
+
+---
+
+## 1. Implementation Order (Execute Exactly in This Sequence)
+
+Work in small, reviewable commits. After each major step: pint → test → build → update log → commit.
+
+### PHASE 1 — Foundation & Navigation-First Entry
+
+**1.1 Design System Confirmation**
+- Verify all colour, typography, spacing, glass, motion and dark-mode tokens exist and are used.
+- Confirm reduced-motion media query collapses all timing to 0.
+
+**1.2 New Home / Search (Primary Entry)**
+- Replace or heavily rework the current Trips landing.
+- Large “Where are you going?” search field (top or centre).
+- Autocomplete from corridors, major junctions, recent destinations, favourites.
+- Corridor Chips remain as secondary horizontal shortcuts (keep live pulse).
+- Recent / Favourite destinations as tappable chips.
+- Map stays visible (map-first principle).
+- On destination select → go to Results screen.
+- Fully accessible (VoiceOver, large touch target, Dynamic Type).
+
+**1.3 Results Screen**
+After destination is chosen, show ranked options:
+1. Join live trips going that way (live seats + “leaving soon”).
+2. Book ahead (48 h board).
+3. Share-link / Invite colleague (if user has active booking).
+4. Demand check-in (“I’m here, need a ride”).
+5. Publish a trip (driver entry).
+- Each option is a large card: fare, seats, ETA, verification badge, IRI indicator.
+- Map updates to show origin → destination + route preview with correct fitBounds + padding.
+
+**1.4 Timing Everywhere**
+Display clear, live timing on all relevant surfaces:
+- Time remaining until departure
+- Walking time to pickup
+- ETA to each junction
+- Overall trip ETA
+Use consistent formatting and live updates via Reverb where data changes.
+
+### PHASE 2 — Map Quality (Leaflet First, then MapLibre)
+
+**2.1 Immediate Leaflet Fixes**
+- Never zoom to empty/meaningless view.
+- Always `fitBounds` with generous padding (40–80 px) when showing origin + destination + route.
+- Set sensible minZoom and maxBounds for Abuja/FCT.
+- Use tile layers that include road labels (CartoDB Positron/Voyager, Stadia, or equivalent).
+- Add direction arrows on route polylines (Leaflet.PolylineDecorator or arrowheads).
+- Ensure “You” pin and vehicle pin are always correctly placed and labelled.
+
+**2.2 MapLibre GL JS (Feature-Flagged)**
+- Add `FEATURE_MAPLIBRE` (default false).
+- Install `maplibre-gl`.
+- Use free vector tiles (OpenFreeMap liberty style or Protomaps/self-hosted).
+- For Connect Guide and main Trips map:
+  - Overview: low pitch (0–20°)
+  - Active Guide: ease to moderate pitch 40–50° (maxPitch 60)
+  - Arrived: ease back
+- Respect `prefers-reduced-motion` (pitch = 0 instantly).
+- Forest Green route line + direction indicators.
+- Fall back to Leaflet when flag is off or WebGL unavailable.
+- Test on mid-range Android + throttled 3G.
+
+### PHASE 3 — Core Sharing & Progress Features
+
+**3.1 Share-to-Join Link**
+- On any confirmed/active booking, generate a private share link.
+- Link opens a join-request page (guest-safe or authenticated).
+- Request reuses existing atomic booking + seat lock + wallet logic.
+- Driver and Control Tower see the request in real time.
+- Public card shows route, time, seats left, verification — never live location.
+
+**3.2 Live Junction Progress Tracker**
+- Define ordered named junctions/milestones per corridor.
+- When vehicle location crosses a geofence → Reverb event.
+- Shared Progress Tracker component visible to:
+  - Passenger (Connect Guide + My Rides)
+  - Driver (live trip view)
+  - Admin (Control Tower)
+- Visual stepper: Booked → Approaching [Junction] → At [Junction] → En-route → Arriving → Completed.
+- Current step Forest Green; past muted; future outlined.
+- VoiceOver announces changes.
+
+**3.3 Progress Wizards / Steppers**
+Add consistent stepper component to:
+- Booking flow (Destination → Options → Payment → Confirmed)
+- Driver Publish flow (Corridor → Time/Seats → Vehicle/Inspection → Publish)
+- Verification upgrades
+Component must be accessible and respect reduced-motion.
+
+### PHASE 4 — Matching & Scheduling Improvements
+
+**4.1 Matching Score Enhancements** (extend TripMatchingService)
+Weighted factors:
+- Corridor + time-window match
+- Remaining seats
+- Driver verification level + historical reliability
+- Women-only preference (soft)
+- Road condition (IRI)
+- “Leaving soon” boost (≤ 15 min)
+Keep 30-min near-term rule and atomic seat lock.
+
+**4.2 Demand → Supply Loop**
+When multiple demand check-ins exist for the same origin-destination-time, surface strong empty-state / prompt:  
+“12 people want Kubwa→CBD at 07:00 — Be the driver” or “Join this forming group”.
+
+**4.3 Scheduling UX Polish**
+- Clear “Leave now” vs “Leave later” / time-band selection.
+- Visible vehicle capacity and inspection status.
+- Optional recurring trip templates for drivers.
+- Soft interest registration for office staff buses that feeds the same matching pool.
+- Learn from Transit / Citymapper / scheduled-ride patterns while staying corridor + fixed-fare.
+
+### PHASE 5 — Admin / Control Tower
+
+**5.1 Sidebar Grouping (Packages)**
+Collapse into collapsible groups:
+- **Operations**: Live Trips, Demand, Fleet, Verifications, SOS
+- **People**: Users, Drivers, Employers/Programmes
+- **Intelligence**: Road Heatmap, GTFS, Impact, Reports
+- **Business**: Wallets, Subsidies, Settlements, API Keys, Time-Bank Trust
+- **System**: Feature Flags, Settings, Activity Logs, Demo tools
+
+**5.2 Mobile-Friendly Admin**
+- Sidebar → hamburger + slide-over or bottom sheet on small screens.
+- Optional bottom nav for the 4–5 most used ops items on mobile.
+- All tables responsive (stack / split patterns).
+- Touch targets ≥ 44 px.
+- Admin remains laptop-primary but fully usable on phone for testing and light ops.
+- Admin acting as a user: provide a clear “View as Rider / Driver” or role-switch that opens the Rider experience (or impersonation with audit log).
+
+**5.3 Branding Consistency**
+Apply the exact same design tokens (Forest Green, glass, typography, spacing, motion) to every Admin page. Denser slate variant is acceptable; the product family must feel unified.
+
+### PHASE 6 — Polish, Accessibility & Hardening
+
+**6.1 Empty States**
+Every list and map has a calm, demand-aware empty state that can create supply.
+
+**6.2 Live Seat Counter**
+Reverb-driven with the brief seat-tick highlight animation.
+
+**6.3 Women-only Preference**
+Visible, opt-in, never a hard sort that hides supply.
+
+**6.4 SOS + Share Trip**
+One-tap, audited, works with offline fallback where possible.
+
+**6.5 Full Accessibility Pass**
+VoiceOver / TalkBack, Dynamic Type, reduced-motion, contrast, focus order, live regions — especially on Search, Results, Connect Guide, Progress Tracker, and Admin mobile.
+
+**6.6 Offline Resilience**
+Cached corridor board + last-known trip status.
+
+**6.7 Impact & Certificates**
+Make download prominent and one-tap.
+
+---
+
+## 2. Technical Constraints & Packages
+
+- Prefer extending: TripService, BookingService, TripMatchingService, RoutingService, FleetService, DemandService, WalletService, GeofenceService.
+- Reverb for all live updates (seats, location, junction progress, join requests).
+- Map: Leaflet (fixed) → MapLibre GL JS (feature-flagged).
+- Free vector tiles: OpenFreeMap or Protomaps.
+- Optional: Filament NavigationGroup for Admin if already in use; otherwise pure Blade groups.
+- QR + PDF for certificates (already planned).
+- No heavy SPA rewrite. Keep Blade + Alpine as the Rider foundation.
+
+---
+
+## 3. Definition of Done (Whole Prompt)
+
+- Opening the app presents “Where are you going?” as the primary action.
+- User can go Destination → Join Live / Book / Share in very few taps.
+- Map never shows empty/meaningless view; labels + arrows + correct framing.
+- Connect Guide supports moderate tilt via MapLibre when flag is on.
+- Live junction progress visible to passenger, driver and admin.
+- Share-to-join works with atomic seat logic.
+- Timing (remaining, walking, junction ETAs) is clear and live.
+- Admin sidebar is grouped, collapsible and mobile-usable.
+- Progress steppers exist on multi-step flows.
+- Matching is smarter (score + leaving-soon + demand loop) without breaking invariants.
+- Entire app (Rider + Admin) shares the same design tokens.
+- Accessibility and reduced-motion pass.
+- Tests green, pint clean, build succeeds, DEVELOPMENT-LOG.md updated.
+
+---
+
+## 4. Commit Style Examples
+feat(nav): navigation-first home and results screen
+fix(map): leaflet fitBounds labels and route arrows
+feat(map): maplibre tilt behind FEATURE_MAPLIBRE
+feat(trip): live junction progress tracker
+feat(booking): share-to-join link
+feat(admin): grouped sidebar and mobile responsiveness
+feat(matching): weighted score and demand-to-supply prompts
+text---
+
+## 5. Final Instruction to the Code Generator
+
+Start at Phase 1 and proceed sequentially.  
+One coherent piece of work per commit.  
+Protect money, seats, verification and dual-app architecture at all times.  
+Prefer clarity, real-world performance on Abuja 3G devices, and calm trust over visual spectacle.
+
+Make the search box the front door.  
+Make the map clear, labelled and gently tilted when guiding.  
+Make progress through the city visible to everyone who needs it.  
+Make Admin usable on a phone while remaining powerful on desktop.
+
+Execute step-by-step. Ship only what a verified worker can successfully use while moving through Abuja.
+
+
+
+
 I reviewed your 3 implementation docs — you have 22 models, 10 enums, triple balance wallet, GTFS publisher, road intelligence, time-bank already built. The docs show a feature-complete but form-first app, not navigation-first. Your suggestions are correct.
 
 Here is the comprehensive guide to implement them:
@@ -522,3 +920,209 @@ Definition of Done (input_section.txt §G): Opening shows "Where are you going?"
 
 
 
+WorkRide Scheduling & Demand-Service Plan
+(Refined from world-class BRT learning, aligned to the actual product)
+
+1. Relevance Check & Refinement
+Your ideas are highly relevant, but they must be adapted to what WorkRide actually is.
+WorkRide is not a classic BRT operator.
+It does not own a large dedicated fleet running fixed high-frequency services on exclusive lanes. It is a corridor-based, verified-colleague, mixed-fleet mobility platform (private cars + staff/programme buses) with:
+
+Fixed fares
+48-hour board / 30-minute near-term matcher
+Existing demand signals (check-ins, OD matrix, forecasts)
+GTFS / GTFS-RT already in the architecture
+Road intelligence (IRI)
+Time-Bank and employer programmes
+
+What we should take from world-class BRT
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+BRT ConceptWorkRide AdaptationTimetabled service at stops/junctionsPredicted arrival windows at named junctions + live progressDemand-responsive frequencyDemand-aware prompting of drivers + soft “interest” for programme busesStop dwell times & headwaysEstimated time at each junction + walking time to meet vehicleService planning from ridership dataUse existing demand_requests + OD matrix + forecasts to surface supply opportunitiesPassenger information (next bus, ETA)Clear timing everywhere + live junction stepperOperational controlControl Tower view of predicted vs actual + alerts
+What we should not copy
+
+Rigid fixed timetable that ignores the 30-min matcher and atomic seat model
+Complex multi-depot vehicle blocking that assumes WorkRide owns the fleet
+Pure A* as the primary matching engine (A* is a path-finding algorithm, not a ride-matching or scheduling algorithm)
+
+Best algorithmic fit for WorkRide
+
+Routing / geometry: Keep OSRM (or Valhalla) — already the right tool. A* is what OSRM uses internally; we do not need to re-implement it.
+Matching: Extend the existing weighted TripMatchingService (corridor + time window + seats + verification + “leaving soon” + soft preferences).
+Demand prediction: Time-series / simple forecasting on historical bookings + check-ins + day-of-week/seasonality (start simple, later improve).
+Service planning: Optimisation that turns predicted demand into suggested driver publish times and programme-bus allocations (not full BRT vehicle scheduling).
+
+Call the feature set Corridor Service Planning & Live Journey Information (or simply Service Planning inside Control Tower and Live Journey on the Rider side). Avoid calling it “BRT scheduling” in the product so users are not confused.
+
+2. Core Concepts We Will Implement
+
+Junction-level journey information
+For any active or upcoming trip the system knows:
+Origin and destination
+Ordered list of named junctions / milestones
+Predicted arrival window at each junction
+Estimated dwell / meeting time
+Running time between junctions
+Overall trip duration
+Live actual progress vs plan
+
+Demand prediction
+Short-term (next 2–48 h) and medium-term (next 7–14 days) demand by corridor + time band + junction, using existing demand_requests, bookings, and OD data.
+Service response
+Prompt drivers to publish at high-demand slots
+Soft allocation / interest for programme & staff buses
+Empty-state and Results-screen messaging that creates supply
+
+Passenger & driver guidance
+Clear “next vehicle”, walking time, junction ETAs, and live stepper.
+Management information
+Control Tower dashboards: predicted vs actual, unserved demand, on-time performance at junctions, vehicle utilisation.
+
+
+3. Standard Professional Implementation Plan
+Phase 0 — Foundations (already partly present)
+
+Confirm named junctions / milestones exist per corridor (or create a simple corridor_junctions table: corridor_id, name, sequence, lat/lng, geofence radius).
+Ensure GTFS stop times / shapes can be aligned to these junctions where programme buses exist.
+Keep OSRM as the routing engine (A* is internal to it).
+
+Phase 1 — Journey Information Model (Data + Services)
+Goal: Every trip can answer “When will it be at Berger? How long to the next junction? What is the total duration?”
+
+Extend trip / route model with ordered junctions and planned timestamps (planned_arrival_at, planned_departure_at or simple window).
+On publish or match, run RoutingService once and store leg durations + cumulative ETAs.
+Live updates: when vehicle location crosses a junction geofence, record actual time and broadcast via Reverb.
+New read-only service methods, e.g.:
+JourneyService::plan(trip) → junctions + planned times
+JourneyService::liveProgress(trip) → current junction, next ETA, variance
+
+Expose to Rider (Connect Guide + My Rides), Driver, and Control Tower.
+
+Deliverable: Passenger and driver see consistent junction-level timing.
+Phase 2 — Demand Prediction (Simple → Useful)
+Goal: Predict demand by corridor + time band + origin junction for the next 48 h (and 7–14 days).
+
+Aggregate existing data:
+Historical bookings
+Demand check-ins
+OD matrix / surveys already in the schema
+
+Start with transparent rules + moving averages (day-of-week, hour-of-day, recent trend).
+Later optional: simple regression or lightweight forecasting library.
+Store forecasts in a demand_forecasts (or extend existing) table: corridor, time_band, origin_junction, predicted_passengers, confidence.
+Feature-flag FEATURE_DEMAND_FORECAST.
+
+Deliverable: Control Tower and empty states know “expected passengers at Berger for Kubwa→CBD 07:00–07:30”.
+Phase 3 — Service Response & Driver Prompting
+Goal: Turn predicted demand into actual seats.
+
+When forecast or live check-ins exceed a threshold and supply is low → surface:
+Strong empty-state / Results prompt: “14 people need Kubwa→CBD at 07:15 — Publish a trip”
+Optional push / in-app notification to qualified drivers
+
+Programme / staff-bus soft interest: office admins or fleet managers can register interest; system treats it as potential supply.
+Keep the 30-minute matcher and atomic seat lock unchanged.
+Optional: simple optimisation that suggests the best publish times to drivers (greedy or basic score), not full BRT vehicle blocking.
+
+Deliverable: Demand visibly creates supply without breaking fixed-fare or seat invariants.
+Phase 4 — Live Journey Experience (Rider + Driver)
+Goal: World-class passenger information.
+
+Connect Guide and My Rides show:
+Time to pickup (walking)
+Time remaining to departure
+Next junction + ETA
+Overall progress stepper (already planned)
+
+Driver live view shows the same plan + actual variance (“2 min behind at Berger”).
+Share-to-join and live seat counts remain integrated.
+All timing uses the same JourneyService so numbers never disagree.
+
+Phase 5 — Control Tower Management Views
+Goal: Operators can plan and intervene.
+
+New or extended dashboard sections:
+Demand heatmap / time-band forecast per corridor
+Unserved demand (predicted passengers with no seats)
+On-time performance at junctions
+Vehicle / trip utilisation
+
+Ability to nudge drivers or allocate programme buses into high-demand slots.
+Export for FERMA / city partners if needed (aligns with open-data story).
+
+Phase 6 — Hardening & Algorithms
+
+Keep OSRM for all path geometry (no custom A* implementation).
+Matching remains the extended weighted scorer (corridor, time, seats, verification, leaving-soon, IRI, soft preferences).
+Demand forecasting starts rule-based; only add heavier ML if data volume and accuracy justify it.
+All new surfaces respect feature flags, accessibility, and the design system.
+
+
+4. What We Explicitly Will Not Do (Yet)
+
+Full BRT-style vehicle scheduling / blocking / crew rostering
+Replacing OSRM with a custom A* engine
+Dynamic pricing
+Assuming WorkRide owns a large dedicated bus fleet
+Publishing rigid public timetables that conflict with the 30-min matcher
+
+
+5. Success Metrics
+
+% of trips that have complete junction-level plans
+Reduction in unserved demand (predicted passengers left without seats)
+Passenger-visible ETA accuracy at junctions
+Driver response rate to demand prompts
+On-time arrival at key junctions
+Control Tower can answer “Where are the gaps tomorrow morning?” in one screen
+
+
+6. Implementation Sequence (for the AI Code Generator)
+
+Junction model + JourneyService (planned + live).
+Expose junction timing on Connect Guide, My Rides, Driver view.
+Simple demand forecast job + storage.
+Demand-aware empty states and driver prompts.
+Control Tower demand & on-time views.
+Soft programme-bus interest → matching pool.
+Polish timing labels everywhere + accessibility.
+Feature flags, tests, DEVELOPMENT-LOG updates.
+
+
+Summary
+Yes — learn from BRT, but translate it into Corridor Service Planning + Live Journey Information that fits WorkRide’s mixed fleet, fixed fares, and existing demand/GTFS foundation.
+Use OSRM (A* inside it) for paths, extend the current matcher for assignment, add transparent demand forecasting, and give every user clear junction-level timing and progress. That combination delivers professional scheduling outcomes without pretending to be a full BRT operator.
+I can turn this plan into a ready-to-paste AI code-generator prompt section whenever you want.
+
+End of prompt.

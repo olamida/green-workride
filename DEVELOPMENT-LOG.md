@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-07 (v0.25.0 — FCM push)
+> Last updated: 2026-08-07 (v0.26.0 — Matching Intelligence + Demand-Supply Signal + Soft Reservations)
 
 ---
 
@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / … Roadmap P3 Closed — Employer CSR Report + Pay-it-Forward Statement + Forecast ML Job + EV Lease Seams + Ride-Credit Reminders + Corridor Fare Config UI + Navigation-First Sprints 1–2 — Admin Grouped Nav + Role Switcher + Map Common + UI Primitives + Destination-First Home `/go` + Search + Share Referral)
+## 2. Current Status (Phase: Foundation / … v0.26.0 — Matching Intelligence + Demand-Supply Signal + Soft Reservations)
 
 | Area | Status |
 |------|--------|
@@ -67,6 +67,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Tests | ✅ 512 feature tests passing (… + scheduling: materialise creates a Trip per slot with 2 waypoints, idempotent re-run, past-slot skip, weekday/paused/feature-off skips, nextDepartures merge/dedupe/corridor filter/disabled, frequency window, null end_time single departure, deterministic reference, admin CRUD/toggle/materialise/destroy + validation, board panel render/omission) |
 | Feature modules | ✅ FCM push complete (roadmap P3.2) — `device_tokens` + `bookings.arrival_notified_at` migrations, `DeviceToken` + `User::deviceTokens`, `FcmService` (legacy HTTP send API, feature-gated `FEATURE_PUSH`), `NotificationService` (routes any notification's `toFcm()` payload through FCM), `UserArrivedAtPickup` event + `UserArrivedAtPickupNotification` (database + log + FCM), `TripService::notifyArrivingPassengers()` fired from `updateLocation` (idempotent `arrival_notified_at` stamp within `push.arrived_radius_m`), `POST/DELETE /api/v1/push/tokens` (`PushTokenController`, 403 when disabled), PWA service worker `push` + `notificationclick` deep-links to the ride — the guide §6 Workflow 1 "500m away" nudge reaches a closed browser |
 | Tests | ✅ 523 feature tests passing (… + FcmPushTest: push-token API gate/register/idempotent/invalid-platform/forget/auth-required, FcmService once-per-device + disabled no-op, arrival nudge within-radius + idempotent, outside-radius skip, non-active-trip skip, cancelled-booking skip) |
+| Feature modules | ✅ v0.26.0 complete — Matching Intelligence + Demand-Supply Signal + Soft Reservations. P1: weighted 0-100 match score (`score_weights`: proximity 40 / timing 25 / rating 15 / verification 10 / seat-fill 10) + readable `score_reasons` on board/API/live corridor chips (`TripMatchingService::scoreTrip()`, feeds `upcoming()` ordering; proximity only applies when a pickup point is known). P2: `DemandService::hotspots()` fuses 24h junction counts + pending rider check-ins (1 km attribution) into per-junction tallies — board "How to book" strip + `/trips` + `/go` empty states list top junctions; Level 1+ riders get a "Be the driver" CTA pre-selecting the corridor, phone-only riders see a matching message instead of a 403. P3: Soft reservations — `BookingStatus::SoftHold` + `bookings.soft_hold_expires_at`, `BookingService::softHold()` (mirrors `book()`'s atomic trip lock / wallet hold / employer coverage / seat decrement; ride-credit excluded; 3-min `ttl_minutes`), `confirmSoftHold()` (under row lock, expired holds rejected), `releaseExpiredSoftHolds()` + `ReleaseExpiredSoftHoldsJob` (every minute: refund via `WalletService::releaseHold`, seat back, trip-interest revert, `TripSeatsUpdated`); web + API controllers/routes, hold form on `trips/show`, confirm/countdown in My Rides; feature-gated `FEATURE_SOFT_HOLD` (off by default) |
+| Tests | ✅ 548 feature tests passing (… + matching score: scored trips + reasons on board/API, proximity-only-with-pickup + DemandHotspotsTest (8): strip hotspot, CTA gating driver vs phone-only, empty-state CTA + corridor route, /go hotspot, create prefill/fallback/invalid query + SoftHoldTest (15): feature-gate on/off, wallet hold + seat decrement + `soft_hold_expires_at`, duplicate rejected, own-trip rejected, ride-credit rejected, cash/subsidy no-hold, full-trip rejected (web session errors + API 422), confirm confirmed + seat stays reserved, expiry rejected, expired-hold release refunds + frees seat + reverts interest + broadcasts, unexpired skipped, disabled skipped, web + API payload/status) |
 
 ## 3. Environment
 
@@ -1046,6 +1048,91 @@ no-ops until `FEATURE_PUSH=true` AND a server key is configured.
 
 ---
 
+### 4.37 v0.26.0 — Matching Intelligence + Demand-Supply Signal + Soft Reservations (COMPLETE)
+
+The merged plan from the implementation tracker (`WORKRIDE-IMPLEMENTATION-TRACKER.md`, reviewed from the
+gallery_of_files idea dumps: `input section.txt`, `WORKRIDE-PROMPT-REMAINING-TASKS-v6-MATCHING-POLISH-OFFLINE.md`,
+`WORKRIDE-PROMPT-SERVICE-PLANNING-LIVE-JOURNEY.md`). Three packages — P1 scored matching, P2 demand-supply
+signal, P3 soft reservations. P1 + P2 committed mid-session (`f15af52`, `b90879a`); P3 shipped with this pass.
+
+**P1 — Weighted matching score (`TripMatchingService`):**
+- `scoreTrip(Trip, ?pickup)` → 0-100 weighted score + readable `score_reasons`. Weights from
+  `config/workride.php` `matching.score_weights` (proximity 40 / timing 25 / rating 15 / verification 10 /
+  seat-fill 10). Proximity only applies when a passenger pickup point is known — the web board (no pickup)
+  ranks purely on timing + driver quality, while the live matcher `findMatches()` adds distance and sorts by
+  score first. `upcoming()` ordering feeds `scoreTrip`, so the board's ranked list and the live corridor chips
+  both carry the same score + reasons. Board trip cards and the API trip payload expose `match_score` +
+  `score_reasons` (e.g. "38% — leaves in 25 min · 12% — verified driver").
+
+**P2 — Demand hotspots + supply CTA (`DemandService::hotspots()`):**
+- `hotspots()` fuses recent junction counts (`demand_surveys`, last 24 h) + pending rider check-ins
+  (`demand_requests`, 1 km attribution) into a per-junction people tally. The board's "How to book" strip and
+  the empty states of `/trips` and `/go` list the top junctions with counts. Verified (Level 1+) riders get a
+  **"Be the driver"** CTA that deep-links into `trips/create` pre-selecting that corridor (invalid
+  `?corridor` falls back to `kubwa_cbd`); phone-only riders see "we're matching a driver" instead of a 403
+  dead-end. This is the demand→supply loop: check-ins and junction counts seed publish prompts.
+
+**P3 — Soft reservations (feature-gated `FEATURE_SOFT_HOLD`, off by default):**
+- **Schema (1 migration):** `add_soft_hold_expires_at_to_bookings_table` — nullable `soft_hold_expires_at`
+  datetime on `bookings`. `Booking` gains fillable + `'datetime'` cast.
+- **`BookingStatus::SoftHold`** new enum case (label "Soft hold").
+- **`BookingService::softHold(Trip, User, array)`** — mirrors `book()` exactly: same atomic trip
+  `lockForUpdate`, same gates (own-trip / women-only / volunteer / departed / full / duplicate), same
+  `resolvePaymentMethod`, employer coverage via `bestCoverage`, and `holdForBooking()` when a wallet/subsidy
+  hold is needed; creates the booking as `SoftHold` with `soft_hold_expires_at = now() + ttl_minutes` (3),
+  decrements `available_seats`, fires `TripSeatsUpdated`. **Ride credits are excluded** (they mint an owed
+  seat immediately; a hold that later expired would need extra cleanup to unwind). Duplicate race still
+  caught by the 23000 QueryException handler.
+- **`BookingService::confirmSoftHold(Booking, User)`** — under `lockForUpdate`: owner/admin only, status must
+  be `SoftHold`, `soft_hold_expires_at` must be present and in the future; flips to `Confirmed` + clears the
+  expiry, marks the rider's trip interest `Matched`, fires `BookingConfirmed` + `TripSeatsUpdated`. No new
+  hold is made — the soft-hold's wallet hold IS the committed money (exactly like `book()`).
+- **`BookingService::releaseExpiredSoftHolds(int $limit = 50): int`** + **`ReleaseExpiredSoftHoldsJob`**
+  (registered `->everyMinute()` in `routes/console.php`): selects expired `SoftHold` bookings ordered by
+  expiry, and per row under `lockForUpdate` re-checks status + expiry (a concurrent confirm/release can never
+  double-refund), flips to `Cancelled`, `WalletService::releaseHold()` (idempotent by reference), employer
+  refund, seat back, trip-interest reverted to `Pending`, `BookingCancelled` + `TripSeatsUpdated`. Feature-off
+  short-circuits to 0.
+- **Controllers + routes:** web `BookingController::softHold` + `confirmSoftHold` (`POST /trips/{trip}/soft-hold`
+  and `POST /bookings/{booking}/soft-hold/confirm`, auth group, `ValidationException` → `back()->withErrors`,
+  `RedirectResponse` return types); API `Api\V1\BookingController::softHold` + `confirmSoftHold`
+  (`POST /api/v1/trips/{trip}/soft-hold` 201 + `soft_hold_expires_at` ISO; `POST /api/v1/bookings/{booking}/soft-hold/confirm`,
+  both `JsonResponse`, `{data: …}`-wrapped, Sanctum).
+- **Views:** `trips/show` gains a "Hold a seat" panel for non-booked riders (payment picker reuses the
+  `x-payment-picker`, free-ride label handled); `bookings/index` `_booking-card` renders held seats with a
+  confirm button + a live countdown (`data-soft-hold-expires-at`) and "expired — release" state; `badge`
+  gains a `Soft hold` gold style. Feature-gated: both panels render only when `workride.soft_hold.enabled`.
+- **Config:** `config/workride.php` `soft_hold.enabled` (`FEATURE_SOFT_HOLD`, default false) + `ttl_minutes`
+  (`WORKRIDE_SOFT_HOLD_TTL_MINUTES`, 3); `.env.example` documents the flag.
+
+**Bugs found & fixed during hardening (PHPStan L8 gate):**
+- `Api\V1\BookingController::softHold()`/`confirmSoftHold()` and the web equivalents had no return types —
+  added `: JsonResponse` / `: RedirectResponse` (matching the §4.35 "new code declares return types" trend).
+- The web `softHold()` added a third `abort_unless($request->user()->canBook(), …)` occurrence, which broke
+  the baseline's expected-count for the `canBook() on User|null` ignore pattern — rewritten as
+  `$request->user()?->canBook() === true` so the count stays at the two pre-existing sites (`book()`,
+  `request()`).
+- The remaining findings (`argument.type` for `$request->user()` into service `User` params, enum-cast
+  `notIdentical.alwaysTrue`/`function.impossibleType`/`deadCode.unreachable`/`staticMethod.void` on the
+  `DB::transaction` + `BookingStatus::SoftHold` comparisons, `property.nonObject` on `first()` results,
+  `missingType.iterableValue` on `softHold()`'s `$data`) are the documented Eloquent-inference classes —
+  absorbed by regenerating `phpstan-baseline.neon` per the §4.30 ritual.
+
+**Tests (`tests/Feature/SoftHoldTest.php`, 15 new — 548 total, 1800 assertions):** feature-gate on/off (web
++ API), wallet hold + seat decrement + `soft_hold_expires_at` set + `BookingStatus::SoftHold`, duplicate
+rejected, own-trip rejected, ride-credit rejected with a readable message, cash/subsidy never hold, full-trip
+rejected (web `assertSessionHasErrors('trip')` + API 422), confirm flips to `Confirmed` + clears expiry +
+seat stays reserved, expired hold rejected, expired-hold release refunds + frees seat + reverts interest +
+broadcasts `BookingCancelled`/`TripSeatsUpdated` (via service and via the job's `handle()`), unexpired
+skipped, disabled short-circuits, web + API payload/status contracts.
+
+**DoD:** `pint --test` clean · PHPStan L8 gate green (baseline regenerated; controller return types +
+`?->canBook()` fixed in code) · `npm run build` clean · `php artisan test` green (**548 / 1800**) ·
+`migrate:fresh --seed` ~62s on live MySQL · `gtfs:generate` valid (171 stops, 3 routes, 32 trips) ·
+tracker §2 rows D–F marked done, session log updated · `v0.26.0` tagged + pushed per guide §19.
+
+---
+
 ## 5. Issues Resolved
 
 ### Feature tests returning 404 on `/`
@@ -1182,6 +1269,18 @@ no-ops until `FEATURE_PUSH=true` AND a server key is configured.
 - **Fix:** moved `@if` onto its own line (preceded by whitespace) so `\B@` matches and the pair compiles balanced.
 - **Status:** ✅ Resolved — caught by the four board-rendering tests in `TripInterestTest`.
 
+### Soft-hold "full trip" test never actually filled the seat
+- **Symptom:** `SoftHoldTest::test_soft_hold_rejects_full_trip` failed — `assertSessionHasErrors('trip')` reported "Session is missing expected key [errors]".
+- **Root cause:** the trip was built with `bookableTrip(null, 600, 1)` — `total_seats`/`available_seats` = 1, so the `available_seats < 1` guard never fired and the web soft-hold **succeeded**, leaving no session error for the assertion.
+- **Fix:** the test now creates the trip directly with `total_seats => 1, available_seats => 0` so both the web (session error) and API (422) paths hit the real full-trip branch.
+- **Status:** ✅ Resolved.
+
+### Release-job tests asserted a value the job's `handle()` never returned
+- **Symptom:** `test_release_expired_soft_holds_refunds_and_frees_seat` failed — `assertSame(1, $released)` got `null`; same for the unexpired/disabled test.
+- **Root cause:** `ReleaseExpiredSoftHoldsJob::handle()` is typed `: void` (matching the repo's job pattern), so calling it and reading the return always yields `null`. The feature's *result* lives in the side effects, not a return value.
+- **Fix:** the release tests now call `BookingService::releaseExpiredSoftHolds()` directly to assert the integer count, and a new `test_release_job_releases_expired_holds` drives the job through its `handle()` and asserts the side effects (status flipped, seat restored, wallet refunded) instead of a return value.
+- **Status:** ✅ Resolved.
+
 ---
 
 ## 6. How to Work On This Project
@@ -1263,6 +1362,9 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Guide Motion & Branding + Live Corridor Chips | Connect guide three-state flow (overview → active HUD → arrived/missed) + branded pins + glass HUD + number ticks + motion tokens (reduced-motion-safe) + live corridor chip pulse + seat-count tick | ✅ Complete (v0.20.0) |
 | Roadmap P3 closed | Employer CSR report (3.14) + pay-it-forward statement (3.11) + forecast ML job (3.9) + EV lease schema seams (3.8) + ride-credit reminders (3.4) + corridor fare config UI (3.6) — P3 backlog now empty | ✅ Complete (v0.21.0) |
 | Navigation-First Sprint 3 | Live junction progress (auto waypoint reach via geofence + `WaypointReached`) + timing strip (Leaves in / Next / ETA / Delayed) + 4-step publish wizard + booking wizard hint + share request (request/approve/decline, no money until approve) + shared `notifications` table | ✅ Complete (v0.23.0) |
+| Recurring Supply Backbone | `bus_schedules` + `SchedulingService` (idempotent materialise, next-departures merge) + nightly job + admin Schedule Control Tower + board "Next departures" panel | ✅ Complete (v0.24.0) |
+| FCM Push | `device_tokens` + `FcmService` + `NotificationService` (`toFcm()`) + `UserArrivedAtPickup` 500m nudge + push-token API + PWA SW push handlers (roadmap P3.2) | ✅ Complete (v0.25.0) |
+| Matching Intelligence + Demand-Supply Signal + Soft Reservations | Weighted 0-100 match score + reasons on board/API · demand hotspots + "Be the driver" CTA · soft reservations (`BookingStatus::SoftHold`, 3-min hold, `ReleaseExpiredSoftHoldsJob`) gated `FEATURE_SOFT_HOLD` | ✅ Complete (v0.26.0) |
 
 ### Immediate next steps
 1. Enable Redis (GEO + queue) per the guide's tech stack
@@ -1280,6 +1382,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 13. ✅ DONE — Navigation-First Sprint 3 (see §4.34); next: remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 14. ✅ DONE — Recurring supply backbone (see §4.35) — `bus_schedules` + `SchedulingService` + nightly job + admin Schedule Control Tower + board "Next departures" panel; remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 15. ✅ DONE — FCM push (see §4.36) — `device_tokens` + `FcmService` + `NotificationService` + `UserArrivedAtPickup` nudge + push-token API + PWA SW push handlers; roadmap P3.2 marked done (P3 backlog empty); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+16. ✅ DONE — v0.26.0 (see §4.37) — weighted matching score + reasons, demand hotspots + "Be the driver" CTA, soft reservations (`FEATURE_SOFT_HOLD`, 3-min hold + `ReleaseExpiredSoftHoldsJob`); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2); next: v0.27.0 driver trip templates + driver prompts (tracker §3)
 
 ---
 
@@ -1317,6 +1420,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.23.0` | Navigation-First Sprint 3 | Live junction progress — `trip_waypoints` timing/geofence columns + idempotent JSON→relational backfill (`eta_minutes`, `is_major_hub`, `distance_from_origin_km`, `geofence_radius_m`, `reached_at`) · `TripService::calculateProgress` passed/current/upcoming + auto `markReachedWaypoints` on location update (`WaypointReached` broadcast + `waypoint_reached` audit trail) · timing strip (Leaves in / Next / ETA / Delayed) · `trips/create` 4-step `progressWizard` + booking wizard hint · share request (public "Request to join this ride" → Requested booking with `share_code`, no seat/hold; approve holds like a wallet booking, decline is a pure flip; `BookingRequested`/`RequestApproved`/`RequestDeclined`/`WaypointReachedNotification` DB+log notifications) · shared `notifications` table created (was missing) · `workride.waypoint.*` config | 489 (1616) | 2026-08-06 |
 | `v0.24.0` | Recurring Supply Backbone (guide §6 Workflow 5) | `bus_schedules` table + `BusSchedule` model (Citymapper-style "every 15 min Mon–Fri 06:30–09:00", days-of-week JSON, pause/resume) · `SchedulingService` — `materializeDay` (idempotent `SCHED-{id}-{Y-m-d}-{Hi}` ref, skips past/paused/off-weekday/off-feature, GTFS regen on new slots), `nextDepartures` (materialised trips + un-materialised slots deduped by `schedule_id|Y-m-d H:i`, corridor + limit), `departuresBetween` · `GenerateRecurringTripsJob` nightly 05:00 (today + tomorrow) · admin `ScheduleController` CRUD + pause/resume + manual materialise (portable `CASE` ordering — SQLite-safe) + `/admin/schedules` + sidebar · board "Next departures / Guaranteed recurring slots" panel via `TripBoardController::index()` → `$nextDepartures` · `GtfsRouteFactory` + `BusScheduleFactory` · PHPStan baseline regenerated (Eloquent inference noise only; unused `GeofenceService` dep removed, impossible `?array` returns typed out, `@param array<string,mixed>` added) | 512 (1675) | 2026-08-07 |
 | `v0.25.0` | FCM Push (roadmap P3.2) | `device_tokens` + `bookings.arrival_notified_at` · `DeviceToken` + `User::deviceTokens()` · `FcmService` (legacy HTTP send, feature-gated `FEATURE_PUSH`) · `NotificationService` (any notification's `toFcm()` → FCM) · `UserArrivedAtPickup` broadcast (private `trip.{id}`) + `UserArrivedAtPickupNotification` (database + log + FCM) · `TripService::notifyArrivingPassengers()` from `updateLocation` (idempotent `arrival_notified_at`, `push.arrived_radius_m` 500) · `POST/DELETE /api/v1/push/tokens` · PWA SW `push`/`notificationclick` deep-link → `/trips/{id}` · `.env.example` keys · PHPStan baseline regenerated (single-element `in_array` → `!==` guard; 4 stale `updateLocation` ignores dropped) | 523 (1701) | 2026-08-07 |
+| `v0.26.0` | Matching Intelligence + Demand-Supply Signal + Soft Reservations | P1 weighted 0-100 match score (`score_weights` proximity 40 / timing 25 / rating 15 / verification 10 / seat-fill 10) + readable `score_reasons` on board/API/live corridor chips (`scoreTrip()` feeds `upcoming()`, proximity only with a pickup point) · P2 `DemandService::hotspots()` (24h junction counts + pending check-ins, 1 km attribution) on board strip + `/trips`/`/go` empty states + "Be the driver" CTA (Level 1+, pre-selects corridor; phone-only riders get a wait message) · P3 soft reservations gated `FEATURE_SOFT_HOLD` — `BookingStatus::SoftHold` + `bookings.soft_hold_expires_at`, `BookingService::softHold()` (atomic lock + wallet hold + employer coverage + seat decrement, ride-credit excluded, 3-min hold) / `confirmSoftHold()` (row-locked) / `releaseExpiredSoftHolds()` + `ReleaseExpiredSoftHoldsJob` (every minute: refund via `WalletService::releaseHold`, seat back, interest revert, live `TripSeatsUpdated`), web + API routes, hold form + confirm/countdown UI · PHPStan baseline regenerated (controller return types + `?->canBook()` fixed in code) | 548 (1800) | 2026-08-07 |
 
 ---
 

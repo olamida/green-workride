@@ -499,6 +499,13 @@ Sprint4 Week5: Asset+Maintenance+Inspection tables + Driver App checklist + OBD2
 Sprint5 Week6: GTFS Publisher → Submit to Google, pitch World Bank → commit + tag v0.5.0
 Sprint6 Week7: Road Sensor useRoadSensor.js + IRI + Heatmap → Pitch FERMA, sell Road API → commit + tag v0.6.0
 Sprint7 Week8: PWA Award UI + Impact Certificates + Corporate Pass → Launch Green Challenge, PR, Angel round → commit + tag v0.7.0
+Sprint8: Employer Mobility Programs + Rewards/Green Points + Commodity Commerce → tag v0.8.0
+Sprint9: Missions + Global Nav Redesign → tag v0.9.0
+Sprint3.6: Tiered KYC (liveness + NIMC + driver anti-spoof) → tag v0.9.1
+Sprint10: Tier-0 phone-verified onboarding + Employer Enrollment Forms 1 & 2 → tag v0.11.0
+Sprint11: Operations & Demand Research schema (fleet/stakeholder/forecast/demand field kit) → tag v0.13.0
+v0.26.0: Matching Intelligence (weighted score + reasons) · Demand-Supply Signal (hotspots + be-the-driver) · Soft Reservations (`FEATURE_SOFT_HOLD`, 3-min hold + `ReleaseExpiredSoftHoldsJob`)
+> Full sprint/version table: `DEVELOPMENT-LOG.md` §7 + §7.1.
 
 ## 19. Git & Version Control - Commit Every Phase
 
