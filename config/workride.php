@@ -330,4 +330,19 @@ return [
         // recommended number of extra vehicles.
         'seats_per_vehicle' => env('WORKRIDE_FORECAST_SEATS_PER_VEHICLE', 15),
     ],
+
+    // Recurring supply backbone (guide §6 Workflow 5) — declarative
+    // BusSchedule rows ("Kubwa→CBD every 15 min Mon–Fri 06:30–09:00")
+    // materialised nightly into real, bookable Trip rows. On by default so
+    // the board always shows the guaranteed timetable ahead of the live rides.
+    'scheduling' => [
+        'enabled' => (bool) env('FEATURE_SCHEDULING', true),
+        // How many days ahead a driver's "Repeat Mon–Fri" carpool publishes
+        // companion trips in one action.
+        'repeat_horizon_days' => env('WORKRIDE_REPEAT_HORIZON_DAYS', 14),
+        // Seat capacity used when a schedule's vehicle has no recorded seats.
+        'default_seats' => env('WORKRIDE_SCHEDULE_DEFAULT_SEATS', 15),
+        // How far ahead the board's "Next departures" panel looks.
+        'lookahead_hours' => env('WORKRIDE_SCHEDULE_LOOKAHEAD_HOURS', 48),
+    ],
 ];

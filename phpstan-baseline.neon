@@ -703,6 +703,12 @@ parameters:
 			path: app/Http/Controllers/Admin/RoadController.php
 
 		-
+			message: '#^Property App\\Models\\BusSchedule\:\:\$status \(string\) does not accept App\\Enums\\BusScheduleStatus\:\:Active\|App\\Enums\\BusScheduleStatus\:\:Paused\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: app/Http/Controllers/Admin/ScheduleController.php
+
+		-
 			message: '#^Method App\\Http\\Controllers\\Admin\\ScoreboardController\:\:index\(\) has no return type specified\.$#'
 			identifier: missingType.return
 			count: 1
@@ -3203,6 +3209,78 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Booking.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$corridor\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$route_long_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$route_short_name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Class App\\Models\\BusSchedule uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Method App\\Models\\BusSchedule\:\:driver\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Method App\\Models\\BusSchedule\:\:route\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Method App\\Models\\BusSchedule\:\:vehicle\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Method App\\Models\\BusSchedule\:\:workplace\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\BelongsTo does not specify its types\: TRelatedModel, TDeclaringModel$#'
+			identifier: missingType.generics
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Parameter \#2 \$haystack of function in_array expects array, array\|string given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\BusScheduleStatus\:\:Active will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>route_long_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/BusSchedule.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>route_short_name" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Models/BusSchedule.php
 
 		-
 			message: '#^Class App\\Models\\ChargingStation uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
@@ -5971,6 +6049,24 @@ parameters:
 			path: app/Services/RoutingService.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$seats\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/SchedulingService.php
+
+		-
+			message: '#^Method App\\Services\\SchedulingService\:\:nextDepartures\(\) should return list\<array\<string, mixed\>\> but returns array\<int, array\{source\: string, trip_id\: int, schedule_id\: int\|null, departure_time\: string, corridor\: string, label\: string, fare\: float, seats\: int\}\|array\{source\: string, trip_id\: null, schedule_id\: int, departure_time\: Carbon\\CarbonInterface, corridor\: App\\Enums\\Corridor, label\: string, fare\: float, seats\: int\}\>\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/SchedulingService.php
+
+		-
+			message: '#^Using nullsafe property access "\?\-\>seats" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Services/SchedulingService.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\User\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\User\>\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 2
@@ -6117,19 +6213,19 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$label\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Services/TripService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lat\.$#'
 			identifier: property.notFound
-			count: 5
+			count: 6
 			path: app/Services/TripService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$lng\.$#'
 			identifier: property.notFound
-			count: 5
+			count: 6
 			path: app/Services/TripService.php
 
 		-
@@ -6193,6 +6289,18 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Cannot call method copy\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Cannot call method format\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 2
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Cannot call method isPast\(\) on string\.$#'
 			identifier: method.nonObject
 			count: 1
@@ -6225,6 +6333,12 @@ parameters:
 		-
 			message: '#^Method App\\Services\\TripService\:\:publish\(\) should return App\\Models\\Trip but returns Illuminate\\Database\\Eloquent\\Model\.$#'
 			identifier: return.type
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Method App\\Services\\TripService\:\:publishRepeatCompanions\(\) has parameter \$data with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
 			count: 1
 			path: app/Services/TripService.php
 
@@ -6271,6 +6385,12 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: argument.unresolvableType
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Parameter \#1 \$trip of class App\\Events\\TripCancelled constructor expects App\\Models\\Trip, App\\Models\\Trip\|null given\.$#'
 			identifier: argument.type
 			count: 1
@@ -6296,6 +6416,12 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$trip of method App\\Services\\TripService\:\:markReachedWaypoints\(\) expects App\\Models\\Trip, App\\Models\\Trip\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Parameter \#1 \$trip of method App\\Services\\TripService\:\:publishRepeatCompanions\(\) expects App\\Models\\Trip, Illuminate\\Database\\Eloquent\\Model given\.$#'
 			identifier: argument.type
 			count: 1
 			path: app/Services/TripService.php
@@ -6349,6 +6475,12 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Return type of call to method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) contains unresolvable type\.$#'
+			identifier: method.unresolvableReturnType
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\TripStatus\:\:Active will always evaluate to true\.$#'
 			identifier: notIdentical.alwaysTrue
 			count: 2
@@ -6367,6 +6499,18 @@ parameters:
 			path: app/Services/TripService.php
 
 		-
+			message: '#^Unable to resolve the template type TKey in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Services/TripService.php
+
+		-
+			message: '#^Unable to resolve the template type TValue in call to function collect$#'
+			identifier: argument.templateType
+			count: 1
+			path: app/Services/TripService.php
+
+		-
 			message: '#^Unreachable statement \- code above always terminates\.$#'
 			identifier: deadCode.unreachable
 			count: 3
@@ -6375,7 +6519,7 @@ parameters:
 		-
 			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 1
+			count: 3
 			path: app/Services/TripService.php
 
 		-

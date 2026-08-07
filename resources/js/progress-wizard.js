@@ -17,6 +17,8 @@ export default function progressWizard(options) {
         isFreeVolunteer: options.isFreeVolunteer ?? false,
         corridorLabels: options.corridorLabels ?? {},
 
+        repeat: options.repeat ?? false,
+
         locate() {
             if (!navigator.geolocation) {
                 this.locationStatus = 'Geolocation not supported by this browser.';

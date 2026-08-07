@@ -10,6 +10,7 @@ use App\Models\DriverScore;
 use App\Models\Trip;
 use App\Services\DemandService;
 use App\Services\RatingService;
+use App\Services\SchedulingService;
 use App\Services\TripMatchingService;
 use App\Services\TripService;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class TripBoardController extends Controller
         private RatingService $ratings,
     ) {}
 
-    public function index(Request $request, TripMatchingService $matcher, DemandService $demand)
+    public function index(Request $request, TripMatchingService $matcher, DemandService $demand, SchedulingService $scheduling)
     {
         $corridor = $request->has('corridor') && $request->input('corridor')
             ? Corridor::from($request->input('corridor'))
@@ -55,7 +56,11 @@ class TripBoardController extends Controller
         // Per-corridor availability within the selected window — the chip hero.
         $corridorStats = $matcher->corridorStats($withinMinutes);
 
-        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip', 'corridorLive', 'corridorStats'));
+        // Guaranteed recurring timetable (guide §6 Workflow 5): materialised
+        // trips merged with the closest unmaterialised schedule slots.
+        $nextDepartures = $scheduling->nextDepartures($corridor, 6);
+
+        return view('trips.board', compact('trips', 'corridor', 'womenOnly', 'window', 'presets', 'demandSnapshot', 'nextTrip', 'corridorLive', 'corridorStats', 'nextDepartures'));
     }
 
     public function create()
@@ -253,6 +258,9 @@ class TripBoardController extends Controller
             'departure_time' => ['required', 'date', 'after:now'],
             'is_free_volunteer' => ['sometimes', 'boolean'],
             'women_only' => ['sometimes', 'boolean'],
+            'repeat' => ['sometimes', 'boolean'],
+            'repeat_days' => ['required_if:repeat,1', 'sometimes', 'array'],
+            'repeat_days.*' => ['string', Rule::in(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])],
             'current_lat' => ['nullable', 'numeric', 'between:-90,90'],
             'current_lng' => ['nullable', 'numeric', 'between:-180,180'],
             'vehicle_id' => ['nullable', 'integer', 'exists:vehicles,id'],

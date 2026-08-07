@@ -7,6 +7,7 @@ use App\Enums\DriverScoreLevel;
 use App\Enums\TripStatus;
 use App\Enums\UserRole;
 use App\Enums\VerificationLevel;
+use App\Models\BusSchedule;
 use App\Models\DriverScore;
 use App\Models\Trip;
 use App\Models\User;
@@ -393,5 +394,39 @@ class TripTest extends TestCase
             ->get("/trips/{$trip->id}")
             ->assertOk()
             ->assertSee('95 Platinum driver');
+    }
+
+    public function test_board_shows_guaranteed_next_departures_from_schedules(): void
+    {
+        $this->travelTo('2026-08-10 05:00:00');
+
+        $driver = $this->driver();
+        $vehicle = Vehicle::where('user_id', $driver->id)->first();
+
+        BusSchedule::factory()->create([
+            'driver_id' => $driver->id,
+            'vehicle_id' => $vehicle->id,
+            'departure_time' => '06:30',
+            'end_time' => '07:00',
+            'frequency_minutes' => 15,
+            'days_of_week' => ['mon'],
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertSee('Next departures')
+            ->assertSee('Guaranteed recurring slots')
+            ->assertSee('scheduled');
+    }
+
+    public function test_board_omits_next_departures_when_scheduling_disabled(): void
+    {
+        config(['workride.scheduling.enabled' => false]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertDontSee('Next departures');
     }
 }

@@ -24,6 +24,7 @@ return [
             'items' => [
                 ['label' => 'Demand Research', 'route' => 'admin.ops.demand', 'active' => 'admin.ops.demand'],
                 ['label' => 'Fleet', 'route' => 'admin.fleet.index', 'active' => 'admin.fleet.*,admin.faults.*,admin.maintenance.*'],
+                ['label' => 'Schedules', 'route' => 'admin.schedules.index', 'active' => 'admin.schedules.*'],
                 ['label' => 'Verifications', 'route' => 'admin.verifications.index', 'active' => 'admin.verifications.*', 'badge' => 'verifications'],
                 ['label' => 'Driver Scores', 'route' => 'admin.scoreboard.index', 'active' => 'admin.scoreboard.*'],
             ],

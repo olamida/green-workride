@@ -23,6 +23,8 @@ class Trip extends Model
         'origin_text',
         'destination_text',
         'share_code',
+        'schedule_ref',
+        'repeat_group',
         'current_lat',
         'current_lng',
         'total_seats',

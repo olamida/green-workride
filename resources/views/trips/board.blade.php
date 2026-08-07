@@ -120,6 +120,35 @@
         @endif
     </div>
 
+    {{-- Guaranteed next departures — the recurring timetable materialised ahead. --}}
+    @if (! empty($nextDepartures))
+        <div class="mb-6 rounded-2xl border border-forest-200 bg-forest-50 px-5 py-4">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="font-heading text-sm font-semibold text-ink-900">Next departures</h2>
+                <span class="text-xs text-ink-500">Guaranteed recurring slots</span>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2">
+                @foreach ($nextDepartures as $departure)
+                    @if ($departure['source'] === 'trip' && $departure['trip_id'])
+                        <a href="{{ route('trips.show', $departure['trip_id']) }}" class="group flex items-center gap-2 rounded-xl border border-forest-200 bg-white px-3 py-2 text-xs font-semibold text-ink-900 transition hover:border-forest-400">
+                            <span class="font-mono">{{ $departure['departure_time']->format('D g:i A') }}</span>
+                            <span class="text-ink-500">{{ $departure['corridor']->label() }}</span>
+                            <span class="font-mono text-forest-700">₦{{ number_format((float) $departure['fare']) }}</span>
+                            <span class="text-ink-400 group-hover:text-ink-600">→</span>
+                        </a>
+                    @else
+                        <span class="flex items-center gap-2 rounded-xl border border-dashed border-forest-300 bg-white px-3 py-2 text-xs font-medium text-ink-700">
+                            <span class="font-mono">{{ $departure['departure_time']->format('D g:i A') }}</span>
+                            <span class="text-ink-500">{{ $departure['corridor']->label() }}</span>
+                            <span class="font-mono text-forest-700">₦{{ number_format((float) $departure['fare']) }}</span>
+                            <span class="text-[10px] uppercase tracking-wide text-ink-400">scheduled</span>
+                        </span>
+                    @endif
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     <div class="space-y-4" x-data="boardLive">
         @php
             $anchors = config('workride.corridor_anchors');

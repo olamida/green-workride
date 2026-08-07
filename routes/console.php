@@ -2,6 +2,7 @@
 
 use App\Jobs\CalculateDemandForecastJob;
 use App\Jobs\DeleteExpiredSelfiesJob;
+use App\Jobs\GenerateRecurringTripsJob;
 use App\Jobs\SendRideCreditRemindersJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -19,6 +20,10 @@ Schedule::job(new DeleteExpiredSelfiesJob)->dailyAt('03:00');
 
 // Nightly: retrain the demand forecast on bookings history (guide §9 Phase 2).
 Schedule::job(new CalculateDemandForecastJob)->dailyAt('04:00');
+
+// Nightly: materialise today + tomorrow's recurring schedule trips so the
+// board/booking/GTFS machinery always has the guaranteed timetable ahead.
+Schedule::job(new GenerateRecurringTripsJob)->dailyAt('05:00');
 
 // Nightly: nudge ride-credit debtors before their due date so debt never
 // silently ages to overdue (roadmap 3.4).

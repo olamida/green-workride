@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\OpsController;
 use App\Http\Controllers\Admin\RatingController as AdminRatingController;
 use App\Http\Controllers\Admin\RewardController as AdminRewardController;
 use App\Http\Controllers\Admin\RoadController as AdminRoadController;
+use App\Http\Controllers\Admin\ScheduleController;
 use App\Http\Controllers\Admin\ScoreboardController;
 use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\Admin\StakeholderController;
@@ -240,6 +241,13 @@ Route::middleware('auth')->group(function () {
 
         Route::get('/driver-scores', [ScoreboardController::class, 'index'])->name('scoreboard.index');
         Route::post('/driver-scores/run', [ScoreboardController::class, 'run'])->name('scoreboard.run');
+
+        Route::get('/schedules', [ScheduleController::class, 'index'])->name('schedules.index');
+        Route::get('/schedules/create', [ScheduleController::class, 'create'])->name('schedules.create');
+        Route::post('/schedules', [ScheduleController::class, 'store'])->name('schedules.store');
+        Route::post('/schedules/{schedule}/toggle', [ScheduleController::class, 'toggle'])->name('schedules.toggle');
+        Route::post('/schedules/{schedule}/materialize', [ScheduleController::class, 'materialize'])->name('schedules.materialize');
+        Route::delete('/schedules/{schedule}', [ScheduleController::class, 'destroy'])->name('schedules.destroy');
 
         Route::get('/trust', [TrustController::class, 'index'])->name('trust.index');
         Route::get('/trust/export', [TrustController::class, 'export'])->name('trust.export');

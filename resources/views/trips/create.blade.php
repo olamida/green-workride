@@ -51,6 +51,7 @@
                   lng: '{{ old('current_lng') }}',
                   corridor: '{{ old('corridor', 'kubwa_cbd') }}',
                   isFreeVolunteer: {{ old('is_free_volunteer') ? 'true' : 'false' }},
+                  repeat: {{ old('repeat') ? 'true' : 'false' }},
                   corridorLabels: @json(collect($corridors)->mapWithKeys(fn ($c) => [$c->value => $c->label()])->all()),
               })">
             @csrf
@@ -134,6 +135,30 @@
                             <span class="block text-xs text-ink-500">Only female riders can book this trip.</span>
                         </span>
                     </label>
+
+                    <label class="flex items-center gap-3 rounded-xl border border-forest-200 bg-forest-50 p-4">
+                        <input type="checkbox" name="repeat" value="1" x-model="repeat" @checked(old('repeat'))
+                               class="h-5 w-5 rounded border-ink-300 text-forest-600 focus:ring-forest-500">
+                        <span>
+                            <span class="block text-sm font-semibold text-ink-900">Repeat this ride weekly</span>
+                            <span class="block text-xs text-ink-500">Publish the same trip on selected weekdays for the next 14 days.</span>
+                        </span>
+                    </label>
+
+                    <div x-show="repeat" x-cloak class="rounded-xl border border-ink-100 bg-paper p-4">
+                        <p class="mb-2 text-sm font-medium text-ink-700">Runs on</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach ([['mon', 'Mon'], ['tue', 'Tue'], ['wed', 'Wed'], ['thu', 'Thu'], ['fri', 'Fri'], ['sat', 'Sat'], ['sun', 'Sun']] as [$day, $label])
+                                <label class="flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-3 py-1.5 text-sm">
+                                    <input type="checkbox" name="repeat_days[]" value="{{ $day }}"
+                                           @checked(in_array($day, old('repeat_days', ['mon', 'tue', 'wed', 'thu', 'fri']), true))
+                                           class="h-4 w-4 rounded border-ink-300 text-forest-600 focus:ring-forest-500">
+                                    <span>{{ $label }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <p class="mt-2 text-xs text-ink-500">The published trip runs today; companions are created for the selected weekdays ahead.</p>
+                    </div>
                 </div>
 
                 {{-- Step 3: Vehicle & location --}}

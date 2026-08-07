@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-06
+> Last updated: 2026-08-07
 
 ---
 
@@ -63,6 +63,8 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Tests | ✅ 489 feature tests passing (… + navigation-first: grouped admin nav render, role-switch/reset, display-only never-mutates-role, non-admin 403, invalid-role reset, non-admin effective-role ignore · live progress tracker + waypoint-reached broadcast + timing strip · share request/approve/decline + gates) |
 | Feature modules | ✅ Navigation-First Sprint 2 complete — Destination-first home `/go` ("Where are you going?") replacing the auth landing: `NavigationService` read-only discovery (junctions 45 + workplaces + `RoutingService::geocode` Nominatim free fallback) · `NavigationController` web `/go` + API `search|directions|nearby` (`{data: …}`-wrapped) · hero search (`search.js` debounced, `destination-selected` events) · corridor chips w/ live pulse + trip counts · never-empty map (`map/common.js` `createMap`/`corridorAnchor`/`fitOrCenter`, `navigation.js` `focusDestination` zoom ≥13) · bottom-sheet ride cards · demand-aware empty state · share referral (`share_code` + `?ref=` session `trip_referral.{trip_id}` surviving guest→login → `bookings.referred_by_user_id` + `booking_referred` audit; driver/self never attributed) · PWA manifest `start_url` → `/go` · header Go + Trips nav |
 | Feature modules | ✅ Navigation-First Sprint 3 complete — Live junction progress (waypoint `reached_at` auto-stamped on crossing the arrival geofence, `calculateProgress` passed/current/upcoming, `WaypointReached` broadcast + change-control trail) · timing strip (scheduled "Leaves in N min"; active "Next: · ETA · Delayed") · 4-step publish wizard (`progressWizard`) + booking wizard hint · share request (public "Request to join this ride" → Requested booking, no seat/hold, approve holds like a wallet booking, decline is a pure flip) · missing shared `notifications` table created |
+| Feature modules | ✅ Recurring supply backbone complete (guide §6 Workflow 5) — `bus_schedules` table + `BusSchedule` model (Citymapper-style "every 15 min Mon–Fri 06:30–09:00"), `SchedulingService` (`materializeDay` idempotent per `SCHED-{id}-{Y-m-d}-{Hi}` ref, `nextDepartures` board panel merging materialised trips + un-materialised slots deduped by `schedule_id|Y-m-d H:i`, `departuresBetween`, GTFS regen on new slots), `GenerateRecurringTripsJob` nightly 05:00 (today + tomorrow) + manual "Materialise" in the Control Tower, admin `ScheduleController` (CRUD + pause/resume + materialise; portable `CASE` ordering so SQLite tests pass), board "Next departures / Guaranteed recurring slots" panel wired via `TripBoardController::index()` → `$nextDepartures`, `GtfsRouteFactory` + `BusScheduleFactory` |
+| Tests | ✅ 512 feature tests passing (… + scheduling: materialise creates a Trip per slot with 2 waypoints, idempotent re-run, past-slot skip, weekday/paused/feature-off skips, nextDepartures merge/dedupe/corridor filter/disabled, frequency window, null end_time single departure, deterministic reference, admin CRUD/toggle/materialise/destroy + validation, board panel render/omission) |
 
 ## 3. Environment
 
@@ -966,6 +968,35 @@ Sprint 3 of the navigation-first redesign (per `WORKRIDE-NAVIGATION-FIRST-MERGED
 
 **DoD:** `pint` clean (pre-existing un-pinted code in `BookingService` formatted) · PHPStan L8 gate green (baseline regenerated) · `npm run build` clean · **489 tests / 1616 assertions green**.
 
+### 4.35 Recurring Supply Backbone — Bus Schedules + Materialise + Board "Next Departures" Panel (COMPLETE)
+
+The declarative supply backbone from guide §6 Workflow 5 (Citymapper-style "every 15 min Mon–Fri 06:30–09:00"): Ops declares a timetable once, and the system materialises real bookable Trip rows for today + tomorrow so the existing board/booking/GTFS machinery all just works.
+
+**Schema (1 migration):** `2026_08_07_120000_create_bus_schedules_table` — `route_id`/`vehicle_id`/`driver_id` FKs (nullable, `nullOnDelete`), `workplace_id` nullable FK, `departure_time`/`end_time` `time`, `frequency_minutes` default 15, `days_of_week` json, `status` string default `active`. Model `BusSchedule` (`App\Enums\BusScheduleStatus` Active/Paused) with `casts()` (`departure_time`/`end_time` string, `days_of_week` array, `status` enum) + `isActive()`/`runsOn()`/`corridor()` (derived from the GTFS route)/`routeLabel()`/`departureTimes()` (frequency window, single departure when `end_time` null)/`referenceFor()`.
+
+**`SchedulingService` (`app/Services/SchedulingService.php`)** — constructor now takes only `PricingService` (the unused `GeofenceService` dependency was removed):
+- `materializeDay(string|CarbonInterface)` — for each active schedule that `runsOn($weekday)`, creates a `Trip` per departure slot with `schedule_ref = SCHED-{id}-{Y-m-d}-{Hi}` (idempotent — re-runs never duplicate), 2 waypoints (origin + destination anchors), fixed corridor fare via `PricingService`, seats from the vehicle (default 15), `TripStatus::Scheduled`; past departures skipped; dispatches `GenerateGtfsFeedJob` when anything was created; feature-gated on `workride.scheduling.enabled`.
+- `nextDepartures(?Corridor, int $limit = 6)` — passenger-facing board panel: materialised `Trip` rows (within `lookahead_hours`, seats > 0, scheduled/active) merged with un-materialised schedule slots, deduped by `schedule_id|Y-m-d H:i`, sorted, limited. Rows carry `source` (trip/schedule), `trip_id`/`schedule_id`, `departure_time` (normalized via `Carbon::parse` so both arms type cleanly), `corridor`, `label`, `fare`, `seats`.
+- `departuresBetween(BusSchedule, CarbonInterface, CarbonInterface)` — pure departure-window enumerator honouring weekday + frequency.
+
+**Job + schedule:** `GenerateRecurringTripsJob` (materialises `now()` + `now()->addDay()`) registered nightly 05:00 in `routes/console.php`.
+
+**Admin Control Tower (`Admin\ScheduleController`):** `index` (portable `CASE status WHEN 'active' THEN 0 ELSE 1 END` ordering — the MySQL-only `FIELD()` was replaced so SQLite tests pass; `with(['route','vehicle','driver'])`), `create`/`store` (validates route/vehicle/driver exist, `departure_time` `date_format:H:i`, nullable `end_time` `after:departure_time`, `frequency_minutes` 5–120, `days_of_week.*` in mon–sun), `toggle` (pause/resume), `materialize` (today + `?tomorrow=` via `$request->boolean('tomorrow')`), `destroy`. All six methods now declare return types (`View`/`RedirectResponse`). Routes `admin.schedules.*` in the admin group; "Schedules" sidebar link; `resources/views/admin/schedules/index.blade.php` + `create.blade.php`.
+
+**Board panel:** `TripBoardController::index()` injects `SchedulingService` and passes `$nextDepartures`; `trips/board.blade.php` renders a "Next departures / Guaranteed recurring slots" panel — materialised trips link to their trip page, un-materialised slots render dashed chips with corridor, time, fare and seats.
+
+**Factories:** `GtfsRouteFactory` (random corridor + `forCorridor(Corridor)` state) + `BusScheduleFactory` (route/vehicle/driver FKs, 06:30→09:00, 15 min, mon–fri, Active).
+
+**Bugs found & fixed during hardening:**
+- MySQL-only `FIELD()` ordering broke SQLite admin tests → portable `CASE`.
+- `toggle()`/`materialize()`/`destroy()` used `back()` → explicit `redirect()->route('admin.schedules.index')` with flash messages.
+- Test reference format asserted compact `Ymd` but `referenceFor` emits a dashed date (`SCHED-{id}-{2026-08-10}-{0630}`) — assertions corrected; idempotency assertion corrected (subsequent calls return 0, total stays 3).
+- PHPStan: unused `GeofenceService` constructor dependency removed (never read); `corridorAnchor()`/`corridorDestination()` typed non-nullable (the `match` is exhaustive — impossible null branches removed); `repeatGroupFor()` gains `@param array<string, mixed>`; `TripBoardController::index()` now explicitly typed. The remaining findings (enum-cast `identical.alwaysFalse`, relation `property.notFound`, `missingType.generics`) are the documented Eloquent-inference patterns and were absorbed by regenerating `phpstan-baseline.neon` per the §4.30 ritual.
+
+**Tests (23 new — 512 total, 1675 assertions):** `SchedulingTest` (12) — materialise creates a Trip per slot with 2 waypoints + `TripStatus::Scheduled` + corridor/fare/seats, idempotent re-run, past-departure skip (`travelTo` Monday 06:45 → 2 created), off-weekday skip, paused skip, feature-off skip, nextDepartures merge + dedupe + corridor filter + disabled, `departuresBetween` frequency window, null `end_time` single departure, deterministic `referenceFor`. `AdminSchedulesTest` (10) — guest redirect, non-admin 403, admin index, create page, store, days-of-week validation, toggle pause/resume, materialise (3 Monday trips), destroy. `TripTest` (2) — board renders the "Next departures" panel with a Mon schedule and omits it when scheduling is disabled.
+
+**DoD:** `pint --test` clean · PHPStan L8 gate green (baseline regenerated; genuine bugs fixed in code) · `npm run build` clean · **512 tests / 1675 assertions green**.
+
 ---
 
 ## 5. Issues Resolved
@@ -1200,6 +1231,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 11. ✅ DONE — Roadmap P3 closed (see §4.31); remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 12. ✅ DONE — Navigation-First Sprint 1 + 2 (see §4.32–4.33); next: Sprint 3 — waypoint migration + live progress tracker + wizards + share request (see `WORKRIDE-NAVIGATION-FIRST-MERGED.md` §4)
 13. ✅ DONE — Navigation-First Sprint 3 (see §4.34); next: remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
+14. ✅ DONE — Recurring supply backbone (see §4.35) — `bus_schedules` + `SchedulingService` + nightly job + admin Schedule Control Tower + board "Next departures" panel; remaining P1 backlog: seeder README + Google OAuth (see `WORKRIDE-ROADMAP.md` 1.1, 1.2)
 
 ---
 
@@ -1235,6 +1267,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.21.0` | Roadmap P3 closed | Employer CSR report (3.14) — `EmployerReportService` + `/admin/employers/{id}/report` printable · Pay-it-forward statement (3.11) — `/admin/trust/pay-it-forward` + CSV · Forecast ML job (3.9) — `CalculateDemandForecastJob` + `demand_forecasts` (14-day, nightly + manual) · EV lease schema seams (3.8, gated `FEATURE_EV_LEASE`) — `assets.propulsion`, `telemetry.battery_soc`, `lease_agreements`, `charging_stations` · Ride-credit reminders (3.4) — `SendRideCreditRemindersJob` + `RideCreditDueSoon` · Corridor fare config UI (3.6) — `settings` + `SettingsService` + `/admin/settings` (override-first fares, `PricingService::fareFor()` reads them, `corridor_fare_updated` trail) — P3 backlog empty | TBD (full suite) | 2026-08-06 |
 | `v0.22.0` | Navigation-First Sprint 1 + 2 | Destination-first auth landing `/go` ("Where are you going?"): `NavigationService` read-only discovery (45 junctions + workplaces + `RoutingService::geocode` Nominatim free fallback) · web `/go` + API `search|directions|nearby` (`{data: …}`) · hero search (`search.js`, `destination-selected` events) · live corridor chips + never-empty map (`map/common.js` + `navigation.js`) · bottom-sheet ride cards · demand-aware empty state · share referral (`share_code` + `?ref=` session → `bookings.referred_by_user_id` + `booking_referred` audit; driver/self never attributed) · PWA `start_url` → `/go` · header Go + Trips nav · admin grouped sidebar + role switcher + map common + UI primitives | 474 (1546) | 2026-08-06 |
 | `v0.23.0` | Navigation-First Sprint 3 | Live junction progress — `trip_waypoints` timing/geofence columns + idempotent JSON→relational backfill (`eta_minutes`, `is_major_hub`, `distance_from_origin_km`, `geofence_radius_m`, `reached_at`) · `TripService::calculateProgress` passed/current/upcoming + auto `markReachedWaypoints` on location update (`WaypointReached` broadcast + `waypoint_reached` audit trail) · timing strip (Leaves in / Next / ETA / Delayed) · `trips/create` 4-step `progressWizard` + booking wizard hint · share request (public "Request to join this ride" → Requested booking with `share_code`, no seat/hold; approve holds like a wallet booking, decline is a pure flip; `BookingRequested`/`RequestApproved`/`RequestDeclined`/`WaypointReachedNotification` DB+log notifications) · shared `notifications` table created (was missing) · `workride.waypoint.*` config | 489 (1616) | 2026-08-06 |
+| `v0.24.0` | Recurring Supply Backbone (guide §6 Workflow 5) | `bus_schedules` table + `BusSchedule` model (Citymapper-style "every 15 min Mon–Fri 06:30–09:00", days-of-week JSON, pause/resume) · `SchedulingService` — `materializeDay` (idempotent `SCHED-{id}-{Y-m-d}-{Hi}` ref, skips past/paused/off-weekday/off-feature, GTFS regen on new slots), `nextDepartures` (materialised trips + un-materialised slots deduped by `schedule_id|Y-m-d H:i`, corridor + limit), `departuresBetween` · `GenerateRecurringTripsJob` nightly 05:00 (today + tomorrow) · admin `ScheduleController` CRUD + pause/resume + manual materialise (portable `CASE` ordering — SQLite-safe) + `/admin/schedules` + sidebar · board "Next departures / Guaranteed recurring slots" panel via `TripBoardController::index()` → `$nextDepartures` · `GtfsRouteFactory` + `BusScheduleFactory` · PHPStan baseline regenerated (Eloquent inference noise only; unused `GeofenceService` dep removed, impossible `?array` returns typed out, `@param array<string,mixed>` added) | 512 (1675) | 2026-08-07 |
 
 ---
 

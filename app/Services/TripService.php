@@ -80,6 +80,7 @@ class TripService
             'status' => TripStatus::Scheduled,
             'departure_time' => $data['departure_time'],
             'waypoints' => $data['waypoints'] ?? null,
+            'repeat_group' => $this->repeatGroupFor($driver, $data),
         ]);
 
         foreach ($data['waypoints'] ?? [] as $index => $waypoint) {
@@ -91,11 +92,108 @@ class TripService
             ]);
         }
 
+        $this->publishRepeatCompanions($trip, $data, $corridor, $isFreeVolunteer, $womenOnly, $totalSeats);
+
         event(new TripPublished($trip));
 
         $this->queueGtfsRegeneration();
 
         return $trip->load('driver', 'vehicle', 'waypoints');
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function repeatGroupFor(User $driver, array $data): ?string
+    {
+        if (! ($data['repeat'] ?? false) || empty($data['repeat_days'])) {
+            return null;
+        }
+
+        return sprintf('REP-%d-%s-%s', $driver->id, now()->format('YmdHis'), substr((string) uniqid('', true), -6));
+    }
+
+    /**
+     * "Repeat Mon–Fri" carpool publishing: on the same weekday, at the same
+     * time-of-day, for the configured horizon, create companion Trip rows in
+     * the same repeat_group. Re-submitting the form is a no-op — a companion
+     * whose (repeat_group, departure_time) already exists is skipped.
+     */
+    private function publishRepeatCompanions(
+        Trip $trip,
+        array $data,
+        Corridor $corridor,
+        bool $isFreeVolunteer,
+        bool $womenOnly,
+        int $totalSeats,
+    ): void {
+        $repeatGroup = $trip->repeat_group;
+
+        if ($repeatGroup === null) {
+            return;
+        }
+
+        $days = collect($data['repeat_days'])->map(fn ($day) => strtolower((string) $day))->all();
+        $horizonDays = (int) config('workride.scheduling.repeat_horizon_days', 14);
+        $time = $trip->departure_time?->format('H:i') ?? '07:00';
+
+        $waypoints = $trip->waypoints()->orderBy('sequence')->get()->map(fn ($wp) => [
+            'label' => $wp->label,
+            'lat' => (float) $wp->lat,
+            'lng' => (float) $wp->lng,
+        ])->all();
+
+        for ($offset = 1; $offset <= $horizonDays; $offset++) {
+            $departure = $trip->departure_time?->copy()->addDays($offset);
+            $weekday = strtolower($departure?->format('D') ?? '');
+
+            if (! in_array($weekday, $days, true)) {
+                continue;
+            }
+
+            $departureAt = ($departure?->format('Y-m-d') ?? '') === '' ? null : $departure;
+            $key = $trip->departure_time->format('H:i');
+
+            $exists = Trip::query()
+                ->where('repeat_group', $repeatGroup)
+                ->whereDate('departure_time', $departure->toDateString())
+                ->whereTime('departure_time', $key)
+                ->exists();
+
+            if ($exists || $departureAt === null) {
+                continue;
+            }
+
+            $companion = Trip::create([
+                'driver_id' => $trip->driver_id,
+                'vehicle_id' => $trip->vehicle_id,
+                'asset_id' => $trip->asset_id,
+                'route_name' => $corridor->label(),
+                'corridor' => $corridor,
+                'origin_text' => $trip->origin_text,
+                'destination_text' => $trip->destination_text,
+                'total_seats' => $totalSeats,
+                'available_seats' => $totalSeats,
+                'fare_per_seat' => $this->pricing->fareFor($corridor, $isFreeVolunteer),
+                'is_free_volunteer' => $isFreeVolunteer,
+                'women_only' => $womenOnly,
+                'status' => TripStatus::Scheduled,
+                'departure_time' => $departureAt,
+                'waypoints' => $waypoints,
+                'repeat_group' => $repeatGroup,
+            ]);
+
+            foreach ($waypoints as $index => $waypoint) {
+                $companion->waypoints()->create([
+                    'label' => $waypoint['label'],
+                    'lat' => $waypoint['lat'],
+                    'lng' => $waypoint['lng'],
+                    'sequence' => $index + 1,
+                ]);
+            }
+
+            event(new TripPublished($companion));
+        }
     }
 
     /**
