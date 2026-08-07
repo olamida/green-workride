@@ -198,6 +198,11 @@
                                         <span class="text-gold-600">★ {{ number_format((float) $driver['rating_avg'], 1) }}</span>
                                     @endif
                                 @endif
+                                @if (($trip['match_score'] ?? null) !== null)
+                                    <span class="inline-flex items-center rounded-full bg-ink-900 px-2.5 py-0.5 text-xs font-semibold text-white" title="Why this match: {{ implode(' · ', $trip['score_reasons'] ?? []) }}">
+                                        {{ $trip['match_score'] }}/100 match
+                                    </span>
+                                @endif
                                 <span class="ml-auto font-semibold text-forest-700 group-hover:underline">View &amp; book →</span>
                             </div>
                         </a>

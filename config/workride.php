@@ -34,6 +34,20 @@ return [
     // a live pickup request. Kept tight so near-term seats are not pre-empted.
     'departure_window_minutes' => env('WORKRIDE_DEPARTURE_WINDOW_MINUTES', 30),
 
+    // Weighted match scoring (v6 matching-polish): every trip surfaced on the
+    // board or API carries a 0-100 "match score" + human-readable reasons so a
+    // rider can see WHY the matcher ranked it. Weights sum to 100; proximity is
+    // only applied when a passenger pickup point is known (API matcher).
+    'matching' => [
+        'score_weights' => [
+            'proximity' => 40,
+            'timing' => 25,
+            'rating' => 15,
+            'verification' => 10,
+            'seat_fill' => 10,
+        ],
+    ],
+
     // Animated SVG brand cards (matching-anim, demand-map-anim, navigation-anim,
     // trip-fill-anim). Off by default — they are decorative, not functional, and
     // we want a calm, content-first UI until the site-wide animation language is

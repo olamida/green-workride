@@ -154,6 +154,8 @@ class TripController extends Controller
             'status' => $trip->status->value,
             'departure_time' => $trip->departure_time->toIso8601String(),
             'match_distance_m' => $trip->match_distance_m ?? null,
+            'match_score' => $trip->match_score ?? null,
+            'score_reasons' => $trip->score_reasons ?? [],
             'driver' => $trip->driver ? [
                 'id' => $trip->driver->id,
                 'name' => $trip->driver->name,

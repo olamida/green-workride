@@ -40,7 +40,18 @@ class TripMatchingService
                 return $trip;
             })
             ->filter(fn (Trip $trip) => $trip->match_distance_m <= $radiusMeters)
-            ->sortBy(fn (Trip $trip) => [$trip->match_distance_m, $trip->departure_time->timestamp])
+            ->map(function (Trip $trip) use ($fromLat, $fromLng, $radiusMeters, $withinMinutes) {
+                $scored = $this->scoreTrip($trip, $fromLat, $fromLng, $radiusMeters, $withinMinutes);
+                $trip->match_score = $scored['score'];
+                $trip->score_reasons = $scored['reasons'];
+
+                return $trip;
+            })
+            ->sortBy(fn (Trip $trip) => [
+                -(int) ($trip->match_score ?? 0),
+                $trip->match_distance_m,
+                $trip->departure_time->timestamp,
+            ])
             ->values();
     }
 
@@ -81,6 +92,15 @@ class TripMatchingService
 
         $this->ratings->attachDriverRatingToTrips($trips);
         DriverScore::attachLatestToTrips($trips);
+
+        // Board context has no passenger pickup point, so the score drops the
+        // proximity factor and ranks purely on timing + driver quality. The API
+        // matcher re-scores each trip WITH proximity before sorting (§findMatches).
+        $trips->each(function (Trip $trip) {
+            $scored = $this->scoreTrip($trip);
+            $trip->match_score = $scored['score'];
+            $trip->score_reasons = $scored['reasons'];
+        });
 
         return $trips;
     }
@@ -152,5 +172,81 @@ class TripMatchingService
         $tripLng = $trip->current_lng ? (float) $trip->current_lng : null;
 
         return $this->geofence->haversine($fromLat, $fromLng, $tripLat ?? 9.05, $tripLng ?? 7.45);
+    }
+
+    /**
+     * Weighted 0-100 match score with human-readable reasons (v6 matching-polish).
+     *
+     * Weights come from config('workride.matching.score_weights') and sum to 100.
+     * Proximity only scores when a passenger pickup point is supplied — the board
+     * (no pickup) ranks purely on timing + driver quality, the API matcher adds
+     * the distance factor. Reasons explain the score so riders trust the ranking.
+     *
+     * @return array{score:int, reasons:string[]}
+     */
+    public function scoreTrip(
+        Trip $trip,
+        ?float $fromLat = null,
+        ?float $fromLng = null,
+        ?float $radiusMeters = null,
+        ?int $withinMinutes = null,
+    ): array {
+        $weights = (array) config('workride.matching.score_weights', []);
+        $radiusMeters ??= (float) config('workride.search_radius_m', 2000);
+        $withinMinutes ??= (int) config('workride.departure_window_minutes', 30);
+
+        $score = 0;
+        $reasons = [];
+
+        // --- proximity (40) — only when we know where the passenger is ---
+        if ($fromLat !== null && $fromLng !== null) {
+            $distance = $this->distanceToTrip($trip, $fromLat, $fromLng);
+            $ratio = max(0.0, 1 - ($distance / $radiusMeters));
+            $score += (float) ($weights['proximity'] ?? 40) * $ratio;
+            $reasons[] = '≈ '.max(1, (int) round($distance)).' km from you';
+        }
+
+        // --- timing (25) — live trips are ideal; soonest departure wins ---
+        $isLive = $trip->status === TripStatus::Active;
+        $minutesToDeparture = $isLive ? 0 : max(0, (int) $trip->departure_time?->diffInMinutes(now(), false) ?? 0);
+        $timingRatio = $isLive ? 1.0 : max(0.0, 1 - ($minutesToDeparture / $withinMinutes));
+        $score += (float) ($weights['timing'] ?? 25) * $timingRatio;
+        $reasons[] = $isLive
+            ? 'Live now'
+            : ($minutesToDeparture === 0
+                ? 'Leaves now'
+                : 'Leaves in '.$minutesToDeparture.' min');
+
+        // --- rating (15) — rated drivers out-rank new ones; no rating is neutral ---
+        $rating = $trip->driver_rating_avg !== null ? (float) $trip->driver_rating_avg : 0.0;
+        $ratingCount = (int) ($trip->driver_rating_count ?? 0);
+        $ratingRatio = $ratingCount > 0 ? $rating / 5 : 0.5;
+        $score += (float) ($weights['rating'] ?? 15) * $ratingRatio;
+        $reasons[] = $ratingCount > 0
+            ? '★ '.number_format($rating, 1).' driver ('.$ratingCount.')'
+            : 'New driver';
+
+        // --- verification (10) — Level 3 is the fully-checked paid driver ---
+        $level = $trip->driver?->verification_level;
+        $verificationRatio = $level?->canDrivePaid() ? 1.0 : ($level?->canDriveVolunteer() ? 0.6 : 0.2);
+        $score += (float) ($weights['verification'] ?? 10) * $verificationRatio;
+        $reasons[] = $level?->canDrivePaid()
+            ? 'Level 3 verified'
+            : ($level?->canDriveVolunteer() ? 'Workplace verified' : 'New account');
+
+        // --- seat_fill (10) — plenty of room beats a nearly-full bus ---
+        $fillRatio = $trip->total_seats > 0 ? ($trip->available_seats / $trip->total_seats) : 0.5;
+        $score += (float) ($weights['seat_fill'] ?? 10) * $fillRatio;
+        $reasons[] = $trip->available_seats.' seats free';
+
+        // Free volunteer rides get an honest label (no points — fare is the hook).
+        if ($trip->is_free_volunteer) {
+            $reasons[] = 'FREE ride';
+        }
+
+        return [
+            'score' => min(100, max(0, (int) round($score))),
+            'reasons' => $reasons,
+        ];
     }
 }

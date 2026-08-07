@@ -6127,6 +6127,12 @@ parameters:
 			path: app/Services/StakeholderService.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$driver_rating_avg\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripMatchingService.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$leaving_soon\.$#'
 			identifier: property.notFound
 			count: 1
@@ -6139,13 +6145,31 @@ parameters:
 			path: app/Services/TripMatchingService.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$match_score\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/TripMatchingService.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$min_fare\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/TripMatchingService.php
 
 		-
+			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$score_reasons\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Services/TripMatchingService.php
+
+		-
 			message: '#^Access to an undefined property App\\Models\\Trip\:\:\$trip_count\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/TripMatchingService.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$verification_level\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/TripMatchingService.php
@@ -6157,8 +6181,20 @@ parameters:
 			path: app/Services/TripMatchingService.php
 
 		-
+			message: '#^Cannot call method diffInMinutes\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/TripMatchingService.php
+
+		-
 			message: '#^Cannot call method lte\(\) on string\.$#'
 			identifier: method.nonObject
+			count: 1
+			path: app/Services/TripMatchingService.php
+
+		-
+			message: '#^Expression on left side of \?\? is not nullable\.$#'
+			identifier: nullCoalesce.expr
 			count: 1
 			path: app/Services/TripMatchingService.php
 
@@ -6177,6 +6213,18 @@ parameters:
 		-
 			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\TripStatus\:\:Active will always evaluate to false\.$#'
 			identifier: identical.alwaysFalse
+			count: 2
+			path: app/Services/TripMatchingService.php
+
+		-
+			message: '#^Ternary operator condition is always false\.$#'
+			identifier: ternary.alwaysFalse
+			count: 3
+			path: app/Services/TripMatchingService.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
 			count: 1
 			path: app/Services/TripMatchingService.php
 

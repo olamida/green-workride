@@ -248,6 +248,8 @@ class NavigationService
             'current_lng' => $trip->current_lng,
             'match_distance_m' => $trip->match_distance_m
                 ?? $this->matching->distanceToTrip($trip, (float) $from['lat'], (float) $from['lng']),
+            'match_score' => $trip->match_score ?? null,
+            'score_reasons' => $trip->score_reasons ?? [],
             'toward_destination' => $trip->toward_destination ?? false,
             'leaving_soon' => $trip->leaving_soon ?? false,
             'driver' => $driver ? [

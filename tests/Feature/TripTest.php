@@ -429,4 +429,56 @@ class TripTest extends TestCase
             ->assertOk()
             ->assertDontSee('Next departures');
     }
+
+    public function test_board_cards_render_match_score_and_reasons(): void
+    {
+        $driver = $this->driver();
+        Trip::factory()->forDriver($driver)->create([
+            'route_name' => 'Kubwa → CBD',
+            'departure_time' => now()->addMinutes(15),
+        ]);
+
+        $this->actingAs($this->verifiedWorker())
+            ->get('/trips')
+            ->assertOk()
+            ->assertSee('Kubwa → CBD')
+            ->assertSee('/100 match')
+            ->assertSee('seats free')
+            ->assertSee('Level 3 verified');
+    }
+
+    public function test_api_search_returns_match_score_and_ranks_closer_higher(): void
+    {
+        $driver = $this->driver();
+        $near = Trip::factory()->forDriver($driver)->create([
+            'corridor' => Corridor::KubwaCbd,
+            'departure_time' => now()->addMinutes(10),
+            'current_lat' => 9.05,
+            'current_lng' => 7.45,
+        ]);
+        $far = Trip::factory()->forDriver($driver)->create([
+            'corridor' => Corridor::KubwaCbd,
+            'departure_time' => now()->addMinutes(10),
+            'current_lat' => 9.0590,
+            'current_lng' => 7.4550,
+        ]);
+
+        $this->actingAs($this->verifiedWorker(), 'sanctum')
+            ->getJson('/api/v1/trips?corridor=kubwa_cbd&from_lat=9.05&from_lng=7.45')
+            ->assertOk()
+            ->assertJsonCount(2, 'trips')
+            ->assertJsonPath('trips.0.id', $near->id)
+            ->assertJsonStructure([
+                'trips' => [['match_score', 'score_reasons', 'match_distance_m']],
+            ])
+            ->assertJsonPath('trips.0.match_score', fn (int $score) => $score > 0);
+
+        $response = $this->actingAs($this->verifiedWorker(), 'sanctum')
+            ->getJson('/api/v1/trips?corridor=kubwa_cbd&from_lat=9.05&from_lng=7.45')
+            ->assertOk()
+            ->json('trips');
+
+        $this->assertGreaterThan($response[1]['match_score'], $response[0]['match_score']);
+        $this->assertLessThan($response[1]['match_distance_m'], $response[0]['match_distance_m']);
+    }
 }
