@@ -1273,6 +1273,60 @@ parameters:
 			path: app/Http/Controllers/Api/V1/FleetController.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$avatar\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$verification_level\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Api\\V1\\GoController\:\:tripPayload\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Api/V1/GoController.php
+
+		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$id\.$#'
 			identifier: property.notFound
 			count: 1
@@ -2087,6 +2141,60 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Http/Controllers/Web/EmployerRequestController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$avatar\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$verification_level\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Cannot call method label\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Cannot call method toIso8601String\(\) on string\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Method App\\Http\\Controllers\\Web\\GoController\:\:tripPayload\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Using nullsafe method call on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 2
+			path: app/Http/Controllers/Web/GoController.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Http/Controllers/Web/GoController.php
 
 		-
 			message: '#^Method App\\Http\\Controllers\\Web\\GtfsController\:\:feed\(\) has no return type specified\.$#'
@@ -5609,6 +5717,162 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Services/GtfsService.php
+
+		-
+			message: '#^Cannot access property \$corridor on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$current_lat on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 4
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$current_lng on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 4
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$driver on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 4
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$lat on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$lng on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$route_name on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$status on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$value on string\.$#'
+			identifier: property.nonObject
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot access property \$vehicle on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: property.nonObject
+			count: 4
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Cannot call method bookings\(\) on Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: method.nonObject
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Method App\\Services\\JourneyService\:\:getLiveJourneyData\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Method App\\Services\\JourneyService\:\:getNextBoardingWaypoint\(\) should return App\\Models\\TripWaypoint\|null but returns Illuminate\\Database\\Eloquent\\Model\|null\.$#'
+			identifier: return.type
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Method App\\Services\\JourneyService\:\:logSos\(\) has parameter \$context with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Method App\\Services\\JourneyService\:\:markWaypointReached\(\) is unused\.$#'
+			identifier: method.unused
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Parameter \#1 \$trip of method App\\Services\\JourneyService\:\:calculateEtaToDestination\(\) expects App\\Models\\Trip, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Parameter \#1 \$trip of method App\\Services\\JourneyService\:\:estimateTripDistance\(\) expects App\\Models\\Trip, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Parameter \#1 \$trip of method App\\Services\\JourneyService\:\:getNextBoardingWaypoint\(\) expects App\\Models\\Trip, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Parameter \#1 \$user of static method App\\Models\\ActivityLog\:\:log\(\) expects App\\Models\\User, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 3
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Result of \|\| is always false\.$#'
+			identifier: booleanOr.alwaysFalse
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Strict comparison using \!\=\= between string and App\\Enums\\TripStatus\:\:Active will always evaluate to true\.$#'
+			identifier: notIdentical.alwaysTrue
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\BookingStatus\:\:Boarded will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 2
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Strict comparison using \=\=\= between string and App\\Enums\\BookingStatus\:\:Completed will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
+			count: 3
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Unreachable statement \- code above always terminates\.$#'
+			identifier: deadCode.unreachable
+			count: 1
+			path: app/Services/JourneyService.php
+
+		-
+			message: '#^Using nullsafe property access on non\-nullable type string\. Use \-\> instead\.$#'
+			identifier: nullsafe.neverNull
+			count: 1
+			path: app/Services/JourneyService.php
 
 		-
 			message: '#^Cannot access property \$value on string\.$#'

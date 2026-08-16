@@ -28,13 +28,13 @@ use App\Http\Controllers\Web\DemandController;
 use App\Http\Controllers\Web\DriverFleetController;
 use App\Http\Controllers\Web\DriverPromptController;
 use App\Http\Controllers\Web\EmployerRequestController;
+use App\Http\Controllers\Web\GoController;
 use App\Http\Controllers\Web\GtfsController;
 use App\Http\Controllers\Web\GuideController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\ImpactCertificateController;
 use App\Http\Controllers\Web\ImpactController;
 use App\Http\Controllers\Web\MissionController;
-use App\Http\Controllers\Web\NavigationController;
 use App\Http\Controllers\Web\PaystackWebhookController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\PwaController;
@@ -94,8 +94,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Navigation-first rider home — "Where are you going?" (navigation sprint).
-    Route::get('/go', NavigationController::class)->name('go');
+    // Go Board — Phase 1 Screen 3: "Where are you going?" destination-first home.
+    Route::get('/go', GoController::class)->name('go');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\BookingController;
 use App\Http\Controllers\Api\V1\ChatController;
 use App\Http\Controllers\Api\V1\DemandController;
 use App\Http\Controllers\Api\V1\FleetController;
+use App\Http\Controllers\Api\V1\GoController;
 use App\Http\Controllers\Api\V1\NavigationController;
 use App\Http\Controllers\Api\V1\P2pTransferController;
 use App\Http\Controllers\Api\V1\PushTokenController;
@@ -34,6 +35,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/navigation/search', [NavigationController::class, 'search']);
         Route::get('/navigation/directions', [NavigationController::class, 'directions']);
         Route::get('/navigation/nearby', [NavigationController::class, 'nearby']);
+
+        // Go Board API (Phase 1) — live board data for pull-to-refresh.
+        Route::get('/go/board', [GoController::class, 'board']);
 
         Route::get('/wallet', [WalletController::class, 'index']);
         Route::post('/wallet/topup', [WalletController::class, 'topUp']);
