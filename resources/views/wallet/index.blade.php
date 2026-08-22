@@ -5,26 +5,26 @@
 @section('content')
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-            <h1 class="font-heading text-2xl font-bold text-ink-900">Wallet</h1>
+            <h1 class="font-heading text-2xl font-bold text-ink-900">My Money For App</h1>
             <p class="mt-1 text-sm text-ink-500">Triple balance — cash for top-ups, earned balance from driving, and subsidy credits from your employer (spent first on rides).</p>
         </div>
     </div>
 
     <div class="grid gap-5 sm:grid-cols-3">
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
-            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Cash balance</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">My cash balance</p>
             <p class="mt-2 font-mono text-3xl font-semibold text-ink-900">₦{{ number_format((float) $wallet->cash_balance, 2) }}</p>
             <p class="mt-1 text-xs text-ink-500">Top up with card, transfer or USSD via Paystack.</p>
         </div>
 
         <div class="rounded-2xl border border-gold-200 bg-amber-50 p-6">
-            <p class="text-xs font-medium uppercase tracking-wider text-amber-700">Earned balance</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-amber-700">Money wey I get from driving</p>
             <p class="mt-2 font-mono text-3xl font-semibold text-amber-800">₦{{ number_format((float) $wallet->earned_balance, 2) }}</p>
             <p class="mt-1 text-xs text-amber-700">Driver earnings after commission, union fee and insurance. Withdraw to bank or send for free.</p>
         </div>
 
         <div class="rounded-2xl border border-forest-200 bg-forest-50 p-6">
-            <p class="text-xs font-medium uppercase tracking-wider text-forest-700">Subsidy credits</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-forest-700">Office support — Na your office pay am</p>
             <p class="mt-2 font-mono text-3xl font-semibold text-forest-800">₦{{ number_format((float) $wallet->subsidy_credits, 2) }}</p>
             <p class="mt-1 text-xs text-forest-700">Issued by your workplace. Spent first on bookings. Not transferable.</p>
         </div>
@@ -33,8 +33,8 @@
     <div class="mt-6 grid gap-5 lg:grid-cols-5">
         <div class="space-y-5 lg:col-span-2">
             <div class="rounded-2xl border border-ink-200 bg-white p-6">
-                <h2 class="font-heading font-semibold text-ink-900">Top up</h2>
-                <p class="mt-1 text-sm text-ink-500">Amount in naira (₦). Minimum ₦100.</p>
+                <h2 class="font-heading font-semibold text-ink-900">Add Money</h2>
+                <p class="mt-1 text-sm text-ink-500">Put money for app (₦). Minimum ₦100.</p>
 
                 <form method="POST" action="{{ route('wallet.topup') }}" class="mt-4 space-y-4">
                     @csrf
@@ -51,7 +51,7 @@
                     </div>
 
                     <button class="w-full rounded-xl bg-forest-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-forest-700">
-                        Continue to Paystack →
+                        Continue to Paystack → Put money for app
                     </button>
                 </form>
 
@@ -59,7 +59,7 @@
                     @foreach ([1000, 2000, 5000, 10000] as $quick)
                         <button type="button" data-quick="{{ $quick }}"
                             class="rounded-full border border-ink-200 bg-paper px-3 py-1 text-xs font-medium text-ink-600 transition hover:border-forest-400 hover:text-forest-700">
-                            ₦{{ number_format($quick) }}
+                            ₦{{ number_format($quick) }} — Quick top-up
                         </button>
                     @endforeach
                 </div>
@@ -68,7 +68,7 @@
             @if (config('workride.time_bank.enabled'))
                 <div class="rounded-2xl border border-ink-200 bg-white p-6">
                     <h2 class="font-heading font-semibold text-ink-900">Send money</h2>
-                    <p class="mt-1 text-sm text-ink-500">Transfer to a verified colleague. Cash transfers carry a 1% fee (min ₦10); earned transfers are free. Daily limit ₦{{ number_format((float) config('workride.p2p.daily_limit'), 0) }}.</p>
+                    <p class="mt-1 text-sm text-ink-500">Transfer to a verified colleague. Cash transfers carry 1% fee (min ₦10); earned transfers free. Daily limit ₦{{ number_format((float) config('workride.p2p.daily_limit'), 0) }}.</p>
 
                     <form method="POST" action="{{ route('wallet.transfer') }}" class="mt-4 space-y-4">
                         @csrf
@@ -107,7 +107,7 @@
                 </div>
 
                 <div class="rounded-2xl border border-ink-200 bg-white p-6">
-                    <h2 class="font-heading font-semibold text-ink-900">Withdraw to bank</h2>
+                    <h2 class="font-heading font-semibold text-ink-900">Comot Money to My Bank</h2>
                     <p class="mt-1 text-sm text-ink-500">Debits earned balance first, then cash — never subsidy credits. Min ₦{{ number_format((float) config('workride.payout.min_amount'), 0) }}, max ₦{{ number_format((float) config('workride.payout.max_amount'), 0) }}.</p>
 
                     <form method="POST" action="{{ route('wallet.withdraw') }}" class="mt-4 space-y-4">
@@ -174,7 +174,7 @@
         <div class="space-y-5 lg:col-span-3">
             <div class="rounded-2xl border border-ink-200 bg-white p-6">
                 <div class="flex items-center justify-between">
-                    <h2 class="font-heading font-semibold text-ink-900">Recent transactions</h2>
+                    <h2 class="font-heading font-semibold text-ink-900">Recent money wey don enter and comot</h2>
                     <a href="{{ route('receipts.statement', now()->format('Y-m')) }}" class="text-xs font-semibold text-forest-600 hover:underline">
                         Monthly statement →
                     </a>

@@ -1,13 +1,14 @@
 /*
  * WorkRide Design System — single source of truth for brand tokens.
  *
- * Extracted from app.css so token changes live in exactly one place.
- * Tokens are consumed by Tailwind v4 via the `@theme` block below:
- *   --color-forest-* / forest, --color-gold-* / gold, --color-ink-* / ink
- *   --color-paper, --font-sans/heading/mono
+ * All Tailwind @theme tokens live here. Never hard-code colors or spacing elsewhere.
+ * Tokens are consumed by Tailwind v4 via the `@theme` block below.
  *
- * Palette (from WORKRIDE-APP-GUIDE §14):
- *   Forest Green #2E7D32 · Gold #FBC02D · Slate #0F172A · Paper #F6F9F6
+ * Palette (from WORKRIDE-FINAL-PROMPT v10):
+ *   Forest Green #1B5E20 (deeper for Apple-like premium)
+ *   Gold #F9A825 (accent, free/volunteer, premium)
+ *   Slate #0F172A (text high-emphasis)
+ *   Paper #F8FAF8 (backgrounds)
  */
 
 @theme {
@@ -16,32 +17,32 @@
     --font-heading: 'Sora', 'Inter', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 
-    /* Forest Green #2E7D32 */
+    /* Forest Green #1B5E20 — primary actions, success, verified */
     --color-forest-50: #f0f7f1;
     --color-forest-100: #dcefdf;
     --color-forest-200: #bce0c3;
     --color-forest-300: #8fc89c;
     --color-forest-400: #5fa970;
     --color-forest-500: #3e8b50;
-    --color-forest-600: #2e7d32;
-    --color-forest-700: #256327;
-    --color-forest-800: #204f23;
-    --color-forest-900: #1b411f;
-    --color-forest-950: #0e2511;
+    --color-forest-600: #1b5e20;
+    --color-forest-700: #164e1b;
+    --color-forest-800: #123d16;
+    --color-forest-900: #0e2e11;
+    --color-forest-950: #071708;
 
-    /* Gold #FBC02D */
+    /* Gold #F9A825 — accent, free/volunteer, premium, Green Points */
     --color-gold-50: #fff9eb;
     --color-gold-100: #ffefc6;
     --color-gold-200: #ffdd88;
     --color-gold-300: #ffc64a;
-    --color-gold-400: #fbc02d;
-    --color-gold-500: #f3a40a;
+    --color-gold-400: #f9a825;
+    --color-gold-500: #f09408;
     --color-gold-600: #d77f05;
     --color-gold-700: #b25a08;
     --color-gold-800: #90450e;
     --color-gold-900: #76390f;
 
-    /* Slate #0F172A */
+    /* Slate #0F172A — text high-emphasis */
     --color-ink-50: #f8fafc;
     --color-ink-100: #f1f5f9;
     --color-ink-200: #e2e8f0;
@@ -54,31 +55,26 @@
     --color-ink-900: #0f172a;
     --color-ink-950: #020617;
 
-    /* Paper #F6F9F6 */
-    --color-paper: #f6f9f6;
-    --color-forest: #2e7d32;
-    --color-gold: #fbc02d;
+    /* Paper #F8FAF8 — backgrounds */
+    --color-paper: #f8faf8;
+    --color-surface: #ffffff;
+    --color-surface-glass: rgba(255, 255, 255, 0.72); /* Liquid-Glass-inspired 12% white glass + blur(20px) */
 
-    /*
-     * Semantic aliases (v5.0 navigation-first merge). The raw navigation-first
-     * prompts reference --color-primary / --color-accent / --color-surface /
-     * --color-ink; these map onto the canonical palette above so doc snippets
-     * (bg-[var(--color-primary)], etc.) work verbatim WITHOUT changing the
-     * guide-mandated brand (Forest #2E7D32 · Gold #FBC02D · Slate #0F172A ·
-     * Paper #F6F9F6).
-     */
+    /* Semantic aliases — color is signal only */
     --color-primary: var(--color-forest-600);
     --color-primary-light: var(--color-forest-500);
     --color-accent: var(--color-gold-400);
-    --color-surface: var(--color-paper);
-    --color-danger: #dc2626;
-    --color-ink: var(--color-ink-900);
+    --color-success: var(--color-forest-600);
+    --color-warning: #f59e0b; /* Leaving soon */
+    --color-danger: #dc2626; /* Restrained red: full/cancelled/overdue */
+    --color-info: #334155; /* Slate-blue */
 
     /* Shape & elevation */
-    --radius-card: 16px;
+    --radius-card: 18px;
     --radius-pill: 9999px;
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
-    --shadow-live: 0 0 0 4px rgba(46, 125, 50, 0.15);
+    --shadow-live: 0 0 0 4px rgba(27, 94, 32, 0.15);
+    --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
 @layer base {
@@ -86,19 +82,78 @@
         @apply bg-paper text-ink-900 antialiased font-sans;
     }
 
-    h1,
-    h2,
-    h3,
-    h4 {
+    h1, h2, h3, h4 {
         @apply font-heading;
     }
+
+    /* Focus visible — forest outline for all interactive elements */
+    *:focus-visible {
+        @apply outline-none ring-2 ring-forest-600 ring-offset-2 ring-offset-white;
+    }
+
+    /* Dark mode support — high contrast ratios ≥4.5:1 WCAG AA */
+    .dark {
+        --color-paper: #0a0f0a;
+        --color-surface: #121812;
+        --color-surface-glass: rgba(18, 24, 18, 0.88);
+        --color-ink-900: #f8faf8;
+        --color-ink-800: #e2e8f0;
+        --color-ink-700: #cbd5e1;
+        --color-ink-600: #94a3b8;
+        --color-ink-500: #64748b;
+        --color-ink-100: #1e293b;
+        --color-ink-200: #1e293b;
+        --color-forest-100: #0e2e11;
+        --color-forest-200: #123d16;
+        --color-forest-300: #164e1b;
+        --color-forest-400: #1b5e20;
+        --color-forest-500: #3e8b50;
+        --color-forest-600: #5fa970;
+        --color-gold-100: #2e2400;
+        --color-gold-200: #3d2f00;
+        --color-gold-300: #5c4400;
+        --color-gold-400: #f9a825;
+        --color-gold-500: #fbc02d;
+        --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+        :root {
+            --color-primary: #0d3b12;
+            --color-accent: #b8860b;
+            --color-danger: #991b1b;
+            --color-ink-900: #000000;
+        }
+        .dark {
+            --color-primary: #3e8b50;
+            --color-accent: #f9a825;
+            --color-danger: #fca5a5;
+            --color-ink-900: #ffffff;
+        }
+    }
+
+    /* Large touch targets — minimum 44x44pt */
+    button, a, [role="button"], input, select, textarea {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* Safe-area inset utilities */
+@layer utilities {
+    .pt-safe { padding-top: env(safe-area-inset-top); }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    .pl-safe { padding-left: env(safe-area-inset-left); }
+    .pr-safe { padding-right: env(safe-area-inset-right); }
+    .safe-area-inset { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 }
 
 /*
  * Motion tokens — purposeful feedback and orientation, never decoration.
  * Every duration is a token so reduced-motion collapses the whole system to
- * 0 ms in one place (WCAG 2.3.3). The pulse scale/opacity tokens drive the
- * live corridor chips and the guide's softly breathing pins.
+ * 0 ms in one place (WCAG 2.3.3).
  */
 :root {
     --wr-motion-fast: 150ms;
@@ -121,9 +176,7 @@
 }
 
 /*
- * Reusable motion utilities — transform + opacity only, never layout. Tailwind
- * `transition` covers the property list; these vary the duration/easing so a
- * component can say `wr-transition-slow` and stay on-token.
+ * Reusable motion utilities — transform + opacity only, never layout.
  */
 .wr-transition-fast {
     transition-property: transform, opacity, background-color, color, border-color;
@@ -144,10 +197,9 @@
 }
 
 /*
- * Soft "something is live here" pulse — gentle scale + opacity loop. Applied
- * to live corridor chips and the guide's vehicle/you pins. `transform-box:
- * fill-box` lets the same class pulse SVG circles around their own centre.
- * Reduced-motion: the app.css global media query forces the duration to 0.
+ * Soft "something is live here" pulse — gentle scale + opacity loop.
+ * Applied to live route chips and the guide's vehicle/you pins.
+ * Reduced-motion: the global media query forces the duration to 0.
  */
 .wr-pulse {
     transform-box: fill-box;
@@ -164,8 +216,7 @@
 }
 
 @keyframes wr-pulse {
-    0%,
-    100% {
+    0%, 100% {
         transform: scale(1);
         opacity: 1;
     }
@@ -176,12 +227,8 @@
 }
 
 @keyframes wr-fade-in {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 @keyframes wr-scale-in {
@@ -193,4 +240,237 @@
         opacity: 1;
         transform: scale(1);
     }
+}
+
+/* Glass morphism utility */
+.wr-glass {
+    background: var(--color-surface-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Card shadow utility */
+.wr-card {
+    @apply rounded-[var(--radius-card)] bg-white shadow-[var(--shadow-card)] border border-ink-100;
+}
+
+/* Seat tick animation for live seat counters */
+.wr-seat-tick {
+    animation: wr-seat-tick 300ms var(--wr-ease-out) both;
+}
+
+@keyframes wr-seat-tick {
+    0% { transform: scale(1); background-color: transparent; }
+    50% { transform: scale(1.1); background-color: var(--color-forest-100); }
+    100% { transform: scale(1); background-color: transparent; }
+}
+
+/* Number tick for distance/ETA updates */
+.wr-number-tick {
+    animation: wr-number-tick 150ms var(--wr-ease-out) both;
+}
+
+@keyframes wr-number-tick {
+    0% { color: inherit; }
+    50% { color: var(--color-gold-400); }
+    100% { color: inherit; }
+}
+
+/* Guide glass cards — frosted elevation language reused across the app */
+.wr-glass {
+    background: var(--color-surface-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: var(--shadow-glass);
+}
+
+/* Guide map pins — circular forest/blue head, white ring, soft breathing */
+.wr-pin {
+    position: relative;
+    width: 34px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wr-pin-body {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 9999px;
+    background-color: var(--pin, var(--color-forest-600));
+    border: 2.5px solid #ffffff;
+    color: #ffffff;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.30);
+}
+
+.wr-pin::after {
+    content: '';
+    position: absolute;
+    bottom: 1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 9px solid var(--pin, var(--color-forest-600));
+    filter: drop-shadow(0 2px 3px rgba(15, 23, 42, 0.25));
+}
+
+.wr-pin-badge {
+    position: absolute;
+    right: -2px;
+    bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background-color: var(--color-gold-400);
+    border: 1.5px solid #ffffff;
+    color: var(--color-ink-900);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* "You" pin — a quiet white dot so the passenger pin reads instantly */
+.wr-pin-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background-color: #ffffff;
+}
+
+/* A pin just appeared or a live update arrived — one soft acknowledgement pulse */
+.wr-pin-soft {
+    animation: wr-pin-soft 2s var(--wr-ease-in-out) 1;
+}
+
+/* Vehicle pin pulses while moving (JS adds/removes over ~2.8 s) */
+.wr-pin-move {
+    animation: wr-pin-move 1.4s var(--wr-ease-in-out) 2;
+}
+
+@keyframes wr-pin-soft {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+}
+
+@keyframes wr-pin-move {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.14); }
+}
+
+/* Forest walking polyline with a soft glow; readability first */
+.wr-route-line {
+    filter: drop-shadow(0 0 4px rgba(27, 94, 32, 0.45));
+}
+
+/* Go Board vehicle pins with seat badges */
+.wr-vehicle-pin {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateZ(0);
+}
+
+.wr-vehicle-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    background-color: var(--pin-color, var(--color-forest-600));
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.30);
+    transition: transform 0.2s ease;
+}
+
+.wr-vehicle-pin:hover .wr-vehicle-body {
+    transform: scale(1.1);
+}
+
+.wr-seat-badge {
+    position: absolute;
+    bottom: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background-color: var(--color-forest-600);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    border: 2px solid #ffffff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.wr-seat-badge.wr-seat-tick {
+    animation: wr-seat-tick 300ms var(--wr-ease-out) both;
+}
+
+/* Demand heat circles */
+.wr-demand-circle {
+    transition: fill-opacity 0.3s ease, radius 0.3s ease;
+}
+
+.wr-demand-circle.wr-pulse {
+    animation: wr-pulse var(--wr-pulse-duration) var(--wr-ease-in-out) infinite;
+}
+
+/* User location pin */
+.wr-user-pin {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wr-user-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 9999px;
+    background-color: #3B82F6;
+    border: 3px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    z-index: 2;
+}
+
+.wr-user-pulse {
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    border: 2px solid #3B82F6;
+    animation: wr-user-pulse 2s ease-out infinite;
+}
+
+@keyframes wr-user-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(2.5);
+        opacity: 0;
+    }
+}
+
+.wr-user-accuracy {
+    transition: opacity 0.3s ease;
 }

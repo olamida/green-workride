@@ -6,9 +6,9 @@
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
             <h1 class="font-heading text-2xl font-bold text-ink-900">Trip Board</h1>
-            <p class="mt-1 text-sm text-ink-500">
-                Verified colleagues riding together, fixed price, no surge.
-            </p>
+<p class="mt-1 text-sm text-ink-500">
+    Verified colleagues riding together, fixed price, no surge.
+</p>
         </div>
         @if (auth()->user()->canDriveVolunteer())
             <a href="{{ route('trips.create') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
@@ -22,31 +22,31 @@
         <p class="font-heading text-sm font-semibold text-forest-900">How to book a seat</p>
         @if ($nextTrip)
             <p class="mt-1 text-sm text-forest-800">
-                <strong>Next departure:</strong>
-                {{ $nextTrip->route_name }} at {{ $nextTrip->departure_time->format('g:i A') }}
-                — {{ $nextTrip->available_seats }}/{{ $nextTrip->total_seats }} seats left.
+                <strong>Motor go come out:</strong>
+                {{ $nextTrip->route_name }} for {{ $nextTrip->departure_time->format('g:i A') }}
+                — {{ $nextTrip->available_seats }}/{{ $nextTrip->total_seats }} seats remain.
             </p>
         @elseif ($demandSnapshot['people'] > 0)
             <p class="mt-1 text-sm text-forest-800">
-                <strong>{{ $demandSnapshot['people'] }} people</strong> want a ride right now
+                <strong>{{ $demandSnapshot['people'] }} people</strong> don wait for motor right now
                 @if (count($demandSnapshot['top_destinations']))
                     (towards {{ implode(', ', $demandSnapshot['top_destinations']) }})
-                @endif — we’re matching. <a href="{{ route('demand.index') }}" class="font-semibold text-forest-700 underline hover:text-forest-900">Check in</a> so Ops knows where to send a bus.
+                @endif — we’re matching. <a href="{{ route('demand.index') }}" class="font-semibold text-forest-700 underline hover:text-forest-900">Check in</a> so Ops knows where send bus.
             </p>
         @elseif (count($hotspots))
             <p class="mt-1 text-sm text-forest-800">
                 <strong>Live demand at {{ collect($hotspots)->take(3)->implode('name', ' · ') }}</strong>
                 @if (auth()->user()->canDriveVolunteer())
-                    — <a href="{{ route('trips.create', ['corridor' => $hotspots[0]['corridor'] ?? '']) }}" class="font-semibold text-forest-700 underline hover:text-forest-900">be the driver</a> on that corridor.
+                    — <a href="{{ route('trips.create', ['corridor' => $hotspots[0]['corridor'] ?? '']) }}" class="font-semibold text-forest-700 underline hover:text-forest-900">Publish motor</a> for people wey need am.
                 @else
                     — we’re matching a driver.
                 @endif
             </p>
         @endif
-        <ol class="mt-3 grid gap-3 text-sm text-ink-700 sm:grid-cols-3">
+<ol class="mt-3 grid gap-3 text-sm text-ink-700 sm:grid-cols-3">
             <li class="flex gap-3">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-forest-600 font-mono text-xs font-bold text-white">1</span>
-                <span><strong>Pick your corridor</strong> — tap Kubwa, Nyanya or Lugbe above. "All corridors" shows every trip.</span>
+                <span><strong>Pick your route</strong> — tap Kubwa, Nyanya or Lugbe above. "All routes" shows every motor.</span>
             </li>
             <li class="flex gap-3">
                 <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-forest-600 font-mono text-xs font-bold text-white">2</span>
@@ -146,7 +146,7 @@
             'bg-rose-600 text-white' => $womenOnly,
             'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100' => ! $womenOnly,
         ])>
-            ♀ Women-only
+            ♀ Women-only Motor wey na only for women
         </a>
     </div>
 
@@ -159,13 +159,13 @@
                 'border border-ink-200 bg-white text-ink-600 hover:bg-ink-100' => $window !== $key,
             ])>
                 @if ($key === 'now')
-                    Leaving soon
+                    Motor go come soon
                 @elseif ($key === 'later')
-                    Later today
+                    E go come later
                 @elseif ($key === 'tomorrow')
-                    Tomorrow
+                    Tomorrow — make we plan am
                 @else
-                    Anytime (48h)
+                    Anytime (48h) — plan am seat ahead
                 @endif
             </a>
         @endforeach
@@ -314,9 +314,9 @@
             <div class="rounded-2xl border border-ink-200 bg-white px-6 py-10 text-center">
                 <p class="font-heading text-lg font-semibold text-ink-900">
                     @if ($demandSnapshot['people'] > 0)
-                        {{ $demandSnapshot['people'] }} people want this journey
+                        {{ $demandSnapshot['people'] }} people don wait for motor — You get motor? Help people!
                     @else
-                        No trips in this window yet
+                        No motor dey go for this window yet — you get motor? Help people!
                     @endif
                 </p>
                 <p class="mx-auto mt-1 max-w-md text-sm text-ink-500">
@@ -358,7 +358,8 @@
                                 </span>
                                 @if (auth()->user()->canDriveVolunteer())
                                     <a href="{{ route('trips.create', ['corridor' => $hotspot['corridor'] ?? '']) }}" class="shrink-0 rounded-full bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">
-                                        Be the driver →
+                                        <a href="{{ route('trips.create', ['corridor' => $hotspot['corridor'] ?? '']) }}" class="shrink-0 rounded-full bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">
+                                            Publish motor →
                                     </a>
                                 @endif
                             </li>
@@ -368,7 +369,7 @@
                 <div class="mt-4 flex flex-wrap items-center justify-center gap-3">
                     @if (auth()->user()->canDriveVolunteer())
                         <a href="{{ route('trips.create') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
-                            Publish a trip
+                            Add My Motor — I Get Space
                         </a>
                     @endif
                     <a href="{{ route('demand.index') }}" class="rounded-xl border border-forest-600 px-4 py-2 text-sm font-semibold text-forest-700 transition hover:bg-forest-50">

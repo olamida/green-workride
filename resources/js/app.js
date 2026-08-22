@@ -8,6 +8,7 @@ import boardLive from './board-live';
 import connectGuideUI from './connect-guide-ui';
 import paymentPicker from './payment-picker';
 import progressWizard from './progress-wizard';
+import darkMode from './dark-mode';
 
 window.Alpine = Alpine;
 
@@ -19,6 +20,7 @@ Alpine.data('boardLive', boardLive);
 Alpine.data('connectGuideUI', connectGuideUI);
 Alpine.data('paymentPicker', paymentPicker);
 Alpine.data('progressWizard', progressWizard);
+Alpine.data('darkMode', darkMode);
 
 Alpine.start();
 

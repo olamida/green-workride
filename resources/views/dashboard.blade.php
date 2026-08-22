@@ -15,16 +15,16 @@
         </div>
         @if ($user->verification_level->value < 3)
             <a href="{{ route('verification.index') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
-                Complete verification
+                Complete verification → book instantly
             </a>
         @endif
     </div>
 
     <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <div class="rounded-2xl border border-ink-200 bg-white p-5">
-            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Verification</p>
-            <p class="mt-2 font-heading text-lg font-semibold text-ink-900">Level {{ $user->verification_level->value }}</p>
-            <p class="mt-1 text-xs text-ink-500">{{ $user->verificationLevelLabel() }}</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Your ID Don Complete?</p>
+            <p class="mt-2 font-heading text-lg font-semibold text-ink-900">ID Level: {{ $user->verification_level->value }}</p>
+            <p class="mt-1 text-xs text-ink-500">Phone ✓, Office ID ✓, NIN ✓ — Your ID don complete?</p>
             <div class="mt-3 flex gap-1">
                 @for ($i = 0; $i < 3; $i++)
                     <span class="h-1.5 flex-1 rounded-full {{ $user->verification_level->value > $i ? 'bg-forest-500' : 'bg-ink-200' }}"></span>
@@ -81,15 +81,14 @@
                 @endforelse
             </div>
             <a href="{{ route('verification.index') }}" class="mt-4 inline-block text-sm font-semibold text-forest-600 hover:underline">
-                Manage verification →
+                Manage your ID →
             </a>
         </div>
 
         <div class="rounded-2xl border border-ink-200 bg-white p-5">
-            <h2 class="font-heading font-semibold text-ink-900">Your corridor is live</h2>
+            <h2 class="font-heading font-semibold text-ink-900">Your motor is live</h2>
             <p class="mt-2 text-sm text-ink-500">
-                Verified colleagues are matching on your corridor right now. Fixed prices, no surge —
-                find a ride or publish your own.
+                Verified colleagues wey dey commot for motor, fixed prices, no surge — find a ride or publish your own.
             </p>
             <div class="mt-4 flex gap-3">
                 <span class="rounded-full bg-forest-50 px-3 py-1 text-xs font-medium text-forest-700">KUBWA → CBD</span>
@@ -97,7 +96,7 @@
                 <span class="rounded-full bg-forest-50 px-3 py-1 text-xs font-medium text-forest-700">LUGBE → CBD</span>
             </div>
             <div class="mt-5">
-                <x-demand-map-anim label="Live demand on your corridor — 12 people waiting at Berger." />
+                <x-demand-map-anim label="Live demand on your route — 12 people waiting at Berger." />
             </div>
             <div class="mt-5 flex flex-wrap gap-3">
                 <a href="{{ route('trips.index') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">

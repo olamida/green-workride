@@ -54,7 +54,7 @@
                            class="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-200">
                 </div>
                 <div>
-                    <label for="template_corridor" class="mb-1 block text-xs font-medium text-ink-700">Corridor</label>
+                    <label for="template_corridor" class="mb-1 block text-xs font-medium text-ink-700">Which road</label>
                     <select id="template_corridor" name="corridor" required
                             class="w-full rounded-xl border border-ink-200 px-3 py-2 text-sm focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-200">
                         @foreach (\App\Enums\Corridor::cases() as $option)
@@ -136,7 +136,7 @@
                         <p class="font-mono text-lg font-semibold text-ink-900">
                             {{ $template->is_free_volunteer ? 'FREE' : '₦'.number_format((float) $template->fare_per_seat, 0) }}
                         </p>
-                        <p class="text-xs text-ink-500">fixed per corridor</p>
+                        <p class="text-xs text-ink-500">fixed per road</p>
                     </div>
                 </div>
 

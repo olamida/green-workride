@@ -1,0 +1,75 @@
+{
+  "app.name": "WorkRide",
+  "app.tagline": "Lọ sí iṣẹ. Gbogbo ọjọ. Tí a ṣàlàyé.",
+
+  "nav.go": "Wá",
+  "nav.rides": "Ìjọkò Míì",
+  "nav.wallet": "Ọwọ́",
+  "nav.impact": "Ètò",
+  "nav.profile": "Àpẹrẹ",
+  "nav.more": "Míì",
+  "nav.search": "Wá",
+
+  "home.where_going": "Níbo lọ ti o fẹ́ lọ?",
+  "home.search_placeholder": "Tẹ ibi tí o fẹ́ lọ",
+  "home.empty_title": "Kò sí ijọkò bayìí",
+  "home.empty_subtitle": "Ṣàlàyé padà wa lẹ́waadàá ṣúgbọ́n tabi jẹ́ akúnya tí ó tún mọ́ra mọ́ra.",
+  "home.be_driver_cta": "Jẹ́ olúkọ́ mọ́tọ́ — Fọ mọ́tọ́ rẹ síi",
+
+  "ride.join_button": "Wá Jọkò",
+  "ride.join_free_button": "Wá Jọkò Ọfẹ́",
+  "ride.seats_left": ":left nípa :total ìjọkò",
+  "ride.fare_label": "Ọjọ́: ₦:amount fún ènìyàn",
+  "ride.free_label": "Ọfẹ́ — Ìrànlọ́wọ́",
+  "ride.driver_verified": "Olúkọ́ mọ́tọ́ tí a ṣàlàyé",
+
+  "booking.confirmed": "Ìjọkò tí a ṣàlàyé",
+  "booking.held": "Ìjọkò tí a dábò fún ìṣẹ́jú 3 — Ṣàlàyé ọwọ́ bayìí",
+  "booking.boarded": "Ó wà ní mọ́tọ́",
+  "booking.completed": "Ìjọkò ti pari",
+
+  "wallet.cash_balance": "Ọwọ́ Míì",
+  "wallet.subsidy_balance": "Ìrànlọ́wọ́ Ofísì",
+  "wallet.earned_balance": "Ọwọ́ Gba Mọ́tọ́",
+  "wallet.top_up": "Kun ọwọ́ síi",
+  "wallet.withdraw": "Gba ọwọ́ lórí kóòkù",
+  "wallet.transfer": "Fí ọwọ́ han",
+
+  "impact.co2_saved": "CO₂ tí a fi gba",
+  "impact.trees_equivalent": "Igí tí a kó",
+  "impact.fuel_saved": "Fúlù tí a fi gba",
+  "impact.green_points": "Ọ̀ǹkà Ìbáṣepọ̀",
+
+  "verify.phone_verified": "Nọ́mbà Tí a Ṣàlàyé",
+  "verify.workplace_id": "Káàdì Ìṣẹ́",
+  "verify.level_progress": "Ìṣàlàyé ID Rẹ: :steps",
+
+  "publish.add_vehicle": "Kun Mọ́tọ́ Rẹ Sìi — Mo ní Ìbáṣe",
+  "publish.free_toggle": "Ìjọkò Ọfẹ́ — Ìrànlọ́wọ́",
+  "publish.save_template": "Bá wíwá yìí padá",
+
+  "demand.checkin_button": "Mo Wà Níbé — Mo Fẹ́ Ìjọkò",
+  "demand.checkin_passengers": "Ènìyàn méejì?",
+
+  "road.condition_good": "Ọ̀nà Dara",
+  "road.condition_fair": "Ọ̀nà Àpẹrẹ",
+  "road.condition_poor": "Ọ̀nà Búrú",
+
+  "sos.button": "ÌLÉRÌ — Dá sílẹ̀ bí mọ́tọ́ bá ní ìṣòro",
+  "sos.share_ride": "Pín Ìjọkò Rẹ Pẹ́lú Ẹ̀bí",
+
+  "general.loading": "Ńlo...",
+  "general.error": "Ìṣòro kan ṣelẹ̀",
+  "general.retry": "Gbọ́dọ̀ ìwáyé",
+  "general.offline": "Ó ti kò sí ní nẹ́tẹ́wọ́rkìí — Ó yóò pàdà sílẹ̀ nígbà tí ó bá wá",
+  "general.confirm": "Ṣàlàyé",
+  "general.cancel": "Fagile",
+  "general.save": "Bá kó",
+  "general.close": "Tì",
+
+  "language.english": "Gẹ́sì",
+  "language.hausa": "Háúsà",
+  "language.yoruba": "Yorùbá",
+  "language.igbo": "Ìgbò",
+  "language.pidgin": "Náìjíríà Píjin"
+}

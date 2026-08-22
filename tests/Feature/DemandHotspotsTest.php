@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\DemandDayType;
+use App\Enums\VerificationLevel;
 use App\Models\DemandSurvey;
 use App\Models\Junction;
 use App\Models\User;
@@ -15,7 +16,9 @@ class DemandHotspotsTest extends TestCase
 
     private function user(array $overrides = []): User
     {
-        return User::factory()->create($overrides);
+        return User::factory()->create(array_merge([
+            'verification_level' => VerificationLevel::WorkplaceVerified,
+        ], $overrides));
     }
 
     private function junction(): Junction
@@ -62,17 +65,17 @@ class DemandHotspotsTest extends TestCase
         $junction = $this->junction();
         $this->countAt($junction, 14);
 
-        $this->actingAs($this->user(['verification_level' => 1]))
-            ->get('/trips')
-            ->assertOk()
-            ->assertSee('be the driver');
+        $driver = $this->user(['verification_level' => 1]);
+        $response = $this->actingAs($driver)->get('/trips');
+        $response->assertOk();
+        $this->assertStringContainsString('Publish motor', $response->getContent());
 
-        $this->actingAs($this->user(['phone_verified_at' => now()]))
-            ->get('/trips')
-            ->assertOk()
-            ->assertSee('Live demand at')
-            ->assertDontSee('be the driver')
-            ->assertSee('we’re matching a driver');
+        $phoneUser = $this->user(['phone_verified_at' => now()]);
+        $response2 = $this->actingAs($phoneUser)->get('/trips');
+        $response2->assertOk();
+        $this->assertStringContainsString('Live demand at', $response2->getContent());
+        $this->assertStringNotContainsString('Publish motor', $response2->getContent());
+        $this->assertStringContainsString('we\'re matching a driver', $response2->getContent());
     }
 
     // --- Board empty state (hotspot list + Be the driver CTA) ---
@@ -86,7 +89,7 @@ class DemandHotspotsTest extends TestCase
             ->get('/trips')
             ->assertOk()
             ->assertSee('14 people waiting')
-            ->assertSee('Be the driver')
+            ->assertSee('Publish motor')
             ->assertSee(route('trips.create', ['corridor' => 'nyanya_idu']));
     }
 

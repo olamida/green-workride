@@ -11,13 +11,13 @@
         </p>
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('admin.business.export.transactions') }}" class="rounded-xl bg-ink-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-ink-800">
-                ⤓ Transactions CSV
+                ⤓ Transactions Excel
             </a>
             <a href="{{ route('admin.business.export.settlements') }}" class="rounded-xl bg-ink-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-ink-800">
-                ⤓ Settlements CSV
+                ⤓ Settlements Excel
             </a>
             <a href="{{ route('admin.business.export.subsidy') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
-                ⤓ Subsidy utilization CSV
+                ⤓ Subsidy utilization Excel
             </a>
         </div>
     </div>

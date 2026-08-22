@@ -13,7 +13,7 @@
                 Connect guide
             </h1>
             <p class="text-sm text-ink-600">
-                {{ $trip->route_name }} · {{ $trip->corridor->label() }} ·
+                {{ $trip->route_name }} · {{ $trip->corridor->short() }} ·
                 departs {{ $trip->departure_time->format('g:i A') }}
             </p>
         </div>

@@ -1,0 +1,75 @@
+{
+  "app.name": "WorkRide",
+  "app.tagline": "Je gida a kullum. Kowane rana. Da tabbaci.",
+
+  "nav.go": "Je",
+  "nav.rides": "Kekeni Na",
+  "nav.wallet": "Kudin",
+  "nav.impact": "Rayuwa",
+  "nav.profile": "Bayani",
+  "nav.more": "Karin",
+  "nav.search": "Bincike",
+
+  "home.where_going": "Ina kake so ka je?",
+  "home.search_placeholder": "Rubuta wani gida",
+  "home.empty_title": "Babu kekeni yanzu",
+  "home.empty_subtitle": "Daukar da minti a gefu ko ka fi farko mayar da kekeni.",
+  "home.be_driver_cta": "Zama mai mota — Zaber motarka",
+
+  "ride.join_button": "Shiga Keken",
+  "ride.join_free_button": "Shiga Keken Bala'a",
+  "ride.seats_left": ":left daga :total kwanaki",
+  "ride.fare_label": "Farashi: ₦:amount ga mutum",
+  "ride.free_label": "Bala'a — Taimako",
+  "ride.driver_verified": "Mai mota da tabbaci",
+
+  "booking.confirmed": "Kwana da tabbaci",
+  "booking.held": "Kwana rukuni na minti 3 — Biyan kuɗi yanzu",
+  "booking.boarded": "Kai a cikin mota",
+  "booking.completed": "Kekeni ya gama",
+
+  "wallet.cash_balance": "Kudin Na",
+  "wallet.subsidy_balance": "Taimakon Ofis",
+  "wallet.earned_balance": "Kudin Gara Motar",
+  "wallet.top_up": "Zaber Kudin",
+  "wallet.withdraw": "Cire Kudin zuwa Banki",
+  "wallet.transfer": "Aika Kudin",
+
+  "impact.co2_saved": "CO₂ da aka kare",
+  "impact.trees_equivalent": "Itace da aka gina",
+  "impact.fuel_saved": "Fuli da aka kare",
+  "impact.green_points": "Kwalin Gamsuwa",
+
+  "verify.phone_verified": "Lambar Tabbaci",
+  "verify.workplace_id": "Kardin Ofis",
+  "verify.level_progress": "Tabbacin ID na Kai: :steps",
+
+  "publish.add_vehicle": "Zaber Motana — Ina da Wuri",
+  "publish.free_toggle": "Kekeni Bala'a — Taimako",
+  "publish.save_template": "Adana wannan wuri don bayan",
+
+  "demand.checkin_button": "Ina Nan — Ina Bukatar Keken",
+  "demand.checkin_passengers": "Mutane nawa?",
+
+  "road.condition_good": "Hanya Daidai",
+  "road.condition_fair": "Hanya Tsawon",
+  "road.condition_poor": "Hanya Maimaitawa",
+
+  "sos.button": "HARI — Dannae idan mota ta samu matsala",
+  "sos.share_ride": "Raba Kekena Da Iyali",
+
+  "general.loading": "Ina Ladaba...",
+  "general.error": "Wuta ya faru",
+  "general.retry": "Sake Gwadawa",
+  "general.offline": "Kai ba a intanet ba — Sako zuwa lokacin da za ka sami intanet",
+  "general.confirm": "Tabbatar",
+  "general.cancel": "Soke",
+  "general.save": "Adana",
+  "general.close": "Kammala",
+
+  "language.english": "Turanci",
+  "language.hausa": "Hausa",
+  "language.yoruba": "Yaruba",
+  "language.igbo": "Igbo",
+  "language.pidgin": "Naijiria Pijin"
+}

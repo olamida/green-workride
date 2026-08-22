@@ -11,7 +11,7 @@
 <a
     href="{{ $href }}"
     data-corridor-chip="{{ $corridor }}"
-    class="inline-flex min-h-[48px] items-center gap-1.5 rounded-full border border-ink-200 bg-white px-4 py-2 text-sm font-semibold text-ink-700 transition hover:border-forest-300 hover:bg-forest-50"
+    class="inline-flex min-h-[48px] items-center gap-1.5 rounded-full border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-900 px-4 py-2 text-sm font-semibold text-ink-700 dark:text-ink-300 transition hover:border-forest-300 dark:hover:border-forest-700 hover:bg-forest-50 dark:hover:bg-forest-900/20"
 >
     <span
         @class([

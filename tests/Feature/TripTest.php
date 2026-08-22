@@ -129,7 +129,7 @@ class TripTest extends TestCase
             ->get('/trips?window=now')
             ->assertOk()
             ->assertDontSee('Next-day planning run')
-            ->assertSee('No trips in this window yet');
+            ->assertSee('No motor dey go for this window yet');
     }
 
     public function test_live_corridor_chip_pulses_when_trip_leaves_soon(): void

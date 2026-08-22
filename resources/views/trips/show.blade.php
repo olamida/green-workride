@@ -4,7 +4,7 @@
 
 @section('content')
     <div class="mb-6">
-        <a href="{{ route('trips.index') }}" class="text-sm font-semibold text-forest-600 hover:underline">← Trip Board</a>
+        <a href="{{ route('trips.index') }}" class="text-sm font-semibold text-forest-600 hover:underline">← Motors Wey Dey Go</a>
     </div>
 
     <div class="grid gap-5 lg:grid-cols-3">
@@ -22,25 +22,26 @@
                                 <span class="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700">Women-only</span>
                             @endif
                         </div>
-                        <h1 class="mt-3 font-heading text-2xl font-bold text-ink-900">{{ $trip->route_name }}</h1>
+                        <h1 class="mt-3 font-heading text-2xl font-bold text-ink-900">{{ $trip->route_name }} — Motor wey go dis route</h1>
                         <p class="mt-1 text-sm text-ink-500">
-                            {{ $trip->origin_text }} → {{ $trip->destination_text }}
+                            {{ $trip->origin_text }} → {{ $trip->destination_text }} — Na route for dis motor
                         </p>
                     </div>
-                    <p class="font-mono text-2xl font-semibold text-ink-900">
-                        ₦{{ number_format((float) $trip->fare_per_seat, 0) }}
+<p class="font-mono text-2xl font-semibold text-ink-900">
+                            ₦{{ number_format((float) $trip->fare_per_seat, 0) }} — How Much?
                     </p>
                 </div>
 
                 <div class="mt-6 grid gap-4 border-t border-ink-100 pt-5 text-sm text-ink-600 sm:grid-cols-3">
                     <div>
                         <p class="text-xs uppercase tracking-wider text-ink-400">Departure</p>
-                        <p class="mt-1 font-medium text-ink-900">{{ $trip->departure_time->format('D, M j · g:i A') }}</p>
+                        <p class="mt-1 font-medium text-ink-900">
+                            Time Wey Motor Dey Comot: {{ $trip->departure_time->format('D, M j · g:i A') }}
                     </div>
                     <div>
                         <p class="text-xs uppercase tracking-wider text-ink-400">Seats</p>
                         <p class="mt-1 font-medium text-ink-900" x-data="tripLive({ tripId: {{ $trip->id }}, initial: {{ $trip->available_seats }} })">
-                            <span x-text="seats"></span>/{{ $trip->total_seats }} left
+                            <span x-text="seats"></span>/{{ $trip->total_seats }} seats remain — Motor never full
                         </p>
                     </div>
                     <div>
@@ -58,26 +59,26 @@
                     @if ($trip->status->value === 'scheduled' && $minutesToDeparture >= 0)
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-forest-50 px-3 py-1.5 text-xs font-semibold text-forest-700">
                             <x-icon name="clock" class="h-3.5 w-3.5" />
-                            Leaves in {{ $minutesToDeparture }} min
+                            Leaves in {{ $minutesToDeparture }} min — Motor go come for journey
                         </span>
                     @endif
                     @if ($trip->status->value === 'active')
                         @if ($etaNext > 0)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-3 py-1.5 text-xs font-semibold text-gold-800">
                                 <x-icon name="map-pin" class="h-3.5 w-3.5" />
-                                Next: {{ $timing['next_waypoint_label'] ?? 'next stop' }} in {{ $etaNext }} min
+                                Next: {{ $timing['next_waypoint_label'] ?? 'next stop' }} in {{ $etaNext }} min — E go reach
                             </span>
                         @endif
                         @if ($timing['eta_to_destination_minutes'] !== null)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-forest-100 px-3 py-1.5 text-xs font-semibold text-forest-800">
                                 <x-icon name="target" class="h-3.5 w-3.5" />
-                                ETA {{ $trip->destination_text }} ~{{ (int) $timing['eta_to_destination_minutes'] }} min
+                                ETA ~{{ (int) $timing['eta_to_destination_minutes'] }} min — E go reach {{ $trip->destination_text }} for journey
                             </span>
                         @endif
                         @if ($delay > 5)
                             <span class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1.5 text-xs font-semibold text-red-700">
                                 <x-icon name="alert" class="h-3.5 w-3.5" />
-                                Delayed {{ $delay }} min
+                                Delayed {{ $delay }} min — Motor don wait for anybody
                             </span>
                         @endif
                     @endif
@@ -118,7 +119,7 @@
                         <button type="button" @click="navigator.clipboard.writeText('{{ route('trips.share', $trip) }}').then(() => { copied = true; setTimeout(() => copied = false, 2000); })"
                                 class="flex items-center gap-2 rounded-xl border border-ink-200 px-4 py-2 text-sm font-semibold text-ink-700 transition hover:bg-ink-100">
                             <x-icon name="arrow-right" class="h-4 w-4" />
-                            <span x-text="copied ? 'Link copied!' : 'Share this ride'"></span>
+                            <span x-text="copied ? 'Link copied!' : 'Share this Motor info'"></span>
                         </button>
                     </div>
                     @if ($isParticipant && in_array($trip->status->value, ['scheduled', 'active'], true))
@@ -126,7 +127,7 @@
                             @csrf
                             <button class="flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">
                                 <x-icon name="alert" class="h-4 w-4" />
-                                SOS
+                                SOS — HELP! I Need Help Now
                             </button>
                         </form>
                     @endif
@@ -144,7 +145,7 @@
                                     <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-forest-400 opacity-75"></span>
                                     <span class="relative inline-flex h-2 w-2 rounded-full bg-forest-500"></span>
                                 </span>
-                                Live
+Live — Motor don comot
                             </span>
                         @endif
                     </div>
@@ -163,7 +164,7 @@
 
             @if ($trip->driver_id === $user->id)
                 <div class="rounded-2xl border border-ink-200 bg-white p-6">
-                    <h2 class="font-heading font-semibold text-ink-900">Passengers</h2>
+                    <h2 class="font-heading font-semibold text-ink-900">Passengers for this Motor</h2>
                     <div class="mt-4 space-y-3">
                         @forelse ($trip->bookings as $booking)
                             <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink-100 bg-paper px-4 py-3">
@@ -173,7 +174,7 @@
                                         @if ($booking->status->value === 'requested')
                                             <span class="inline-flex items-center gap-1">
                                                 <x-icon name="ticket" class="h-3.5 w-3.5" />
-                                                Requested to join
+                                                I join this Motor
                                                 @if ($booking->share_code)
                                                     · ride code {{ $booking->share_code }}
                                                 @endif
@@ -198,22 +199,22 @@
                                     @if ($booking->status->value === 'confirmed')
                                         <form method="POST" action="{{ route('bookings.board', $booking) }}">
                                             @csrf
-                                            <button class="rounded-lg bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">Board</button>
+                                            <button class="rounded-lg bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">Enter Motor</button>
                                         </form>
                                         <form method="POST" action="{{ route('bookings.no-show', $booking) }}">
                                             @csrf
-                                            <button class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 transition hover:bg-ink-100">No-show</button>
+                                            <button class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 transition hover:bg-ink-100"><button class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 transition hover:bg-ink-100">No show</button></button>
                                         </form>
                                     @endif
                                     @if ((float) $booking->fare_paid > 0 && in_array($booking->status->value, ['boarded', 'completed'], true))
                                         <a href="{{ route('receipts.earnings', $booking) }}" class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 transition hover:bg-white">
-                                            Earnings receipt
+                                            <a href="{{ route('receipts.earnings', $booking) }}" class="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-semibold text-ink-700 transition hover:bg-white">Driver earnings receipt</a>
                                         </a>
                                     @endif
                                 </div>
                             </div>
                         @empty
-                            <p class="text-sm text-ink-500">No passengers yet.</p>
+                            <p class="text-sm text-ink-500">No passengers yet for this Motor.</p>
                         @endforelse
                     </div>
                 </div>
@@ -221,24 +222,24 @@
 
             @if ($canStart || $canComplete || $canCancelTrip)
                 <div class="rounded-2xl border border-ink-200 bg-white p-6">
-                    <h2 class="font-heading font-semibold text-ink-900">Driver actions</h2>
+                    <h2 class="font-heading font-semibold text-ink-900">Driver actions for this trip</h2>
                     <div class="mt-4 flex flex-wrap gap-3">
                         @if ($canStart)
                             <form method="POST" action="{{ route('trips.start', $trip) }}">
                                 @csrf
-                                <button class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">▶ Start trip</button>
+                                <button class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">▶ Start motor</button>
                             </form>
                         @endif
                         @if ($canComplete)
                             <form method="POST" action="{{ route('trips.complete', $trip) }}">
                                 @csrf
-                                <button class="rounded-xl bg-forest-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-800">■ Complete trip</button>
+                                <button class="rounded-xl bg-forest-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-800">■ ■ Complete trip</button>
                             </form>
                         @endif
                         @if ($canCancelTrip)
                             <form method="POST" action="{{ route('trips.cancel', $trip) }}">
                                 @csrf
-                                <button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">Cancel trip</button>
+                                <button class="rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50">Cancel this motor</button>
                             </form>
                         @endif
                     </div>
@@ -301,7 +302,7 @@
                     </div>
                     @if (! $trip->is_free_volunteer)
                         <p class="mt-1 text-sm text-ink-500">
-                            Pay wallet, subsidy, cash or ride-credit. Fixed price {{ $trip->corridor->short() }} — no surge.
+                            Pay wallet, subsidy, cash or ride-credit. Fixed price — no surge.
                         </p>
                     @endif
                     <x-payment-picker

@@ -1,0 +1,78 @@
+{
+  "app.name": "WorkRide",
+  "app.tagline": "Gaa ọrụ. Ụbọchị niile. Ebe a dị egwu.",
+
+  "nav.go": "Gaa",
+  "nav.rides": "Ụgbọ M",
+  "nav.wallet": "Ego",
+  "nav.impact": "Ngwaahịa",
+  "nav.profile": "Ntowaazu",
+  "nav.more": "Ndị ọzọ",
+  "nav.search": "Chọọ",
+
+  "home.where_going": "Ebe ị ga-aga?",
+  "home.search_placeholder": "Debe ebe ị ga-aga",
+  "home.empty_title": "Enweghị ụgbọ n'ụlọ",
+  "home.empty_subtitle": "Zara echiche n'oge ọtụtụ mgbe ọzọ ma ọ bụ onye mkpụrụ ịgwa ụgbọ.",
+  "home.be_driver_cta": "Bụ onye n'egosi ụgbọ — Tinye ụgbọ gị",
+
+  "ride.join_button": "Banye Na Ụgbọ",
+  "ride.join_free_button": "Banye Na Ụgbọ N'efu",
+  "ride.seats_left": ":left nke :total nda",
+  "ride.fare_label": "Ọnụahịa: ₦:amount bụ onye",
+  "ride.free_label": "N'efu — Enyemaka",
+  "ride.driver_verified": "Onye n'egosi ụgbọ ebe a chọrọ",
+
+  "booking.confirmed": "Nda a chọrọ",
+  "booking.held": "Nda a dábò maka mmetụ 3 — Kwesịghị ego ugbu a",
+  "booking.boarded": "Ị dị n'ụgbọ",
+  "booking.completed": "Ụgbọ emeela",
+
+  "wallet.cash_balance": "Ego M",
+  "wallet.subsidy_balance": "Enyemaka Ofisi",
+  "wallet.earned_balance": "Ego Ego ụgbọ",
+  "wallet.top_up": "Tinye Ego",
+  "wallet.withdraw": "Wee Ego Gaanụ Bank",
+  "wallet.transfer": "Zaa Ego",
+
+  "impact.co2_saved": "CO₂ a gwosola",
+  "impact.trees_equivalent": "Osisi a kpọrọ",
+  "impact.fuel_saved": "Fyụụl a gwosola",
+  "impact.green_points": "Ntowaazu Enyemaka",
+
+  "verify.phone_verified": "Nọmba Chọrọ",
+  "verify.workplace_id": "Kaadị ọrụ",
+  "verify.level_progress": "Nchọpụta ID Gị: :steps",
+
+  "publish.add_vehicle": "Tinye Ụgbọ Gị — M nwere ebe",
+  "publish.free_toggle": "Ụgbọ N'efu — Enyemaka",
+  "publish.save_template": "Cheta ụzọ a maka mgbe ọzọ",
+
+  "demand.checkin_button": "M nọ n'ebe a — M chọrọ ụgbọ",
+  "demand.checkin_passengers": "Ndị mmadụ ọlụ?",
+
+  "road.condition_good": "Ụzọ Mara Mma",
+  "road.condition_fair": "Ụzọ Nwantịntị",
+  "road.condition_poor": "Ụzọ Ọjọọ",
+
+  "sos.button": "NSO — Mepụta mgbe ụgbọ nwere nsogbu",
+  "sos.share_ride": "Gbaa ụgbọ gị n'otu na Umunna",
+
+  "general.loading": "Na-aga...",
+  "general.error": "Nsogbu dị",
+  "general.retry": "Waa ọzọ",
+  "general.offline": "Ị adịghị na netwọọk — E mee ka ha malite mgbe ị ga-anọ n'netwọọk",
+  "general.confirm": "Chọrọ",
+  "general.cancel": "Hapụ",
+  "general.save": "Cheta",
+  "general.close": "Mechara",
+  "general.done": "Emeela",
+  "general.next": "Ozọ",
+  "general.back": "Azụ",
+
+  "language.english": "English",
+  "language.hausa": "Hausa",
+  "language.yoruba": "Yoruba",
+  "language.igbo": "Igbo",
+  "language.pidgin": "Naijiria Pijin"
+}

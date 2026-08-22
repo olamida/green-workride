@@ -5,18 +5,17 @@
 @section('content')
     <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-            <h1 class="font-heading text-2xl font-bold text-ink-900">Your community impact</h1>
+            <h1 class="font-heading text-2xl font-bold text-ink-900">How You Don Help Your Area</h1>
             <p class="mt-1 text-sm text-ink-500">
-                Every shared ride cuts CO₂, saves fuel and keeps a colleague in the workforce.
-                Download your certificates below for ESG reporting and subsidy audits.
+                Every shared ride cut fuel wey you no go burn, reduce smoke wey go pollute air, and keep colleague for work. Download your certificates below for work report and ESG.
             </p>
         </div>
         <div class="flex gap-3">
             <a href="{{ route('impact.certificate', 'co2') }}" class="rounded-xl bg-forest-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-forest-700">
-                CO₂ certificate
+                CO₂ certificate — Download your proof
             </a>
             <a href="{{ route('impact.certificate', 'fuel') }}" class="rounded-xl border border-forest-600 px-4 py-2 text-sm font-semibold text-forest-700 transition hover:bg-forest-50">
-                Fuel saved
+Fuel saved — Naira you no spend on petrol
             </a>
         </div>
     </div>
@@ -33,12 +32,12 @@
             <p class="mt-1 text-xs text-ink-500">at ₦1,400/L ≈ ₦{{ number_format((float) $personal->fuel_saved_litres * 1400, 0) }} saved</p>
         </div>
         <div class="rounded-2xl border border-ink-200 bg-white p-5">
-            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Shared trips</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Shared trips — How many motors you don enter</p>
             <p class="mt-2 font-mono text-2xl font-bold text-ink-900">{{ $personal->total_trips }}</p>
-            <p class="mt-1 text-xs text-ink-500">Green level {{ $personal->level }} / 5</p>
+            <p class="mt-1 text-xs text-ink-500">Good person level {{ $personal->level }} / 5</p>
         </div>
         <div class="rounded-2xl border border-ink-200 bg-white p-5">
-            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Tree equivalent</p>
+            <p class="text-xs font-medium uppercase tracking-wider text-ink-400">Tree equivalent — Your share of the forest</p>
             <p class="mt-2 font-mono text-2xl font-bold text-forest-700">{{ number_format((float) $personal->trees_equivalent, 1) }} 🌳</p>
             <p class="mt-1 text-xs text-ink-500">your share of the forest</p>
         </div>
@@ -46,7 +45,7 @@
 
     <div class="mt-8 grid gap-6 lg:grid-cols-2">
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
-            <h2 class="font-heading font-semibold text-ink-900">Workplace leaderboard</h2>
+            <h2 class="font-heading font-semibold text-ink-900">Workplace leaderboard — Your colleagues wey dey share motor</h2>
             <p class="mt-1 text-sm text-ink-500">
                 @if (auth()->user()->workplace)
                     {{ auth()->user()->workplace->name }}
@@ -64,13 +63,13 @@
                         <span class="font-mono text-sm font-semibold text-forest-700">{{ number_format((float) $entry->impactStat->co2_saved_kg, 1) }} kg</span>
                     </div>
                 @empty
-                    <p class="text-sm text-ink-500">No colleagues are sharing rides yet. Be the first.</p>
+                    <p class="text-sm text-ink-500">No colleagues are sharing rides yet. Be the first to help — go solo or get verified.</p>
                 @endforelse
             </div>
         </div>
 
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
-            <h2 class="font-heading font-semibold text-ink-900">Abuja-wide leaderboard</h2>
+            <h2 class="font-heading font-semibold text-ink-900">Abuja-wide leaderboard — Top 25 verified civil servants wey don save fuel for area</h2>
             <p class="mt-1 text-sm text-ink-500">Top 25 verified civil servants by CO₂ saved.</p>
             <div class="mt-4 space-y-3">
                 @forelse ($leaderboard as $index => $entry)
@@ -83,7 +82,7 @@
                         <span class="font-mono text-sm font-semibold text-forest-700">{{ number_format((float) $entry->impactStat->co2_saved_kg, 1) }} kg</span>
                     </div>
                 @empty
-                    <p class="text-sm text-ink-500">No verified riders have impact data yet.</p>
+                    <p class="text-sm text-ink-500">No verified riders don don impact data yet. You fit be the first wey start sharing.</p>
                 @endforelse
             </div>
         </div>
