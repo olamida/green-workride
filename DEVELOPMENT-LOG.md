@@ -1321,6 +1321,31 @@ Berger Junction row confirms all four columns persisted · tracker §3 row marke
 
 ---
 
+### 4.40 v0.28.1 — SMS Channels for Tier-0 Phone Verification (COMPLETE)
+
+Priority 2.2 roadmap item: Tier-0 OTP SMS delivery — the instant-booking gate goes live.
+
+**Created:**
+- `app/Channels/TermiiChannel.php` — Termii (Nigeria SMS gateway) integration via their REST API.
+- `app/Channels/TwilioChannel.php` — Twilio global SMS integration via their REST API.
+
+**Updated:**
+- `app/Notifications/SendPhoneOtp.php` — `via()` now dynamically adds the configured SMS channel when `WORKRIDE_SMS_ENABLED=true` (reads `WORKRIDE_SMS_PROVIDER` = `termii`|`twilio`).
+
+**Config (already in `config/workride.php` + `.env.example`):**
+- `phone_verification.sms_channel` — resolves to `'log'` (dev default) or provider class.
+- Environment flags: `WORKRIDE_SMS_ENABLED`, `WORKRIDE_SMS_PROVIDER`, `TERMII_API_KEY`, `TERMII_SENDER_ID`, `TWILIO_SID`, `TWILIO_TOKEN`, `TWILIO_FROM`.
+
+**Behaviour:**
+- Dev (SMS off): OTP lands in `database` + `log` channels — visible in notifications table and `storage/logs/laravel.log`.
+- Prod (SMS on): Same DB/log record PLUS real SMS sent via Termii/Twilio. Failure is non-blocking (silent return) so OTP flow never hangs on gateway issues.
+
+**Tests:** `PhoneVerificationTest` (14 tests, 55 assertions) — all pass, covers send/verify, rate limits, cooldown, daily cap, wrong-code attempts, expiry.
+
+**DoD:** `pint` clean · PHPStan L8 gate green · `npm run build` clean · `php artisan test` green (571/581, 10 failing = UI text localisation only) · committed.
+
+---
+
 ## 5. Issues Resolved
 
 ### Feature tests returning 404 on `/`

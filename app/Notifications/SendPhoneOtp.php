@@ -2,12 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Channels\TermiiChannel;
+use App\Channels\TwilioChannel;
 use Illuminate\Notifications\Notification;
 
 /**
- * Phone verification OTP. Delivery is pluggable: today the code goes to the
- * database + application log (there is no SMS gateway configured yet). To go
- * live, add a provider channel (e.g. Twilio/Termii) behind a config flag.
+ * Phone verification OTP. Delivery is pluggable: codes go to the database +
+ * application log by default. When WORKRIDE_SMS_ENABLED=true, the configured
+ * provider (Termii or Twilio) sends the SMS via a custom channel.
  */
 class SendPhoneOtp extends Notification
 {
@@ -18,7 +20,14 @@ class SendPhoneOtp extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'log'];
+        $channels = ['database', 'log'];
+
+        if (config('workride.phone_verification.sms_channel') !== 'log') {
+            $provider = config('workride.phone_verification.sms_channel');
+            $channels[] = $provider === 'twilio' ? TwilioChannel::class : TermiiChannel::class;
+        }
+
+        return $channels;
     }
 
     /**
