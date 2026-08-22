@@ -21,7 +21,10 @@
 /storage/*.key
 /storage/pail
 /storage/phpstan
+/storage/framework/lsp-*.php
 /vendor
+test_output.txt
+gallery_of_files/
 _ide_helper.php
 _ide_helper_models.php
 Homestead.json
