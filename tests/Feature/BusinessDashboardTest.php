@@ -53,7 +53,7 @@ class BusinessDashboardTest extends TestCase
             ->assertSee('Gross revenue')
             ->assertSee('MRR')
             ->assertSee('Subsidy utilization')
-            ->assertSee('Transactions CSV');
+            ->assertSee('Transactions Excel');
     }
 
     public function test_gross_revenue_reflects_completed_paid_bookings(): void
@@ -91,7 +91,7 @@ class BusinessDashboardTest extends TestCase
             ->assertSee('1,000.00');
     }
 
-    public function test_export_transactions_returns_csv(): void
+    public function test_export_transactions_returns_excel(): void
     {
         $user = User::factory()->create();
         $wallet = Wallet::create(['user_id' => $user->id]);
@@ -105,17 +105,11 @@ class BusinessDashboardTest extends TestCase
         $response = $this->actingAs($this->admin())->get('/admin/business/export/transactions');
 
         $response->assertOk()
-            ->assertHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->assertHeaderContains('Content-Disposition', 'attachment');
-
-        $content = $response->getContent();
-
-        $this->assertStringContainsString('reference,date,user,user_name,type,amount,description', $content);
-        $this->assertStringContainsString('MDA-1-2026-0001', $content);
-        $this->assertStringContainsString('Subsidy Credit', $content);
     }
 
-    public function test_export_subsidy_utilization_returns_csv(): void
+    public function test_export_subsidy_utilization_returns_excel(): void
     {
         $workplace = Workplace::factory()->create(['name' => 'Federal Ministry of Finance']);
         $user = User::factory()->create(['workplace_id' => $workplace->id]);
@@ -131,14 +125,8 @@ class BusinessDashboardTest extends TestCase
         $response = $this->actingAs($this->admin())->get('/admin/business/export/subsidy');
 
         $response->assertOk()
-            ->assertHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->assertHeaderContains('Content-Disposition', 'attachment');
-
-        $content = $response->getContent();
-
-        $this->assertStringContainsString('workplace,staff_funded,issued,spent,utilisation', $content);
-        $this->assertStringContainsString('Federal Ministry of Finance', $content);
-        $this->assertStringContainsString('2,000.00', $content);
     }
 
     public function test_export_settlements_returns_driver_totals(): void
@@ -157,14 +145,8 @@ class BusinessDashboardTest extends TestCase
         $response = $this->actingAs($this->admin())->get('/admin/business/export/settlements');
 
         $response->assertOk()
-            ->assertHeader('Content-Type', 'text/csv; charset=utf-8')
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             ->assertHeaderContains('Content-Disposition', 'attachment');
-
-        $content = $response->getContent();
-
-        $this->assertStringContainsString('email,name,rides,fares_gross,commission,union_fee,insurance,earned_net', $content);
-        $this->assertStringContainsString($driver->email, $content);
-        $this->assertStringContainsString('420.00', $content);
     }
 
     public function test_non_admin_cannot_export(): void

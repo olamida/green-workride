@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\TransactionType;
+use App\Exports\DriverSettlementsExport;
+use App\Exports\SubsidyUtilizationExport;
+use App\Exports\TransactionsExport;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Payout;
@@ -13,6 +16,7 @@ use App\Models\Wallet;
 use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * Sprint 7 — Business dashboard for the Ops Control Tower. Turns the wallet,
@@ -37,22 +41,7 @@ class BusinessController extends Controller
      */
     public function exportTransactions()
     {
-        $rows = Transaction::query()
-            ->with('wallet.user')
-            ->latest()
-            ->limit(1000)
-            ->get()
-            ->map(fn (Transaction $t) => [
-                'reference' => $t->reference,
-                'date' => $t->created_at->toDateTimeString(),
-                'user' => $t->wallet?->user?->email ?? '',
-                'user_name' => $t->wallet?->user?->name ?? '',
-                'type' => $t->type->label(),
-                'amount' => number_format((float) $t->amount, 2),
-                'description' => $t->description ?? '',
-            ]);
-
-        return $this->csv('workride-transactions-'.now()->format('Ymd-His'), ['reference', 'date', 'user', 'user_name', 'type', 'amount', 'description'], $rows);
+        return Excel::download(new TransactionsExport, 'workride-transactions-'.now()->format('Ymd-His').'.xlsx');
     }
 
     /**
@@ -60,40 +49,7 @@ class BusinessController extends Controller
      */
     public function exportSettlements()
     {
-        $commission = (float) config('workride.commission_rate');
-        $union = (float) config('workride.union_fee_rate');
-        $insurance = (float) config('workride.insurance_per_trip');
-
-        $rows = DB::table('transactions as t')
-            ->join('wallets as w', 'w.id', '=', 't.wallet_id')
-            ->join('users as u', 'u.id', '=', 'w.user_id')
-            ->where('t.type', TransactionType::Earned->value)
-            ->groupBy('u.id', 'u.name', 'u.email')
-            ->select(
-                'u.email',
-                'u.name',
-                DB::raw('COUNT(t.id) as rides'),
-                DB::raw('SUM(t.amount) as earned_net'),
-                DB::raw('SUM(t.meta->>"$.fare") as fares_gross'),
-            )
-            ->get()
-            ->map(function ($row) use ($commission, $union, $insurance) {
-                $gross = (float) $row->fares_gross;
-                $net = (float) $row->earned_net;
-
-                return [
-                    'email' => $row->email,
-                    'name' => $row->name,
-                    'rides' => $row->rides,
-                    'fares_gross' => number_format($gross, 2),
-                    'commission' => number_format($gross * $commission, 2),
-                    'union_fee' => number_format($gross * $union, 2),
-                    'insurance' => number_format((float) $row->rides * $insurance, 2),
-                    'earned_net' => number_format($net, 2),
-                ];
-            });
-
-        return $this->csv('workride-driver-settlements-'.now()->format('Ymd-His'), ['email', 'name', 'rides', 'fares_gross', 'commission', 'union_fee', 'insurance', 'earned_net'], $rows);
+        return Excel::download(new DriverSettlementsExport, 'workride-driver-settlements-'.now()->format('Ymd-His').'.xlsx');
     }
 
     /**
@@ -101,16 +57,7 @@ class BusinessController extends Controller
      */
     public function exportSubsidy()
     {
-        $rows = $this->subsidyByWorkplace()
-            ->map(fn (array $row) => [
-                'workplace' => $row['workplace'],
-                'staff_funded' => $row['staff_funded'],
-                'issued' => number_format($row['issued'], 2),
-                'spent' => number_format($row['spent'], 2),
-                'utilisation' => $row['issued'] > 0 ? number_format(($row['spent'] / $row['issued']) * 100, 1).'%' : '0%',
-            ]);
-
-        return $this->csv('workride-subsidy-utilization-'.now()->format('Ymd-His'), ['workplace', 'staff_funded', 'issued', 'spent', 'utilisation'], $rows);
+        return Excel::download(new SubsidyUtilizationExport, 'workride-subsidy-utilization-'.now()->format('Ymd-His').'.xlsx');
     }
 
     /**
@@ -255,24 +202,5 @@ class BusinessController extends Controller
                 'spent' => round((float) ($spentRow->spent ?? 0), 2),
             ];
         })->values();
-    }
-
-    private function csv(string $filename, array $headers, iterable $rows)
-    {
-        $csv = fopen('php://temp', 'r+');
-        fputcsv($csv, $headers);
-
-        foreach ($rows as $row) {
-            fputcsv($csv, array_values((array) $row));
-        }
-
-        rewind($csv);
-        $content = stream_get_contents($csv);
-        fclose($csv);
-
-        return response($content, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'.csv"',
-        ]);
     }
 }
