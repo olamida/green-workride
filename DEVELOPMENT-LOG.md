@@ -1538,6 +1538,23 @@ Priority 2.2 roadmap item: Tier-0 OTP SMS delivery — the instant-booking gate 
 - All 18 GTFS tests pass
 - Ready for feedvalidator.mobilitydata.org validation and Google submission
 
+### 4.42 v0.32.0 — Employer Self-Service CSV Enrollment Portal (COMPLETE)
+
+**Roadmap P3.5 complete:** MDA-scoped roster management for employer admins.
+
+- Migration: `is_employer_admin` boolean on `employer_members` table
+- Middleware: `EnsureEmployerAdmin` - restricts access to employer admins only
+- Controller: `EmployerEnrollmentController` with:
+  - `index()` - dashboard with stats (total/active/pending/admins)
+  - `store()` - CSV upload via existing `EmployerService::enrollMany()` (auto-creates users, sends welcome notifications)
+  - `toggleAdmin()` - promote/demote admin status (protects last admin)
+  - `destroy()` - remove member (protects last admin)
+- View: `employer/enrollment/index.blade.php` - stats cards, CSV upload form, roster table with admin toggle + remove actions
+- Routes: `employers/{employer}/enrollment` group behind `employer.admin` middleware
+- Route aliases updated: `employers.vehicles`, `employers.vehicles.store`, `employers.vehicles.destroy`
+- Tests: 13 tests pass (requires auth, join flow, CSV enrollment, vehicle registration, admin toggle, member removal)
+- PHPStan L8 clean (0 errors), Pint clean
+
 ---
 
 ## 6. How to Work On This Project
@@ -1686,6 +1703,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.28.0` | Junction Intel Columns | `junctions` demand intelligence (gallery `WORKRIDE-45-JUNCTIONS-SEED.sql`): migration `2026_08_08_120006_add_junction_intel_columns` (`passenger_volume_daily` unsignedInteger, `is_major_hub` bool, `state` string, `avg_wait_time_mins` unsignedSmallInteger) + `Junction` casts/fillables · `JunctionSeeder` rewritten to a 51-row authoritative catalog (volumes 500–5000, 13 major hubs, states FCT/Niger/Nasarawa, waits 10–35 min) · `NavigationService::search()` seeded-volume fallback until survey totals exist (`totalCounted() ?: passenger_volume_daily`) · `DemandService::junctionCounts()` returns the intel keys · Control Tower junction table "Major hub · ~N min" badge column · PHPStan baseline unchanged (no new findings) | 581 (1907) | 2026-08-08 |
 | `v0.30.0` | Redis/Memurai production wiring + PHPStan L8 green | Memurai (Redis) running on 127.0.0.1:6379; `.env` configured for Redis cache/queue/session; Termii/Twilio channels typed for `SendPhoneOtp`; Export classes typed; nullsafe operators removed where eager-loaded; NavigationTest + WalletTopUpTest assertions updated; PHPStan baseline regenerated — 0 errors at level 8; all 158 core tests pass; pint clean | 158+ (557+) | 2026-08-23 |
 | `v0.31.0` | GTFS Google Transit submission prep | Configurable `agency_url` via `WORKRIDE_GTFS_AGENCY_URL`; `GTFS-SUBMISSION-GUIDE.md` with feed validation, Google Partner Program steps, monitoring; GTFS-RT endpoints verified; `.env.example` updated; all 18 GTFS tests pass | 158+ (557+) | 2026-08-23 |
+| `v0.32.0` | Employer self-service CSV enrollment portal (roadmap P3.5) | `is_employer_admin` on `employer_members`; `EnsureEmployerAdmin` middleware; `EmployerEnrollmentController` (CSV upload, admin toggle, member removal); `employer/enrollment/index.blade.php` dashboard; routes `employers/{employer}/enrollment` behind `employer.admin` middleware; 13 tests pass | 188 (665) | 2026-08-23 |
 
 ---
 
