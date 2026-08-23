@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\RideCreditStatus;
 use App\Enums\TrustLedgerDirection;
 use App\Enums\TrustLedgerType;
+use App\Exports\CommunityTrustExport;
+use App\Exports\PayItForwardExport;
 use App\Http\Controllers\Controller;
 use App\Models\CommunityTrust;
 use App\Models\RideCredit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 /**
  * Community Trust reconciliation (guide §2.1 + §19 traceability): the auditable
@@ -82,32 +85,10 @@ class TrustController extends Controller
 
     public function export()
     {
-        $entries = CommunityTrust::query()
-            ->orderBy('recorded_at')
-            ->orderBy('id')
-            ->get();
-
-        $csv = fopen('php://temp', 'w');
-        fputcsv($csv, ['reference', 'type', 'direction', 'amount', 'balance_after', 'recorded_at', 'meta']);
-
-        foreach ($entries as $entry) {
-            fputcsv($csv, [
-                $entry->reference,
-                $entry->type->value,
-                $entry->direction->value,
-                number_format((float) $entry->amount, 2, '.', ''),
-                number_format((float) $entry->balance_after, 2, '.', ''),
-                $entry->recorded_at->toDateTimeString(),
-                json_encode($entry->meta ?? []),
-            ]);
-        }
-
-        rewind($csv);
-
-        return response(stream_get_contents($csv), 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="community-trust-ledger.csv"',
-        ]);
+        return Excel::download(
+            new CommunityTrustExport,
+            'community-trust-ledger-'.now()->format('Ymd-His').'.xlsx'
+        );
     }
 
     /**
@@ -193,35 +174,9 @@ class TrustController extends Controller
         abort_unless(preg_match('/^\d{4}-\d{2}$/', $rawMonth), 422);
         $month = Carbon::parse($rawMonth);
 
-        $start = $month->copy()->startOfMonth();
-        $end = $month->copy()->endOfMonth();
-
-        $credits = RideCredit::with('user')
-            ->whereBetween('created_at', [$start, $end])
-            ->orderBy('created_at')
-            ->get();
-
-        $csv = fopen('php://temp', 'w');
-        fputcsv($csv, ['created_at', 'name', 'email', 'seats_owed', 'seats_repaid', 'fare_value', 'status', 'due_date']);
-
-        foreach ($credits as $credit) {
-            fputcsv($csv, [
-                $credit->created_at->toDateTimeString(),
-                $credit->user?->name ?? 'Unknown',
-                $credit->user?->email ?? '—',
-                $credit->seats_owed,
-                $credit->seats_repaid,
-                number_format((float) $credit->fare_value, 2, '.', ''),
-                $credit->status->value,
-                $credit->due_date?->toDateString() ?? '—',
-            ]);
-        }
-
-        rewind($csv);
-
-        return response(stream_get_contents($csv), 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="pay-it-forward-'.$month->format('Y-m').'.csv"',
-        ]);
+        return Excel::download(
+            new PayItForwardExport($month),
+            'pay-it-forward-'.$month->format('Y-m').'.xlsx'
+        );
     }
 }

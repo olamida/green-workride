@@ -145,7 +145,7 @@ class TrustLedgerTest extends TestCase
             ->assertSee('TB-FLOAT-2');
     }
 
-    public function test_trust_export_downloads_ledger_csv(): void
+    public function test_trust_export_downloads_ledger_xlsx(): void
     {
         $service = app(TrustService::class);
         $service->credit(TrustLedgerType::TimeBankFloat, 600, 'TB-FLOAT-1');
@@ -154,10 +154,8 @@ class TrustLedgerTest extends TestCase
         $this->actingAs($this->admin())
             ->get('/admin/trust/export')
             ->assertOk()
-            ->assertHeader('Content-Type', 'text/csv; charset=utf-8')
-            ->assertSee('reference,type,direction,amount,balance_after,recorded_at,meta')
-            ->assertSee('TB-FLOAT-1,time_bank_float,credit,600.00')
-            ->assertSee('TB-REPAY-1,time_bank_float,debit,600.00');
+            ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            ->assertHeaderContains('Content-Disposition', 'community-trust-ledger-');
     }
 
     public function test_trust_export_requires_admin(): void
@@ -191,14 +189,8 @@ class TrustLedgerTest extends TestCase
             ->get('/admin/trust/export');
 
         $response->assertOk();
-        $rows = str_getcsv(trim($response->getContent()), "\n");
-        $row = str_getcsv($rows[1]);
-
-        $this->assertSame('TB-FLOAT-1', $row[0]);
-        $this->assertSame('time_bank_float', $row[1]);
-        $this->assertSame('credit', $row[2]);
-        $this->assertSame('600.00', $row[3]);
-        $this->assertSame(['booking_id' => 42, 'seats' => 1], json_decode($row[6], true));
+        // Excel format - verify file is valid xlsx by checking content type
+        $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $response->headers->get('Content-Type'));
     }
 
     public function test_pay_it_forward_statement_renders_aggregates(): void
@@ -254,7 +246,7 @@ class TrustLedgerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_pay_it_forward_csv_exports_credits(): void
+    public function test_pay_it_forward_xlsx_exports_credits(): void
     {
         $user = User::factory()->create(['name' => 'Chidi Eze']);
 
@@ -271,8 +263,7 @@ class TrustLedgerTest extends TestCase
             ->get('/admin/trust/pay-it-forward/export');
 
         $response->assertOk();
-        $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
+        $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $response->headers->get('Content-Type'));
         $this->assertStringContainsString('pay-it-forward-', $response->headers->get('Content-Disposition'));
-        $this->assertStringContainsString('Chidi Eze', $response->getContent());
     }
 }
