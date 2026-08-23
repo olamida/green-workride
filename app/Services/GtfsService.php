@@ -120,7 +120,7 @@ class GtfsService
         $agencyLines[] = [
             'agency_id' => config('workride.gtfs.agency_id'),
             'agency_name' => config('workride.gtfs.agency_name'),
-            'agency_url' => config('app.url'),
+            'agency_url' => config('workride.gtfs.agency_url'),
             'agency_timezone' => config('workride.gtfs.agency_timezone'),
             'agency_lang' => config('workride.gtfs.agency_lang'),
         ];

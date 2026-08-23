@@ -163,6 +163,7 @@ return [
     'gtfs' => [
         'agency_id' => env('WORKRIDE_GTFS_AGENCY_ID', 'WR'),
         'agency_name' => env('WORKRIDE_GTFS_AGENCY_NAME', 'WorkRide Staff Mobility'),
+        'agency_url' => env('WORKRIDE_GTFS_AGENCY_URL', config('app.url')),
         'agency_lang' => env('WORKRIDE_GTFS_AGENCY_LANG', 'en'),
         'agency_timezone' => env('WORKRIDE_GTFS_AGENCY_TIMEZONE', 'Africa/Lagos'),
         // Feed covers 365 days forward from generation.
