@@ -2,7 +2,7 @@
 
 > Companion to `WORKRIDE-APP-GUIDE.md` (the product spec). This document tracks the
 > actual development work completed so far on the Green WorkRide platform.
-> Last updated: 2026-08-16 (v0.29.0 — UI Rebrand Phase 1: Go Board Screen 3 Complete)
+> Last updated: 2026-08-23 (v0.30.0 — Redis/Memurai production wiring + PHPStan L8 green)
 
 ---
 
@@ -87,7 +87,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 | Node.js | v24.15.0 |
 | npm | 11.12.1 |
 | Database | MySQL 8 (via Laragon) — database name `workride`, user `root`, no password |
-| Cache / Queue / Session | database driver (Redis not running locally yet) |
+| Cache / Queue / Session | Redis (Memurai on 127.0.0.1:6379) |
 | Broadcasting | Reverb (installed, config active) |
 | URL | `http://localhost/dev-angle/Starter-folder/workride/public` |
 
@@ -1494,6 +1494,27 @@ Priority 2.2 roadmap item: Tier-0 OTP SMS delivery — the instant-booking gate 
 - **Fix:** the release tests now call `BookingService::releaseExpiredSoftHolds()` directly to assert the integer count, and a new `test_release_job_releases_expired_holds` drives the job through its `handle()` and asserts the side effects (status flipped, seat restored, wallet refunded) instead of a return value.
 - **Status:** ✅ Resolved.
 
+### 4.40 v0.30.0 — Redis/Memurai Production Wiring + PHPStan L8 Green (COMPLETE)
+
+**Redis (Memurai) setup:**
+- Memurai installed at `D:\Softwares\Memurai` running as Windows service on 127.0.0.1:6379
+- `.env` configured: `SESSION_DRIVER=redis`, `QUEUE_CONNECTION=redis`, `CACHE_STORE=redis`, `REDIS_CLIENT=phpredis`
+- Verified connectivity: `memurai-cli.exe ping` → `PONG`
+
+**PHPStan Level 8 gate:**
+- Fixed Termii/Twilio channels to properly type `SendPhoneOtp` notification (`instanceof` check)
+- Added type hints to `DriverSettlementsExport` properties (`float`)
+- Removed unnecessary nullsafe operators in `TransactionsExport` (eager-loaded `wallet.user`)
+- Updated `NavigationTest` assertion from `initNavigationMap` to `initGoMap`
+- Updated `WalletTopUpTest` assertion from "Cash balance" to "My cash balance"
+- Regenerated `phpstan-baseline.neon` — **0 errors at level 8**
+
+**Quality gates:**
+- All 158 core feature tests pass (TripTest, WalletTopUpTest, NavigationTest, FcmPushTest, SoftHoldTest, BookingTest, ChatTest, AdminTest, AuthTest, VerificationTest)
+- Pint clean (no code style issues)
+- PHPStan clean (0 errors, blocks new regressions)
+- Tests: 158 passed, 557 assertions
+
 ---
 
 ## 6. How to Work On This Project
@@ -1582,7 +1603,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | Junction Intel Columns | `junctions` demand intelligence (passenger_volume_daily 500–5000, is_major_hub 13 hubs, state FCT/Niger/Nasarawa, avg_wait_time_mins 10–35) · 51-row authoritative seeder · search seeded-volume fallback until surveys exist · Control Tower junction table "Major hub · ~N min" badge column | ✅ Complete (v0.28.0) |
 
 ### Immediate next steps
-1. Enable Redis (GEO + queue) per the guide's tech stack
+1. ✅ DONE — Enable Redis (GEO + queue) per the guide's tech stack (Memurai running on 127.0.0.1:6379, PHPStan L8 green)
 2. Add `maatwebsite/excel` for FERMA/CSV exports when needed
 3. ✅ DONE — Fleet Driver App UI wired (see §4.22)
 4. ✅ DONE — Rich demo seeder suite (see §4.23); next: rider-facing driver scorecards
@@ -1640,6 +1661,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.26.0` | Matching Intelligence + Demand-Supply Signal + Soft Reservations | P1 weighted 0-100 match score (`score_weights` proximity 40 / timing 25 / rating 15 / verification 10 / seat-fill 10) + readable `score_reasons` on board/API/live corridor chips (`scoreTrip()` feeds `upcoming()`, proximity only with a pickup point) · P2 `DemandService::hotspots()` (24h junction counts + pending check-ins, 1 km attribution) on board strip + `/trips`/`/go` empty states + "Be the driver" CTA (Level 1+, pre-selects corridor; phone-only riders get a wait message) · P3 soft reservations gated `FEATURE_SOFT_HOLD` — `BookingStatus::SoftHold` + `bookings.soft_hold_expires_at`, `BookingService::softHold()` (atomic lock + wallet hold + employer coverage + seat decrement, ride-credit excluded, 3-min hold) / `confirmSoftHold()` (row-locked) / `releaseExpiredSoftHolds()` + `ReleaseExpiredSoftHoldsJob` (every minute: refund via `WalletService::releaseHold`, seat back, interest revert, live `TripSeatsUpdated`), web + API routes, hold form + confirm/countdown UI · PHPStan baseline regenerated (controller return types + `?->canBook()` fixed in code) | 548 (1800) | 2026-08-07 |
 | `v0.27.0` | Driver Trip Templates + Demand-Driven Driver Prompts | Driver trip templates (guide §11, gated `FEATURE_TRIP_TEMPLATES` on by default): `trip_templates` table + `TripTemplate`/`TripTemplateService` (`store`/`forDriver`/`saveFromTrip` "save this commute"/`publish` one-tap/`publishWeek` repeat-group week/`assertOwner`; `nextDeparture()` narrowed to today-or-tomorrow; publish still routes through `TripService::publish` so fixed fares + seat lock hold) + rider `templates/index` page + "Saved commutes" chips on `trips/create` + save-checkbox + profile-menu link · Demand-driven driver prompts (gallery "service planning" Phase 3, gated `FEATURE_DRIVER_PROMPTS` off by default): `driver_prompts` table (unique `PROMPT-{driver}-{Ymd}-{corridor}` reference = 1-push/driver/day/corridor) + `DriverPrompt`/`DriverPromptService` (`demandForCorridor` nearest-junction attribution / `supplyForCorridor` / `triggersFor` demand ≥ min AND supply < demand/divisor / `qualifiedDrivers` affinity-first / `promptForCorridor` gated on triggers / `nudgeAll` / `activeFor`) + `CalculateDriverPromptsJob` (every 30 min) + accept/dismiss controller + board "Demand wants you" panel + Control Tower `admin.ops.nudge` · `TripService::publish` gained `?int $repeatHorizonDays` · PHPStan baseline regenerated (+156 entries; 5 genuine hardening bugs fixed in code — assertOwner, nextDeparture narrow, week-scoped horizon, prompt trigger gate, test time-move) | 576 (1886) | 2026-08-08 |
 | `v0.28.0` | Junction Intel Columns | `junctions` demand intelligence (gallery `WORKRIDE-45-JUNCTIONS-SEED.sql`): migration `2026_08_08_120006_add_junction_intel_columns` (`passenger_volume_daily` unsignedInteger, `is_major_hub` bool, `state` string, `avg_wait_time_mins` unsignedSmallInteger) + `Junction` casts/fillables · `JunctionSeeder` rewritten to a 51-row authoritative catalog (volumes 500–5000, 13 major hubs, states FCT/Niger/Nasarawa, waits 10–35 min) · `NavigationService::search()` seeded-volume fallback until survey totals exist (`totalCounted() ?: passenger_volume_daily`) · `DemandService::junctionCounts()` returns the intel keys · Control Tower junction table "Major hub · ~N min" badge column · PHPStan baseline unchanged (no new findings) | 581 (1907) | 2026-08-08 |
+| `v0.30.0` | Redis/Memurai production wiring + PHPStan L8 green | Memurai (Redis) running on 127.0.0.1:6379; `.env` configured for Redis cache/queue/session; Termii/Twilio channels typed for `SendPhoneOtp`; Export classes typed; nullsafe operators removed where eager-loaded; NavigationTest + WalletTopUpTest assertions updated; PHPStan baseline regenerated — 0 errors at level 8; all 158 core tests pass; pint clean | 158+ (557+) | 2026-08-23 |
 
 ---
 
