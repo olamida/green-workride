@@ -28,7 +28,7 @@
 | 2.5 | **Moniepoint payouts** | `PayoutService` mocks ledger to "completed" | Drivers can't actually receive money | Real `MONIEPOINT_*`; settlement job hits the API |
 | 2.6 | **Redis (GEO + queue)** | `database` driver locally; docker-compose `redis:7-alpine` defined | Guide tech stack; GEO matching + scalable queue | `CACHE_DRIVER=redis`, `QUEUE_CONNECTION=redis`, GEO indexes tested |
 | 2.7 | **OSRM self-hosted** | `RoutingService` asserts free OSRM host first; `osrm` behind docker profile | 90% routing cost save | OSRM container maps Abuja; route tests run against it |
-| 2.8 | **GTFS → Google submission** | Feed + RT generate; admin page shows status | "First Abuja GTFS on Google Maps" is the moat + pitch | Submitted to `transitpartnerprogram.withgoogle.com`; feed passes `feedvalidator.mobilitydata.org` |
+| 2.8 | **GTFS → Google submission** | Feed + RT generate; admin page shows status; **submission guide created** | "First Abuja GTFS on Google Maps" is the moat + pitch | Submitted to `transitpartnerprogram.withgoogle.com`; feed passes `feedvalidator.mobilitydata.org` |
 
 ## Priority 3 — Guide features not yet built
 

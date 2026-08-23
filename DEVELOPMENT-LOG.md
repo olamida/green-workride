@@ -1515,6 +1515,29 @@ Priority 2.2 roadmap item: Tier-0 OTP SMS delivery — the instant-booking gate 
 - PHPStan clean (0 errors, blocks new regressions)
 - Tests: 158 passed, 557 assertions
 
+### 4.41 v0.31.0 — GTFS Google Transit Submission Prep (COMPLETE)
+
+**GTFS configuration:**
+- Added `agency_url` to GTFS config via `WORKRIDE_GTFS_AGENCY_URL` environment variable
+- Updated `GtfsService` to use configurable `agency_url` instead of hardcoded `config('app.url')`
+- Added GTFS environment variables to `.env.example` for documentation
+
+**Submission documentation:**
+- Created `GTFS-SUBMISSION-GUIDE.md` with complete submission process:
+  - Feed endpoints (static GTFS + GTFS-RT vehicle positions + trip updates)
+  - Pre-submission validation checklist
+  - Feed validator usage (feedvalidator.mobilitydata.org)
+  - Google Transit Partner Program application steps
+  - Maintenance & monitoring guidelines
+  - Troubleshooting guide
+
+**Feed verification:**
+- Static GTFS: 4.6 KB, 171 stops, 3 routes, 32 trips, 365-day service calendar
+- GTFS-RT vehicle_positions.pb: 583 bytes (active trips with live coords)
+- GTFS-RT trip_updates.pb: 13 bytes (empty snapshot as expected)
+- All 18 GTFS tests pass
+- Ready for feedvalidator.mobilitydata.org validation and Google submission
+
 ---
 
 ## 6. How to Work On This Project
@@ -1662,6 +1685,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.27.0` | Driver Trip Templates + Demand-Driven Driver Prompts | Driver trip templates (guide §11, gated `FEATURE_TRIP_TEMPLATES` on by default): `trip_templates` table + `TripTemplate`/`TripTemplateService` (`store`/`forDriver`/`saveFromTrip` "save this commute"/`publish` one-tap/`publishWeek` repeat-group week/`assertOwner`; `nextDeparture()` narrowed to today-or-tomorrow; publish still routes through `TripService::publish` so fixed fares + seat lock hold) + rider `templates/index` page + "Saved commutes" chips on `trips/create` + save-checkbox + profile-menu link · Demand-driven driver prompts (gallery "service planning" Phase 3, gated `FEATURE_DRIVER_PROMPTS` off by default): `driver_prompts` table (unique `PROMPT-{driver}-{Ymd}-{corridor}` reference = 1-push/driver/day/corridor) + `DriverPrompt`/`DriverPromptService` (`demandForCorridor` nearest-junction attribution / `supplyForCorridor` / `triggersFor` demand ≥ min AND supply < demand/divisor / `qualifiedDrivers` affinity-first / `promptForCorridor` gated on triggers / `nudgeAll` / `activeFor`) + `CalculateDriverPromptsJob` (every 30 min) + accept/dismiss controller + board "Demand wants you" panel + Control Tower `admin.ops.nudge` · `TripService::publish` gained `?int $repeatHorizonDays` · PHPStan baseline regenerated (+156 entries; 5 genuine hardening bugs fixed in code — assertOwner, nextDeparture narrow, week-scoped horizon, prompt trigger gate, test time-move) | 576 (1886) | 2026-08-08 |
 | `v0.28.0` | Junction Intel Columns | `junctions` demand intelligence (gallery `WORKRIDE-45-JUNCTIONS-SEED.sql`): migration `2026_08_08_120006_add_junction_intel_columns` (`passenger_volume_daily` unsignedInteger, `is_major_hub` bool, `state` string, `avg_wait_time_mins` unsignedSmallInteger) + `Junction` casts/fillables · `JunctionSeeder` rewritten to a 51-row authoritative catalog (volumes 500–5000, 13 major hubs, states FCT/Niger/Nasarawa, waits 10–35 min) · `NavigationService::search()` seeded-volume fallback until survey totals exist (`totalCounted() ?: passenger_volume_daily`) · `DemandService::junctionCounts()` returns the intel keys · Control Tower junction table "Major hub · ~N min" badge column · PHPStan baseline unchanged (no new findings) | 581 (1907) | 2026-08-08 |
 | `v0.30.0` | Redis/Memurai production wiring + PHPStan L8 green | Memurai (Redis) running on 127.0.0.1:6379; `.env` configured for Redis cache/queue/session; Termii/Twilio channels typed for `SendPhoneOtp`; Export classes typed; nullsafe operators removed where eager-loaded; NavigationTest + WalletTopUpTest assertions updated; PHPStan baseline regenerated — 0 errors at level 8; all 158 core tests pass; pint clean | 158+ (557+) | 2026-08-23 |
+| `v0.31.0` | GTFS Google Transit submission prep | Configurable `agency_url` via `WORKRIDE_GTFS_AGENCY_URL`; `GTFS-SUBMISSION-GUIDE.md` with feed validation, Google Partner Program steps, monitoring; GTFS-RT endpoints verified; `.env.example` updated; all 18 GTFS tests pass | 158+ (557+) | 2026-08-23 |
 
 ---
 
