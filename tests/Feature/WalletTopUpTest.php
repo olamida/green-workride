@@ -28,7 +28,7 @@ class WalletTopUpTest extends TestCase
         $this->actingAs($user)
             ->get('/wallet')
             ->assertOk()
-            ->assertSee('Cash balance')
+            ->assertSee('My cash balance')
             ->assertSee('1,000.00')
             ->assertSee('2,500.00');
     }

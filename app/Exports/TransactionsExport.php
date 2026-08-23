@@ -30,8 +30,8 @@ class TransactionsExport implements FromCollection, ShouldAutoSize, WithHeadings
         return [
             $transaction->reference,
             $transaction->created_at->toDateTimeString(),
-            $transaction->wallet?->user?->email ?? '',
-            $transaction->wallet?->user?->name ?? '',
+            $transaction->wallet->user->email ?? '',
+            $transaction->wallet->user->name ?? '',
             $transaction->type->label(),
             number_format((float) $transaction->amount, 2),
             $transaction->description ?? '',

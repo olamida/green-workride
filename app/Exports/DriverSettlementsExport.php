@@ -12,11 +12,11 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class DriverSettlementsExport implements FromCollection, ShouldAutoSize, WithHeadings, WithMapping
 {
-    protected $commission;
+    protected float $commission;
 
-    protected $union;
+    protected float $union;
 
-    protected $insurance;
+    protected float $insurance;
 
     public function __construct()
     {

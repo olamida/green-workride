@@ -67,8 +67,8 @@ class NavigationTest extends TestCase
             ->get('/go')
             ->assertOk()
             ->assertSee('Where are you going?')
-            ->assertSee('navigation-map')
-            ->assertSee('initNavigationMap')
+            ->assertSee('go-map')
+            ->assertSee('initGoMap')
             ->assertSee('Kubwa → CBD')
             ->assertSee('whereTo')
             ->assertSee('data-corridor-chip');
@@ -79,8 +79,8 @@ class NavigationTest extends TestCase
         $this->actingAs($this->user())
             ->get('/go')
             ->assertOk()
-            ->assertSee('navigation-map')
-            ->assertSee('initNavigationMap');
+            ->assertSee('go-map')
+            ->assertSee('initGoMap');
     }
 
     public function test_api_search_returns_junction_with_demand_volume(): void

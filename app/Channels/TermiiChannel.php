@@ -2,6 +2,7 @@
 
 namespace App\Channels;
 
+use App\Notifications\SendPhoneOtp;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
 
@@ -13,7 +14,7 @@ class TermiiChannel
 {
     public function send(mixed $notifiable, Notification $notification): void
     {
-        $code = $notification->code;
+        $code = $notification instanceof SendPhoneOtp ? $notification->code : '';
 
         $apiKey = config('services.termii.key');
         $senderId = config('services.termii.sender_id', 'WorkRide');
