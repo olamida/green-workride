@@ -3,6 +3,7 @@
 use App\Http\Middleware\EffectiveRoleMiddleware;
 use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\EnsureDriverVerified;
+use App\Http\Middleware\EnsureEmployerAdmin;
 use App\Http\Middleware\EnsureNotBanned;
 use App\Http\Middleware\EnsureVerifiedWorker;
 use Illuminate\Foundation\Application;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'verified.worker' => EnsureVerifiedWorker::class,
             'driver.verified' => EnsureDriverVerified::class,
             'not.banned' => EnsureNotBanned::class,
+            'employer.admin' => EnsureEmployerAdmin::class,
         ]);
 
         $middleware->validateCsrfTokens(except: ['paystack/webhook']);

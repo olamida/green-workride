@@ -55,7 +55,7 @@ class EmployerEnrollmentTest extends TestCase
 
     public function test_employers_page_requires_auth(): void
     {
-        $this->get('/profile/employers')->assertRedirect('/login');
+        $this->get('/employers')->assertRedirect('/login');
     }
 
     public function test_user_can_request_to_join_employer(): void
@@ -64,7 +64,7 @@ class EmployerEnrollmentTest extends TestCase
         $user = $this->user();
 
         $this->actingAs($user)
-            ->get('/profile/employers')
+            ->get('/employers')
             ->assertOk()
             ->assertSee('Enrollment Test Corp');
 
@@ -268,11 +268,11 @@ class EmployerEnrollmentTest extends TestCase
         $user = $this->user();
 
         $this->actingAs($user)
-            ->get('/employer/vehicles')
+            ->get('/employers/vehicles')
             ->assertOk();
 
         $this->actingAs($user)
-            ->post('/employer/vehicles', [
+            ->post('/employers/vehicles', [
                 'plate_number' => 'ABJ-777-KJ',
                 'make' => 'Toyota',
                 'model' => 'Hiace',
@@ -287,7 +287,7 @@ class EmployerEnrollmentTest extends TestCase
         $this->assertSame($user->id, $vehicle->user_id);
 
         $this->actingAs($user)
-            ->delete("/employer/vehicles/{$vehicle->id}")
+            ->delete("/employers/vehicles/{$vehicle->id}")
             ->assertRedirect();
 
         $this->assertDatabaseMissing('vehicles', ['id' => $vehicle->id]);
@@ -300,7 +300,7 @@ class EmployerEnrollmentTest extends TestCase
         $vehicle = Vehicle::factory()->create(['user_id' => $owner->id]);
 
         $this->actingAs($other)
-            ->delete("/employer/vehicles/{$vehicle->id}")
+            ->delete("/employers/vehicles/{$vehicle->id}")
             ->assertSessionHasErrors('vehicle');
 
         $this->assertDatabaseHas('vehicles', ['id' => $vehicle->id]);

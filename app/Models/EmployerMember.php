@@ -18,6 +18,7 @@ class EmployerMember extends Model
         'employee_id',
         'joined_via',
         'status',
+        'is_employer_admin',
     ];
 
     protected function casts(): array
@@ -25,6 +26,7 @@ class EmployerMember extends Model
         return [
             'status' => EmployerMemberStatus::class,
             'joined_via' => EmployerJoinVia::class,
+            'is_employer_admin' => 'boolean',
         ];
     }
 
@@ -46,5 +48,10 @@ class EmployerMember extends Model
     public function isPending(): bool
     {
         return $this->status === EmployerMemberStatus::Pending;
+    }
+
+    public function isEmployerAdmin(): bool
+    {
+        return $this->is_employer_admin;
     }
 }

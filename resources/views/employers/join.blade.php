@@ -67,7 +67,7 @@
             Own the staff bus, coaster or car you drive to work? Register it so it can run as a WorkRide
             corridor vehicle.
         </p>
-        <a href="{{ route('employer.vehicles') }}" class="mt-3 inline-block rounded-xl bg-forest-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-700">
+        <a href="{{ route('employers.vehicles') }}" class="mt-3 inline-block rounded-xl bg-forest-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-700">
             Manage my vehicles
         </a>
     </div>

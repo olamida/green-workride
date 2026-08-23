@@ -27,6 +27,7 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\DemandController;
 use App\Http\Controllers\Web\DriverFleetController;
 use App\Http\Controllers\Web\DriverPromptController;
+use App\Http\Controllers\Web\EmployerEnrollmentController;
 use App\Http\Controllers\Web\EmployerRequestController;
 use App\Http\Controllers\Web\GoController;
 use App\Http\Controllers\Web\GtfsController;
@@ -140,12 +141,21 @@ Route::middleware('auth')->group(function () {
         Route::post('/nin', [VerificationController::class, 'storeNin'])->name('nin');
     });
 
-    // Employer mobility, rider side (guide §7 Form 1) + self-service vehicles.
-    Route::get('/profile/employers', [EmployerRequestController::class, 'employers'])->name('employers.self');
-    Route::post('/employers/{employer}/join', [EmployerRequestController::class, 'join'])->name('employers.join');
-    Route::get('/employer/vehicles', [EmployerRequestController::class, 'vehicles'])->name('employer.vehicles');
-    Route::post('/employer/vehicles', [EmployerRequestController::class, 'storeVehicle'])->name('employer.vehicles.store');
-    Route::delete('/employer/vehicles/{vehicle}', [EmployerRequestController::class, 'destroyVehicle'])->name('employer.vehicles.destroy');
+    Route::prefix('employers')->name('employers.')->middleware('auth')->group(function () {
+        Route::get('/', [EmployerRequestController::class, 'employers'])->name('self');
+        Route::post('/{employer}/join', [EmployerRequestController::class, 'join'])->name('join');
+        Route::get('/vehicles', [EmployerRequestController::class, 'vehicles'])->name('vehicles');
+        Route::post('/vehicles', [EmployerRequestController::class, 'storeVehicle'])->name('vehicles.store');
+        Route::delete('/vehicles/{vehicle}', [EmployerRequestController::class, 'destroyVehicle'])->name('vehicles.destroy');
+
+        // Employer admin self-service roster management (roadmap P3.5)
+        Route::prefix('{employer}/enrollment')->name('enrollment.')->middleware('employer.admin')->group(function () {
+            Route::get('/', [EmployerEnrollmentController::class, 'index'])->name('index');
+            Route::post('/', [EmployerEnrollmentController::class, 'store'])->name('store');
+            Route::patch('/members/{member}/toggle-admin', [EmployerEnrollmentController::class, 'toggleAdmin'])->name('toggle-admin');
+            Route::delete('/members/{member}', [EmployerEnrollmentController::class, 'destroy'])->name('destroy');
+        });
+    });
 
     Route::prefix('missions')->name('missions.')->group(function () {
         Route::get('/', [MissionController::class, 'index'])->name('index');

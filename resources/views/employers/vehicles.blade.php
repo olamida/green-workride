@@ -14,7 +14,7 @@
     <div class="grid gap-6 lg:grid-cols-2">
         <div class="rounded-2xl border border-ink-200 bg-white p-6">
             <h2 class="font-heading font-semibold text-ink-900">Add a vehicle</h2>
-            <form method="POST" action="{{ route('employer.vehicles.store') }}" class="mt-4 space-y-3">
+            <form method="POST" action="{{ route('employers.vehicles.store') }}" class="mt-4 space-y-3">
                 @csrf
                 <div>
                     <input type="text" name="plate_number" value="{{ old('plate_number') }}" placeholder="Plate number (e.g. ABJ-849-KJ)" required
@@ -52,7 +52,7 @@
                         </div>
                         <div class="flex items-center gap-3">
                             <x-badge :status="$vehicle->papers_verified ? 'approved' : 'pending'" :label="$vehicle->papers_verified ? 'Verified' : 'Pending papers'" />
-                            <form method="POST" action="{{ route('employer.vehicles.destroy', $vehicle) }}">
+                            <form method="POST" action="{{ route('employers.vehicles.destroy', $vehicle) }}">
                                 @csrf
                                 @method('DELETE')
                                 <button class="text-xs font-medium text-red-600 hover:underline">Remove</button>
