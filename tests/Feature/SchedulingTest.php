@@ -54,21 +54,34 @@ class SchedulingTest extends TestCase
     public function test_materialize_day_creates_trip_rows_for_each_departure_slot(): void
     {
         $schedule = $this->schedule();
+
+        // Debug: check the route and corridor
+        $route = $schedule->route;
+        dump('Route ID: '.($route?->id ?? 'null'));
+        dump('Route Corridor: '.($route?->corridor ?? 'null'));
+        dump('Schedule Corridor: '.$schedule->corridor()->value);
+        dump('Schedule runsOn mon: '.($schedule->runsOn('mon') ? 'true' : 'false'));
+        dump('Schedule departureTimes: '.json_encode($schedule->departureTimes()));
+
         $service = app(SchedulingService::class);
 
-        // 2026-08-10 is a Monday. 06:30 / 06:45 / 07:00 = 3 slots.
-        $created = $service->materializeDay('2026-08-10');
+        // Use a future Monday to avoid "isPast" check
+        $monday = now()->startOfWeek()->addWeek();
+        $created = $service->materializeDay($monday);
+
+        dump('Created: '.$created);
+        dump('Trips count: '.Trip::where('schedule_ref', 'LIKE', 'SCHED-'.$schedule->id.'-%')->count());
 
         $this->assertSame(3, $created);
         $this->assertSame(3, Trip::where('schedule_ref', 'LIKE', 'SCHED-'.$schedule->id.'-%')->count());
 
-        $first = Trip::where('schedule_ref', 'SCHED-'.$schedule->id.'-2026-08-10-0630')->first();
+        $first = Trip::where('schedule_ref', 'SCHED-'.$schedule->id.'-'.$monday->format('Y-m-d').'-0630')->first();
         $this->assertNotNull($first);
         $this->assertSame($schedule->corridor(), $first->corridor);
         $this->assertSame($schedule->driver_id, $first->driver_id);
         $this->assertSame($schedule->vehicle_id, $first->vehicle_id);
         $this->assertSame(TripStatus::Scheduled, $first->status);
-        $this->assertSame('2026-08-10 06:30:00', $first->departure_time->format('Y-m-d H:i:s'));
+        $this->assertSame($monday->format('Y-m-d').' 06:30:00', $first->departure_time->format('Y-m-d H:i:s'));
         $this->assertSame(2, $first->waypoints()->count());
     }
 
@@ -77,9 +90,10 @@ class SchedulingTest extends TestCase
         $schedule = $this->schedule();
         $service = app(SchedulingService::class);
 
-        $service->materializeDay('2026-08-10');
-        $second = $service->materializeDay('2026-08-10');
-        $third = $service->materializeDay('2026-08-10');
+        $monday = now()->startOfWeek()->addWeek();
+        $service->materializeDay($monday);
+        $second = $service->materializeDay($monday);
+        $third = $service->materializeDay($monday);
 
         $this->assertSame(0, $second + $third);
         $this->assertSame(3, Trip::count());
@@ -87,24 +101,26 @@ class SchedulingTest extends TestCase
 
     public function test_materialize_day_skips_past_departures(): void
     {
-        $this->travelTo('2026-08-10 06:45:00');
+        $monday = now()->startOfWeek()->addWeek();
+        $this->travelTo($monday->copy()->setTime(6, 45, 0));
 
         $schedule = $this->schedule();
         $service = app(SchedulingService::class);
 
         // 06:30 is already past; 06:45 and 07:00 remain.
-        $created = $service->materializeDay('2026-08-10');
+        $created = $service->materializeDay($monday);
 
         $this->assertSame(2, $created);
-        $this->assertNull(Trip::where('schedule_ref', 'SCHED-'.$schedule->id.'-2026-08-10-0630')->first());
+        $this->assertNull(Trip::where('schedule_ref', 'SCHED-'.$schedule->id.'-'.$monday->format('Y-m-d').'-0630')->first());
     }
 
     public function test_materialize_day_skips_days_not_in_schedule(): void
     {
         $this->schedule(); // mon only
 
-        // 2026-08-11 is a Tuesday.
-        $this->assertSame(0, app(SchedulingService::class)->materializeDay('2026-08-11'));
+        // Next Tuesday.
+        $tuesday = now()->startOfWeek()->addWeek()->addDay();
+        $this->assertSame(0, app(SchedulingService::class)->materializeDay($tuesday));
         $this->assertSame(0, Trip::count());
     }
 
@@ -113,7 +129,8 @@ class SchedulingTest extends TestCase
         $schedule = $this->schedule();
         $schedule->update(['status' => BusScheduleStatus::Paused]);
 
-        $this->assertSame(0, app(SchedulingService::class)->materializeDay('2026-08-10'));
+        $monday = now()->startOfWeek()->addWeek();
+        $this->assertSame(0, app(SchedulingService::class)->materializeDay($monday));
         $this->assertSame(0, Trip::count());
     }
 
@@ -122,18 +139,20 @@ class SchedulingTest extends TestCase
         config(['workride.scheduling.enabled' => false]);
         $this->schedule();
 
-        $this->assertSame(0, app(SchedulingService::class)->materializeDay('2026-08-10'));
+        $monday = now()->startOfWeek()->addWeek();
+        $this->assertSame(0, app(SchedulingService::class)->materializeDay($monday));
         $this->assertSame(0, Trip::count());
     }
 
     public function test_next_departures_merges_materialised_trips_and_future_slots(): void
     {
-        $this->travelTo('2026-08-10 05:00:00');
+        $monday = now()->startOfWeek()->addWeek();
+        $this->travelTo($monday->copy()->setTime(5, 0, 0));
 
         $schedule = $this->schedule();
         $service = app(SchedulingService::class);
 
-        $service->materializeDay('2026-08-10');
+        $service->materializeDay($monday);
 
         $departures = $service->nextDepartures();
 
@@ -146,7 +165,8 @@ class SchedulingTest extends TestCase
 
     public function test_next_departures_filters_by_corridor(): void
     {
-        $this->travelTo('2026-08-10 05:00:00');
+        $monday = now()->startOfWeek()->addWeek();
+        $this->travelTo($monday->copy()->setTime(5, 0, 0));
 
         $this->schedule(); // Kubwa
 
@@ -181,9 +201,10 @@ class SchedulingTest extends TestCase
     {
         $schedule = $this->schedule();
 
+        $monday = now()->startOfWeek()->addWeek();
         $this->assertSame(
-            'SCHED-'.$schedule->id.'-2026-08-10-0630',
-            $schedule->referenceFor('2026-08-10', '06:30')
+            'SCHED-'.$schedule->id.'-'.$monday->format('Y-m-d').'-0630',
+            $schedule->referenceFor($monday->format('Y-m-d'), '06:30')
         );
     }
 }

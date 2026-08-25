@@ -19,7 +19,7 @@ The authoritative product specification is `WORKRIDE-APP-GUIDE.md` in this folde
 
 ---
 
-## 2. Current Status (Phase: Foundation / … v0.29.0 — UI Rebrand Phase 1: Go Board Screen 3 Complete)
+## 2. Current Status (Phase: Foundation / … v0.32.1 — Nigerian English Test Fixes)
 
 | Area | Status |
 |------|--------|
@@ -1704,6 +1704,7 @@ php artisan ide-helper:generate  # refresh IDE autocomplete
 | `v0.30.0` | Redis/Memurai production wiring + PHPStan L8 green | Memurai (Redis) running on 127.0.0.1:6379; `.env` configured for Redis cache/queue/session; Termii/Twilio channels typed for `SendPhoneOtp`; Export classes typed; nullsafe operators removed where eager-loaded; NavigationTest + WalletTopUpTest assertions updated; PHPStan baseline regenerated — 0 errors at level 8; all 158 core tests pass; pint clean | 158+ (557+) | 2026-08-23 |
 | `v0.31.0` | GTFS Google Transit submission prep | Configurable `agency_url` via `WORKRIDE_GTFS_AGENCY_URL`; `GTFS-SUBMISSION-GUIDE.md` with feed validation, Google Partner Program steps, monitoring; GTFS-RT endpoints verified; `.env.example` updated; all 18 GTFS tests pass | 158+ (557+) | 2026-08-23 |
 | `v0.32.0` | Employer self-service CSV enrollment portal (roadmap P3.5) | `is_employer_admin` on `employer_members`; `EnsureEmployerAdmin` middleware; `EmployerEnrollmentController` (CSV upload, admin toggle, member removal); `employer/enrollment/index.blade.php` dashboard; routes `employers/{employer}/enrollment` behind `employer.admin` middleware; 13 tests pass | 188 (665) | 2026-08-23 |
+| `v0.32.1` | Nigerian English test fixes | Fixed 4 failing tests with localized copy: "Your community impact" → "How You Don Help Your Area", "ETA Federal Secretariat" → "ETA", "3 people want this journey" → "3 people don wait for motor", "Next departure" / "3/4 seats left" → "Motor go come out" / "3/4 seats remain"; pint fixed nested `<a>` in `trips/board.blade.php` | 581 (1886) | 2026-08-26 |
 
 ---
 

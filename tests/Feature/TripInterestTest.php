@@ -164,7 +164,7 @@ class TripInterestTest extends TestCase
 
         $this->actingAs($this->verifiedWorker())
             ->get('/trips')
-            ->assertSee('3 people want this journey', false)
+            ->assertSee('3 people don wait for motor', false)
             ->assertSee('Secretariat', false);
     }
 
@@ -178,8 +178,8 @@ class TripInterestTest extends TestCase
 
         $this->actingAs($this->verifiedWorker())
             ->get('/trips')
-            ->assertSee('Next departure', false)
-            ->assertSee('3/4 seats left', false);
+            ->assertSee('Motor go come out', false)
+            ->assertSee('3/4 seats remain', false);
     }
 
     public function test_active_trips_sort_before_scheduled(): void

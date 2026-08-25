@@ -40,7 +40,7 @@ class ImpactPageTest extends TestCase
         $this->actingAs($user)
             ->get('/impact')
             ->assertOk()
-            ->assertSee('Your community impact')
+            ->assertSee('How You Don Help Your Area')
             ->assertSee('26.4')
             ->assertSee('CO₂ certificate');
     }

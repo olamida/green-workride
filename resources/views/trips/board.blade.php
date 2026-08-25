@@ -356,10 +356,9 @@
                                         @endif
                                     </span>
                                 </span>
-                                @if (auth()->user()->canDriveVolunteer())
+@if (auth()->user()->canDriveVolunteer())
                                     <a href="{{ route('trips.create', ['corridor' => $hotspot['corridor'] ?? '']) }}" class="shrink-0 rounded-full bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">
-                                        <a href="{{ route('trips.create', ['corridor' => $hotspot['corridor'] ?? '']) }}" class="shrink-0 rounded-full bg-forest-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-forest-700">
-                                            Publish motor →
+                                        Publish motor →
                                     </a>
                                 @endif
                             </li>

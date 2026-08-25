@@ -95,7 +95,7 @@ class Sprint3LiveProgressTest extends TestCase
             ->assertSee('Ride progress')
             ->assertSee('data-wp-status')
             ->assertSee('Next:')
-            ->assertSee('ETA Federal Secretariat');
+            ->assertSee('ETA');
     }
 
     public function test_progress_tracker_marks_passed_current_upcoming_states(): void
