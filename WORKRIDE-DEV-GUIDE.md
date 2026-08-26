@@ -143,6 +143,7 @@ Run these **before every commit** (feature/process OR sprint milestone). From
 | Tests | `php artisan test` | all green (428 / 1361) |
 | Build | `npm run build` | no errors |
 | Docs | update `DEVELOPMENT-LOG.md` | reflects this change |
+| **Resume prompt** | `php artisan workride:resume-prompt` | generates `resume-prompt.md` with next task |
 | Stage | `git add <relevant files>` | only intended files |
 | Inspect | `git status` / `git diff --cached` | no `.env`, no secrets |
 | Commit | `git commit -m "<conventional>"` | message explains WHY |
@@ -150,6 +151,24 @@ Run these **before every commit** (feature/process OR sprint milestone). From
 | Push | `git push origin main && git push --tags` | after a tagged sprint |
 
 Commit message = Conventional Commits: `feat|fix|test|refactor|chore|docs|perf(scope): subject`.
+
+### Resume Prompt (feed to next session)
+
+After the docs gate, run:
+
+```bash
+php artisan workride:resume-prompt
+```
+
+This generates `resume-prompt.md` at the repo root — a ready-to-paste prompt for the next opencode session that captures:
+
+- Current tag + test count
+- What was just completed (from the latest DEVELOPMENT-LOG entry)
+- Next 3 roadmap items (from `WORKRIDE-ROADMAP.md`)
+- Key config flags / feature gates
+- Any open blockers or follow-ups
+
+Paste that file's contents into the next session's first message — zero context-setting needed.
 
 ### PHPStan gate (level 8, baseline-managed)
 
