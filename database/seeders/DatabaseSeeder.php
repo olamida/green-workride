@@ -15,6 +15,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            // Multi-tenant foundation (must run first for city-scoped seeders)
+            CountrySeeder::class,
+            CitySeeder::class,
+
             WorkplaceSeeder::class,
             GtfsStopSeeder::class,
             AdminUserSeeder::class,
