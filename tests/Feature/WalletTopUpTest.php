@@ -37,6 +37,10 @@ class WalletTopUpTest extends TestCase
     {
         $user = User::factory()->create();
 
+        // Temporarily remove Paystack config for this test
+        config(['services.paystack.secret_key' => null]);
+        config(['services.paystack.public_key' => null]);
+
         $this->actingAs($user)
             ->post('/wallet/topup', ['amount' => 5000])
             ->assertSessionHasErrors('amount');
@@ -74,6 +78,9 @@ class WalletTopUpTest extends TestCase
     public function test_api_top_up_unconfigured_returns_503(): void
     {
         $user = User::factory()->create();
+
+        config(['services.paystack.secret_key' => null]);
+        config(['services.paystack.public_key' => null]);
 
         $this->actingAs($user, 'sanctum')
             ->postJson('/api/v1/wallet/topup', ['amount' => 5000])

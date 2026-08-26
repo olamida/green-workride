@@ -19,6 +19,11 @@ class PaystackService
         return filled($this->secretKey()) && filled($this->webhookSecret());
     }
 
+    public function canInitialize(): bool
+    {
+        return filled($this->secretKey());
+    }
+
     /**
      * Initialise a one-off charge and return the Paystack redirect URL.
      *

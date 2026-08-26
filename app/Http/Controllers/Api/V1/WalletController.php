@@ -32,9 +32,9 @@ class WalletController extends Controller
             'amount' => ['required', 'numeric', 'min:100', 'max:1000000'],
         ]);
 
-        if (! $paystack->isConfigured()) {
+        if (! $paystack->canInitialize()) {
             return response()->json([
-                'message' => 'Paystack is not configured. Top-ups are unavailable.',
+                'message' => 'Paystack is not configured. Add PAYSTACK_SECRET_KEY to .env to enable top-ups.',
             ], 503);
         }
 

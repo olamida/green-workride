@@ -42,9 +42,9 @@ class WalletController extends Controller
             'amount' => ['required', 'numeric', 'min:100', 'max:1000000'],
         ]);
 
-        if (! $paystack->isConfigured()) {
+        if (! $paystack->canInitialize()) {
             return back()->withErrors([
-                'amount' => 'Paystack is not configured yet. Add PAYSTACK_PUBLIC_KEY, PAYSTACK_SECRET_KEY and PAYSTACK_WEBHOOK_SECRET to .env to enable top-ups.',
+                'amount' => 'Paystack is not configured. Add PAYSTACK_PUBLIC_KEY and PAYSTACK_SECRET_KEY to .env to enable top-ups.',
             ]);
         }
 
