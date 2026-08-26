@@ -30,3 +30,9 @@ _ide_helper_models.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Generated / test artifacts
+resume-prompt.md
+osrm-data/
+storage/test_response.html
+check_content.php
+test_str_contains.php
