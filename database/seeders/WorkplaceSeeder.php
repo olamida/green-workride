@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\City;
 use App\Models\Workplace;
 use Illuminate\Database\Seeder;
 
@@ -15,6 +16,7 @@ class WorkplaceSeeder extends Seeder
 {
     public function run(): void
     {
+        $abuja = City::where('slug', 'abuja')->first();
         $cbd = ['lat' => 9.0450, 'lng' => 7.4922]; // Three Arms Zone / Federal Secretariat
 
         $mdas = [
@@ -75,10 +77,12 @@ class WorkplaceSeeder extends Seeder
                     'lng' => round($cbd['lng'] + (mt_rand(-15, 15) / 10000), 7),
                     'geofence_radius_m' => 500,
                     'is_government' => true,
+                    'country_id' => $abuja?->country_id,
+                    'city_id' => $abuja?->id,
                 ],
             );
         }
 
-        $this->command?->info('Seeded '.count($mdas).' FCT MDA workplaces.');
+        $this->command?->info('Seeded '.count($mdas).' FCT MDA workplaces in Abuja.');
     }
 }

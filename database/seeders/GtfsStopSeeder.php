@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\City;
 use App\Models\GtfsStop;
 use Illuminate\Database\Seeder;
 
@@ -14,6 +15,8 @@ class GtfsStopSeeder extends Seeder
 {
     public function run(): void
     {
+        $abuja = City::where('slug', 'abuja')->first();
+
         $stops = [
             // ---- Kubwa → CBD corridor ----
             ['KUB-01', 'Kubwa Junction', 9.1117, 7.3304, 'kubwa_cbd', 'Kubwa'],
@@ -84,6 +87,7 @@ class GtfsStopSeeder extends Seeder
                     'stop_lon' => $lng,
                     'corridor' => $corridor,
                     'zone' => $zone,
+                    'city_id' => $abuja?->id,
                 ],
             );
         }

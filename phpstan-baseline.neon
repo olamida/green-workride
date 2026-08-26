@@ -3673,18 +3673,6 @@ parameters:
 			path: app/Models/FuelAdvance.php
 
 		-
-			message: '#^Class App\\Models\\GtfsRoute uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/GtfsRoute.php
-
-		-
-			message: '#^Class App\\Models\\GtfsStop uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/GtfsStop.php
-
-		-
 			message: '#^Class App\\Models\\GtfsValidation uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
 			identifier: missingType.generics
 			count: 1
@@ -4589,24 +4577,6 @@ parameters:
 			identifier: missingType.generics
 			count: 1
 			path: app/Models/Wallet.php
-
-		-
-			message: '#^Class App\\Models\\Workplace uses generic trait Illuminate\\Database\\Eloquent\\Factories\\HasFactory but does not specify its types\: TFactory$#'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Workplace.php
-
-		-
-			message: '#^Method App\\Models\\Workplace\:\:users\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Workplace.php
-
-		-
-			message: '#^Method App\\Models\\Workplace\:\:verifications\(\) return type with generic class Illuminate\\Database\\Eloquent\\Relations\\HasMany does not specify its types\: TRelatedModel, TDeclaringModel$#'
-			identifier: missingType.generics
-			count: 1
-			path: app/Models/Workplace.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'

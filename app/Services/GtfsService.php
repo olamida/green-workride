@@ -31,11 +31,11 @@ class GtfsService
      *
      * @return array{path:string,size:int,hash:string,stops:int,routes:int,trips:int}
      */
-    public function generate(): array
+    public function generate(?int $cityId = null): array
     {
-        $routes = $this->ensureRoutes();
-        $trips = $this->eligibleTrips();
-        $stopsByCorridor = $this->catalogStops();
+        $routes = $this->ensureRoutes($cityId);
+        $trips = $this->eligibleTrips($cityId);
+        $stopsByCorridor = $this->catalogStops($cityId);
 
         $agencyLines = [];
         $stopsLines = $this->catalogStopsCsvLines($stopsByCorridor->flatten());
@@ -60,7 +60,7 @@ class GtfsService
             $corridor = $trip->corridor;
             $route = $routes->firstWhere('corridor', $corridor->value) ?? $routes->first();
             $tripId = $this->tripIdFor($trip);
-            $points = $this->tripPoints($trip, $corridor);
+            $points = $this->tripPoints($trip, $corridor, $cityId);
             $times = $this->scheduleTimes($points, $trip->departure_time);
 
             $corridorStops = $stopsByCorridor->get($corridor->value, collect());
@@ -198,39 +198,54 @@ class GtfsService
         return 'SHP-'.$trip->id;
     }
 
-    private function eligibleTrips(): EloquentCollection
+    private function eligibleTrips(?int $cityId = null): EloquentCollection
     {
-        return Trip::query()
+        $query = Trip::query()
             ->whereIn('status', [TripStatus::Scheduled, TripStatus::Active])
             ->whereNotNull('departure_time')
             ->orderBy('departure_time')
-            ->with('waypoints')
-            ->get();
+            ->with('waypoints');
+
+        if ($cityId !== null) {
+            $query->whereHas('asset', function ($q) use ($cityId) {
+                $q->where('city_id', $cityId);
+            });
+        }
+
+        return $query->get();
     }
 
-    private function ensureRoutes(): SupportCollection
+    private function ensureRoutes(?int $cityId = null): SupportCollection
     {
         $routes = collect();
 
         foreach (Corridor::cases() as $corridor) {
+            $routeData = [
+                'route_id' => $corridor->short(),
+                'agency_id' => config('workride.gtfs.agency_id'),
+                'route_short_name' => $corridor->short(),
+                'route_long_name' => $corridor->label(),
+                'route_type' => 3,
+                'corridor' => $corridor->value,
+            ];
+
+            if ($cityId !== null) {
+                $routeData['city_id'] = $cityId;
+            }
+
             $routes->push(GtfsRoute::updateOrCreate(
-                ['corridor' => $corridor->value],
-                [
-                    'route_id' => $corridor->short(),
-                    'agency_id' => config('workride.gtfs.agency_id'),
-                    'route_short_name' => $corridor->short(),
-                    'route_long_name' => $corridor->label(),
-                    'route_type' => 3,
-                ],
+                ['corridor' => $corridor->value, 'city_id' => $cityId],
+                $routeData,
             ));
         }
 
         return $routes;
     }
 
-    private function catalogStops(): Collection
+    private function catalogStops(?int $cityId = null): Collection
     {
         return GtfsStop::query()
+            ->when($cityId !== null, fn ($q) => $q->where('city_id', $cityId))
             ->orderBy('id')
             ->get()
             ->groupBy('corridor');
@@ -254,7 +269,7 @@ class GtfsService
      *
      * @return array<int, array{label:string,lat:float,lng:float}>
      */
-    private function tripPoints(Trip $trip, Corridor $corridor): array
+    private function tripPoints(Trip $trip, Corridor $corridor, ?int $cityId = null): array
     {
         $points = [];
 
@@ -280,15 +295,18 @@ class GtfsService
             return $points;
         }
 
-        return $this->corridorEndpoints($corridor);
+        return $this->corridorEndpoints($corridor, $cityId);
     }
 
     /**
      * @return array<int, array{label:string,lat:float,lng:float}>
      */
-    private function corridorEndpoints(Corridor $corridor): array
+    private function corridorEndpoints(Corridor $corridor, ?int $cityId = null): array
     {
-        $stops = GtfsStop::where('corridor', $corridor->value)->orderBy('id')->get();
+        $stops = GtfsStop::where('corridor', $corridor->value)
+            ->when($cityId !== null, fn ($q) => $q->where('city_id', $cityId))
+            ->orderBy('id')
+            ->get();
 
         if ($stops->count() < 2) {
             return [
